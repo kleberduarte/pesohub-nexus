@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-50: #fdf2f2;
+  --color-brand-100: #fce4e4;
+  --color-brand-200: #f8c5c5;
+  --color-brand-300: #f39b9b;
+  --color-brand-400: #eb6161;
+  --color-brand-500: #e32626;
+  --color-brand-600: #E30613; /* Ramuza Red */
+  --color-brand-700: #c10510;
+  --color-brand-800: #a0040d;
+  --color-brand-900: #82030b;
+  --color-brand-950: #4a0206;
+}
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light;
+  color: #0f172a;
+  background-color: #f8fafc;
+
+  font-synthetic: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
