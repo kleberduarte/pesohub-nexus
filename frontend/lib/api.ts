@@ -77,11 +77,17 @@ export interface CreateDeviceInput {
   grupoId?: string;
 }
 
+export interface DiscoveredDevice {
+  ip: string;
+  port: number;
+}
+
 export const devicesApi = {
   list: () => request<Device[]>("/devices"),
   create: (data: CreateDeviceInput) =>
     request<Device>("/devices", { method: "POST", body: JSON.stringify(data) }),
   remove: (id: string) => request<void>(`/devices/${id}`, { method: "DELETE" }),
+  discover: () => request<DiscoveredDevice[]>("/devices/discovered"),
 };
 
 // ---------- Products ----------

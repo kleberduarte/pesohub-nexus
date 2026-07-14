@@ -5,6 +5,7 @@ import { DevicesModule } from "./presentation/routes/devices/devices.module";
 import { ProductsModule } from "./presentation/routes/products/products.module";
 import { SyncModule } from "./presentation/routes/sync/sync.module";
 import { AuthModule } from "./presentation/routes/auth/auth.module";
+import { RealtimeModule } from "./infrastructure/realtime/realtime.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { AuthModule } from "./presentation/routes/auth/auth.module";
     DevicesModule,
     ProductsModule,
     SyncModule,
+    RealtimeModule,
   ],
 })
 export class AppModule {}

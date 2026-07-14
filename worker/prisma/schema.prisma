@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DeviceStatus {
+  ONLINE
+  OFFLINE
+  NOT_CONFIGURED
+}
+
+enum SyncJobType {
+  TOTAL
+  INCREMENTAL
+}
+
+enum SyncJobStatus {
+  PENDING
+  IN_PROGRESS
+  SUCCESS
+  ERROR
+}
+
+enum SyncJobItemAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum UserRole {
+  ADMIN
+  OPERADOR
+  VIEWER
+}
+
+model Device {
+  id            String        @id @default(cuid())
+  nome          String
+  ip            String
+  porta         Int           @default(33581)
+  grupoId       String?
+  grupo         DeviceGroup?  @relation(fields: [grupoId], references: [id])
+  status        DeviceStatus  @default(OFFLINE)
+  ultimoAcesso  DateTime?
+  agentId       String?
+  agent         Agent?        @relation(fields: [agentId], references: [id])
+  syncJobs      SyncJob[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model DeviceGroup {
+  id      String   @id @default(cuid())
+  nome    String
+  devices Device[]
+}
+
+model Agent {
+  id               String    @id @default(cuid())
+  token            String    @unique
+  lojaId           String
+  versao           String
+  ultimoHeartbeat  DateTime?
+  devices          Device[]
+  createdAt        DateTime  @default(now())
+}
+
+model Product {
+  id               String          @id @default(cuid())
+  codigo           String          @unique
+  codigoBarras     String          @unique
+  nome             String
+  preco            Decimal         @db.Decimal(10, 2)
+  categoriaImposto String?
+  ativo            Boolean         @default(true)
+  versao           Int             @default(1)
+  syncJobItems     SyncJobItem[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model SyncJob {
+  id           String         @id @default(cuid())
+  deviceId     String
+  device       Device         @relation(fields: [deviceId], references: [id])
+  status       SyncJobStatus  @default(PENDING)
+  tipo         SyncJobType
+  iniciadoEm   DateTime?
+  concluidoEm  DateTime?
+  erro         String?
+  items        SyncJobItem[]
+}
+
+model SyncJobItem {
+  id         String             @id @default(cuid())
+  jobId      String
+  job        SyncJob            @relation(fields: [jobId], references: [id])
+  productId  String
+  product    Product            @relation(fields: [productId], references: [id])
+  acao       SyncJobItemAction
+  status     SyncJobStatus      @default(PENDING)
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  senha     String
+  role      UserRole  @default(OPERADOR)
+  createdAt DateTime  @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  acao      String
+  payload   Json?
+  timestamp DateTime @default(now())
+}
