@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Search, Trash2, Edit2, Wifi, RefreshCw, X } from "lucide-react";
-import { devicesApi, type Device, ApiError } from "../../../lib/api";
+import { devicesApi, type Device, type DiscoveredDevice, ApiError } from "../../../lib/api";
 
 export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -12,6 +12,8 @@ export default function DevicesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [newDevice, setNewDevice] = useState({ nome: "", ip: "", porta: "33581" });
+  const [isScanning, setIsScanning] = useState(false);
+  const [discovered, setDiscovered] = useState<DiscoveredDevice[] | null>(null);
 
   const loadDevices = async () => {
     setLoading(true);
@@ -36,6 +38,31 @@ export default function DevicesPage() {
       await devicesApi.create({ ...newDevice, porta: Number(newDevice.porta) });
       setIsModalOpen(false);
       setNewDevice({ nome: "", ip: "", porta: "33581" });
+      await loadDevices();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível salvar a balança.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleScanNetwork = async () => {
+    setIsScanning(true);
+    setError("");
+    try {
+      setDiscovered(await devicesApi.discover());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível buscar balanças na rede.");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleAddDiscovered = async (device: DiscoveredDevice) => {
+    setSaving(true);
+    try {
+      await devicesApi.create({ nome: `Balança ${device.ip}`, ip: device.ip, porta: device.port });
+      setDiscovered((prev) => prev?.filter((d) => d.ip !== device.ip) ?? null);
       await loadDevices();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível salvar a balança.");
@@ -71,9 +98,13 @@ export default function DevicesPage() {
           />
         </div>
         <div className="flex space-x-3 w-full sm:w-auto">
-          <button className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium">
+          <button
+            onClick={handleScanNetwork}
+            disabled={isScanning}
+            className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
+          >
             <Search className="w-4 h-4 mr-2" />
-            Buscar na Rede
+            {isScanning ? "Buscando..." : "Buscar na Rede"}
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
@@ -87,6 +118,35 @@ export default function DevicesPage() {
 
       {error && (
         <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>
+      )}
+
+      {discovered !== null && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4">
+          <h3 className="text-sm font-semibold text-slate-700 mb-3">Balanças encontradas na rede</h3>
+          {discovered.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nenhuma balança nova encontrada. Verifique se o Agent Local está conectado e se a
+              balança está ligada na rede da loja.
+            </p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {discovered.map((d) => (
+                <li key={d.ip} className="flex items-center justify-between py-2">
+                  <span className="font-mono text-sm text-slate-600">
+                    {d.ip}:{d.port}
+                  </span>
+                  <button
+                    onClick={() => handleAddDiscovered(d)}
+                    disabled={saving}
+                    className="text-sm font-medium text-brand-600 hover:text-brand-700 disabled:opacity-60"
+                  >
+                    Adicionar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">

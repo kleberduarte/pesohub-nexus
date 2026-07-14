@@ -1,0 +1,24 @@
+{
+  "name": "ramuza-nexus-agent-local",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Processo que roda dentro da rede da loja, perto das balanças, e faz a ponte TCP real com o hardware.",
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "start:dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "probe": "ts-node-dev --transpile-only src/probe.ts",
+    "probe:commands": "ts-node-dev --transpile-only src/probe-commands.ts",
+    "probe:udp": "ts-node-dev --transpile-only src/probe-udp.ts"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.12.3",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.3"
+  }
+}

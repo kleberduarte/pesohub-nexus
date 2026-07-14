@@ -4,6 +4,7 @@ import { CreateDeviceUseCase } from "../../../application/usecases/create-device
 import { CreateDeviceDto } from "../../../application/dtos/create-device.dto";
 import { DEVICE_REPOSITORY, DeviceRepository } from "../../../domain/repositories/device.repository";
 import { Inject } from "@nestjs/common";
+import { AgentGateway } from "../../../infrastructure/realtime/agent.gateway";
 
 @ApiTags("devices")
 @Controller("devices")
@@ -11,11 +12,20 @@ export class DevicesController {
   constructor(
     private readonly createDevice: CreateDeviceUseCase,
     @Inject(DEVICE_REPOSITORY) private readonly devices: DeviceRepository,
+    private readonly agentGateway: AgentGateway,
   ) {}
 
   @Get()
   findAll() {
     return this.devices.findAll();
+  }
+
+  @Get("discovered")
+  async findDiscovered() {
+    const discovered = this.agentGateway.getDiscoveredDevices();
+    const registered = await this.devices.findAll();
+    const registeredIps = new Set(registered.map((d) => d.ip));
+    return discovered.filter((d) => !registeredIps.has(d.ip));
   }
 
   @Get(":id")
