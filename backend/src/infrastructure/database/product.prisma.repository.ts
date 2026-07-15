@@ -1,4 +1,5 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "./prisma.service";
 import { Product } from "../../domain/entities/product.entity";
 import { ProductRepository } from "../../domain/repositories/product.repository";
@@ -15,8 +16,15 @@ export class ProductPrismaRepository implements ProductRepository {
     return this.prisma.product.findUnique({ where: { id } }) as unknown as Promise<Product | null>;
   }
 
-  create(data: Omit<Product, "id" | "versao">): Promise<Product> {
-    return this.prisma.product.create({ data }) as unknown as Promise<Product>;
+  async create(data: Omit<Product, "id" | "versao">): Promise<Product> {
+    try {
+      return (await this.prisma.product.create({ data })) as unknown as Product;
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        throw new ConflictException("Já existe um produto com este código de barras.");
+      }
+      throw err;
+    }
   }
 
   update(id: string, data: Partial<Product>): Promise<Product> {
@@ -27,6 +35,16 @@ export class ProductPrismaRepository implements ProductRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.prisma.product.delete({ where: { id } });
+    try {
+      await this.prisma.$transaction([
+        this.prisma.syncJobItem.deleteMany({ where: { productId: id } }),
+        this.prisma.product.delete({ where: { id } }),
+      ]);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+        throw new NotFoundException("Produto não encontrado.");
+      }
+      throw err;
+    }
   }
 }
