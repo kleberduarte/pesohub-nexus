@@ -10,7 +10,8 @@
     "start:dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "probe": "ts-node-dev --transpile-only src/probe.ts",
     "probe:commands": "ts-node-dev --transpile-only src/probe-commands.ts",
-    "probe:udp": "ts-node-dev --transpile-only src/probe-udp.ts"
+    "probe:udp": "ts-node-dev --transpile-only src/probe-udp.ts",
+    "probe:udp:reply": "ts-node-dev --transpile-only src/probe-udp-reply.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
