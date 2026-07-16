@@ -14,5 +14,6 @@ import { RealtimeModule } from "../../../infrastructure/realtime/realtime.module
     LinkDeviceAgentUseCase,
     { provide: DEVICE_REPOSITORY, useClass: DevicePrismaRepository },
   ],
+  exports: [DEVICE_REPOSITORY],
 })
 export class DevicesModule {}
