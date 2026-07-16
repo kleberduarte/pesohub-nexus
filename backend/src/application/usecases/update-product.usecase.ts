@@ -1,28 +1,22 @@
 import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { PRODUCT_REPOSITORY, ProductRepository } from "../../domain/repositories/product.repository";
 import { isValidEan13 } from "../../domain/services/ean13.validator";
-import { CreateProductDto } from "../dtos/create-product.dto";
+import { UpdateProductDto } from "../dtos/update-product.dto";
 import { ProductSyncDispatcher } from "../services/product-sync-dispatcher.service";
 
 @Injectable()
-export class CreateProductUseCase {
+export class UpdateProductUseCase {
   constructor(
     @Inject(PRODUCT_REPOSITORY) private readonly products: ProductRepository,
     private readonly syncDispatcher: ProductSyncDispatcher,
   ) {}
 
-  async execute(dto: CreateProductDto) {
-    if (!isValidEan13(dto.codigoBarras)) {
+  async execute(id: string, dto: UpdateProductDto) {
+    if (dto.codigoBarras && !isValidEan13(dto.codigoBarras)) {
       throw new BadRequestException("Código de barras EAN-13 inválido (dígito verificador incorreto)");
     }
-    const product = await this.products.create({
-      codigo: dto.codigo,
-      codigoBarras: dto.codigoBarras,
-      nome: dto.nome,
-      preco: dto.preco,
-      categoriaImposto: dto.categoriaImposto ?? null,
-      ativo: dto.ativo ?? true,
-    });
+
+    const product = await this.products.update(id, dto);
 
     if (product.ativo) {
       await this.syncDispatcher.syncToLinkedDevices(product.id);
