@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -10,19 +11,43 @@ import {
   CloudUpload,
   Menu,
   Bell,
+  Building2,
+  Users,
 } from "lucide-react";
-import { clearToken } from "../../lib/api";
+import { clearToken, clientesApi, getCurrentUser, type ClienteBranding, type DecodedUser } from "../../lib/api";
+import { applyBranding } from "../../lib/branding";
 
-const navigation = [
+const baseNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Balanças", href: "/devices", icon: Scale },
   { name: "Produtos (PLU)", href: "/products", icon: PackageSearch },
   { name: "Sincronização", href: "/sync", icon: CloudUpload },
+  { name: "Usuários", href: "/usuarios", icon: Users },
 ];
+
+const superadminNavigation = [{ name: "Empresas", href: "/empresas", icon: Building2 }];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [branding, setBranding] = useState<ClienteBranding | null>(null);
+  const [user, setUser] = useState<DecodedUser | null>(null);
+
+  useEffect(() => {
+    setUser(getCurrentUser());
+    clientesApi
+      .branding()
+      .then((data) => {
+        setBranding(data);
+        applyBranding(data);
+      })
+      .catch(() => {
+        // sem tenant resolvido ainda (ex: token expirado) — mantém identidade padrão PesoHub
+      });
+  }, []);
+
+  const navigation =
+    user?.role === "SUPERADMIN" ? [...superadminNavigation, ...baseNavigation] : baseNavigation;
 
   const handleLogout = () => {
     clearToken();
@@ -34,10 +59,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <div className="w-64 bg-brand-50 border-r border-brand-100 flex flex-col h-screen overflow-y-auto">
         <div className="h-16 flex items-center px-6 border-b border-brand-100 shrink-0 sticky top-0 bg-brand-50 z-10">
-          <svg className="w-8 h-8 mr-2" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M50 15 L90 85 L70 85 L50 50 L30 85 L10 85 Z" fill="#E30613" />
-          </svg>
-          <span className="text-2xl font-bold tracking-tight text-brand-950">ramuza</span>
+          <img
+            src={branding?.logoUrl ?? "/pesohub-icon.png"}
+            alt={branding?.nome ?? "PesoHub"}
+            className="w-8 h-8 mr-2 object-contain"
+          />
+          <span className="text-2xl font-bold tracking-tight text-brand-950">
+            {(branding?.nome ?? "PesoHub").toLowerCase()}
+          </span>
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-1">
@@ -80,7 +109,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Menu className="w-6 h-6" />
             </button>
             <h1 className="text-xl font-semibold text-slate-800 ml-4 md:ml-0">
-              {navigation.find((n) => n.href === pathname)?.name || "Ramuza Nexus"}
+              {navigation.find((n) => n.href === pathname)?.name || "PesoHub"}
             </h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -90,9 +119,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
             <div className="flex items-center space-x-3 border-l border-slate-200 pl-4">
               <div className="w-8 h-8 bg-brand-100 text-brand-600 rounded-full flex items-center justify-center font-bold">
-                A
+                {(user?.email ?? "?").charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm font-medium text-slate-700">Admin</span>
+              <span className="text-sm font-medium text-slate-700">{user?.email ?? "Usuário"}</span>
             </div>
           </div>
         </header>

@@ -11,7 +11,7 @@ async function bootstrap() {
   app.setGlobalPrefix("api/v1");
 
   const config = new DocumentBuilder()
-    .setTitle("Ramuza Nexus API")
+    .setTitle("PesoHub API")
     .setDescription("Plataforma de Gestão Remota de Balanças")
     .setVersion("1.0")
     .addBearerAuth()

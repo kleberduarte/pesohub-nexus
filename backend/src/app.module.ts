@@ -6,6 +6,8 @@ import { ProductsModule } from "./presentation/routes/products/products.module";
 import { SyncModule } from "./presentation/routes/sync/sync.module";
 import { AuthModule } from "./presentation/routes/auth/auth.module";
 import { RealtimeModule } from "./infrastructure/realtime/realtime.module";
+import { ClientesModule } from "./presentation/routes/clientes/clientes.module";
+import { UsersModule } from "./presentation/routes/users/users.module";
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { RealtimeModule } from "./infrastructure/realtime/realtime.module";
     ProductsModule,
     SyncModule,
     RealtimeModule,
+    ClientesModule,
+    UsersModule,
   ],
 })
 export class AppModule {}

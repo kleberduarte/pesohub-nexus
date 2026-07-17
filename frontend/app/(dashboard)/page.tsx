@@ -1,16 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Scale, Package, Wifi, WifiOff } from "lucide-react";
-import { devicesApi, productsApi, type Device, ApiError } from "../../lib/api";
+import Link from "next/link";
+import { Scale, Package, Wifi, WifiOff, Building2 } from "lucide-react";
+import { devicesApi, productsApi, getCurrentUser, type Device, ApiError } from "../../lib/api";
 
 export default function DashboardPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [productCount, setProductCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [noCompany, setNoCompany] = useState(false);
 
   useEffect(() => {
+    const user = getCurrentUser();
+    if (!user?.clienteId) {
+      setNoCompany(true);
+      setLoading(false);
+      return;
+    }
+
     Promise.all([devicesApi.list(), productsApi.list()])
       .then(([devicesRes, productsRes]) => {
         setDevices(devicesRes);
@@ -19,6 +28,21 @@ export default function DashboardPage() {
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível carregar o painel."))
       .finally(() => setLoading(false));
   }, []);
+
+  if (noCompany) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-10 text-center">
+        <Building2 className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <p className="text-slate-700 font-medium">Nenhuma empresa selecionada</p>
+        <p className="text-sm text-slate-500 mt-1 mb-4">
+          Escolha uma empresa cadastrada para ver os dados do painel.
+        </p>
+        <Link href="/empresas" className="text-sm font-medium text-brand-600 hover:text-brand-700">
+          Ir para Empresas
+        </Link>
+      </div>
+    );
+  }
 
   const activeDevices = devices.filter((d) => d.status === "ONLINE").length;
   const recentDevices = [...devices]

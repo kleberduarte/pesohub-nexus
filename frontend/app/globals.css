@@ -1,17 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #fdf2f2;
-  --color-brand-100: #fce4e4;
-  --color-brand-200: #f8c5c5;
-  --color-brand-300: #f39b9b;
-  --color-brand-400: #eb6161;
-  --color-brand-500: #e32626;
-  --color-brand-600: #E30613; /* Ramuza Red */
-  --color-brand-700: #c10510;
-  --color-brand-800: #a0040d;
-  --color-brand-900: #82030b;
-  --color-brand-950: #4a0206;
+  /* PesoHub default platform palette — overridden at runtime per tenant via applyBranding() */
+  --color-brand-50: #e6eef7;
+  --color-brand-100: #ccddf0;
+  --color-brand-200: #99bbe0;
+  --color-brand-300: #6699d1;
+  --color-brand-400: #3377c1;
+  --color-brand-500: #1a5da8;
+  --color-brand-600: #004080; /* PesoHub blue */
+  --color-brand-700: #00346a;
+  --color-brand-800: #002953;
+  --color-brand-900: #001d3d;
+  --color-brand-950: #001229;
+
+  --color-accent-500: #00bfa5; /* PesoHub teal */
+  --color-accent-600: #00a690;
 }
 
 :root {

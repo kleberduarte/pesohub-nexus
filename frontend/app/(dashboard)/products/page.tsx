@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Search, Filter, Download, Upload, MoreVertical, X, Save } from "lucide-react";
-import { productsApi, type Product, type CreateProductInput, ApiError } from "../../../lib/api";
+import { productsApi, getCurrentUser, type Product, type CreateProductInput, ApiError } from "../../../lib/api";
 
 const emptyForm: CreateProductInput = {
   codigo: "",
@@ -24,6 +24,11 @@ export default function ProductsPage() {
   const loadProducts = async () => {
     setLoading(true);
     setError("");
+    if (!getCurrentUser()?.clienteId) {
+      setError("Nenhuma empresa selecionada. Escolha uma empresa cadastrada para ver os produtos.");
+      setLoading(false);
+      return;
+    }
     try {
       setProducts(await productsApi.list());
     } catch (err) {

@@ -11,15 +11,15 @@ export class UpdateProductUseCase {
     private readonly syncDispatcher: ProductSyncDispatcher,
   ) {}
 
-  async execute(id: string, dto: UpdateProductDto) {
+  async execute(id: string, clienteId: string, dto: UpdateProductDto) {
     if (dto.codigoBarras && !isValidEan13(dto.codigoBarras)) {
       throw new BadRequestException("Código de barras EAN-13 inválido (dígito verificador incorreto)");
     }
 
-    const product = await this.products.update(id, dto);
+    const product = await this.products.update(id, clienteId, dto);
 
     if (product.ativo) {
-      await this.syncDispatcher.syncToLinkedDevices(product.id);
+      await this.syncDispatcher.syncToLinkedDevices(product.id, clienteId);
     }
 
     return product;

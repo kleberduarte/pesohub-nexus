@@ -1,6 +1,6 @@
 # Agent Local
 
-Processo que roda **dentro da rede da loja**, na mesma sub-rede da balança (ex: `10.10.40.x`), e faz a ponte entre o backend do Ramuza Nexus (que pode estar em outra rede/nuvem) e o hardware.
+Processo que roda **dentro da rede da loja**, na mesma sub-rede da balança (ex: `10.10.40.x`), e faz a ponte entre o backend do PesoHub (que pode estar em outra rede/nuvem) e o hardware.
 
 Não roda em `docker-compose.yml` do projeto principal porque sua localização é física — deve estar instalado numa máquina/servidor dentro da loja, na mesma sub-rede da balança.
 
