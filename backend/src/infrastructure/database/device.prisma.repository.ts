@@ -1,5 +1,4 @@
-import { ConflictException, Injectable } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "./prisma.service";
 import { Device } from "../../domain/entities/device.entity";
 import { DeviceRepository } from "../../domain/repositories/device.repository";
@@ -8,34 +7,35 @@ import { DeviceRepository } from "../../domain/repositories/device.repository";
 export class DevicePrismaRepository implements DeviceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(): Promise<Device[]> {
-    return this.prisma.device.findMany();
+  findAll(clienteId: string): Promise<Device[]> {
+    return this.prisma.device.findMany({ where: { clienteId } });
   }
 
-  findById(id: string): Promise<Device | null> {
-    return this.prisma.device.findUnique({ where: { id } });
+  findById(id: string, clienteId: string): Promise<Device | null> {
+    return this.prisma.device.findFirst({ where: { id, clienteId } });
   }
 
   create(data: Omit<Device, "id">): Promise<Device> {
     return this.prisma.device.create({ data });
   }
 
-  update(id: string, data: Partial<Device>): Promise<Device> {
-    return this.prisma.device.update({ where: { id }, data });
+  async update(id: string, clienteId: string, data: Partial<Device>): Promise<Device> {
+    const result = await this.prisma.device.updateMany({ where: { id, clienteId }, data });
+    if (result.count === 0) {
+      throw new NotFoundException("Balança não encontrada.");
+    }
+    return this.prisma.device.findFirst({ where: { id, clienteId } }) as Promise<Device>;
   }
 
-  async delete(id: string): Promise<void> {
-    try {
-      await this.prisma.$transaction([
-        this.prisma.syncJobItem.deleteMany({ where: { job: { deviceId: id } } }),
-        this.prisma.syncJob.deleteMany({ where: { deviceId: id } }),
-        this.prisma.device.delete({ where: { id } }),
-      ]);
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
-        throw new ConflictException("Balança não encontrada.");
-      }
-      throw err;
+  async delete(id: string, clienteId: string): Promise<void> {
+    const device = await this.prisma.device.findFirst({ where: { id, clienteId } });
+    if (!device) {
+      throw new NotFoundException("Balança não encontrada.");
     }
+    await this.prisma.$transaction([
+      this.prisma.syncJobItem.deleteMany({ where: { job: { deviceId: id } } }),
+      this.prisma.syncJob.deleteMany({ where: { deviceId: id } }),
+      this.prisma.device.delete({ where: { id } }),
+    ]);
   }
 }

@@ -1,5 +1,6 @@
 export class Product {
   id!: string;
+  clienteId!: string;
   codigo!: string;
   codigoBarras!: string;
   nome!: string;

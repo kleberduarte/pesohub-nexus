@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Plus, Search, Trash2, Edit2, Wifi, RefreshCw, X } from "lucide-react";
-import { devicesApi, type Device, type DiscoveredDevice, ApiError } from "../../../lib/api";
+import { devicesApi, getCurrentUser, type Device, type DiscoveredDevice, ApiError } from "../../../lib/api";
 
 export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -18,6 +18,11 @@ export default function DevicesPage() {
   const loadDevices = async () => {
     setLoading(true);
     setError("");
+    if (!getCurrentUser()?.clienteId) {
+      setError("Nenhuma empresa selecionada. Escolha uma empresa cadastrada para ver as balanças.");
+      setLoading(false);
+      return;
+    }
     try {
       setDevices(await devicesApi.list());
     } catch (err) {

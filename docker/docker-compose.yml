@@ -1,21 +1,21 @@
 services:
-  ramuza-frontend:
+  pesohub-frontend:
     build:
       context: ../frontend
     ports:
       - "3001:3001"
     environment:
-      NEXT_PUBLIC_API_URL: http://ramuza-backend:3000/api/v1
+      NEXT_PUBLIC_API_URL: http://pesohub-backend:3000/api/v1
     depends_on:
-      - ramuza-backend
+      - pesohub-backend
 
-  ramuza-backend:
+  pesohub-backend:
     build:
       context: ../backend
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgresql://ramuza:ramuza@postgres:5432/ramuza_nexus?schema=public
+      DATABASE_URL: postgresql://pesohub:pesohub@postgres:5432/pesohub_nexus?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
@@ -23,11 +23,11 @@ services:
       - postgres
       - redis
 
-  ramuza-worker:
+  pesohub-worker:
     build:
       context: ../worker
     environment:
-      DATABASE_URL: postgresql://ramuza:ramuza@postgres:5432/ramuza_nexus?schema=public
+      DATABASE_URL: postgresql://pesohub:pesohub@postgres:5432/pesohub_nexus?schema=public
       REDIS_HOST: redis
       REDIS_PORT: 6379
     depends_on:
@@ -37,9 +37,9 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ramuza
-      POSTGRES_PASSWORD: ramuza
-      POSTGRES_DB: ramuza_nexus
+      POSTGRES_USER: pesohub
+      POSTGRES_PASSWORD: pesohub
+      POSTGRES_DB: pesohub_nexus
     volumes:
       - postgres-data:/var/lib/postgresql/data
     ports:

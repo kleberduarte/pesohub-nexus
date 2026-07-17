@@ -8,12 +8,12 @@ import { ProductRepository } from "../../domain/repositories/product.repository"
 export class ProductPrismaRepository implements ProductRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(): Promise<Product[]> {
-    return this.prisma.product.findMany() as unknown as Promise<Product[]>;
+  findAll(clienteId: string): Promise<Product[]> {
+    return this.prisma.product.findMany({ where: { clienteId } }) as unknown as Promise<Product[]>;
   }
 
-  findById(id: string): Promise<Product | null> {
-    return this.prisma.product.findUnique({ where: { id } }) as unknown as Promise<Product | null>;
+  findById(id: string, clienteId: string): Promise<Product | null> {
+    return this.prisma.product.findFirst({ where: { id, clienteId } }) as unknown as Promise<Product | null>;
   }
 
   async create(data: Omit<Product, "id" | "versao">): Promise<Product> {
@@ -27,24 +27,25 @@ export class ProductPrismaRepository implements ProductRepository {
     }
   }
 
-  update(id: string, data: Partial<Product>): Promise<Product> {
-    return this.prisma.product.update({
-      where: { id },
+  async update(id: string, clienteId: string, data: Partial<Product>): Promise<Product> {
+    const result = await this.prisma.product.updateMany({
+      where: { id, clienteId },
       data: { ...data, versao: { increment: 1 } },
-    }) as unknown as Promise<Product>;
+    });
+    if (result.count === 0) {
+      throw new NotFoundException("Produto não encontrado.");
+    }
+    return this.prisma.product.findFirst({ where: { id, clienteId } }) as unknown as Promise<Product>;
   }
 
-  async delete(id: string): Promise<void> {
-    try {
-      await this.prisma.$transaction([
-        this.prisma.syncJobItem.deleteMany({ where: { productId: id } }),
-        this.prisma.product.delete({ where: { id } }),
-      ]);
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
-        throw new NotFoundException("Produto não encontrado.");
-      }
-      throw err;
+  async delete(id: string, clienteId: string): Promise<void> {
+    const product = await this.prisma.product.findFirst({ where: { id, clienteId } });
+    if (!product) {
+      throw new NotFoundException("Produto não encontrado.");
     }
+    await this.prisma.$transaction([
+      this.prisma.syncJobItem.deleteMany({ where: { productId: id } }),
+      this.prisma.product.delete({ where: { id } }),
+    ]);
   }
 }

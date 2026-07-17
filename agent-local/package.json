@@ -1,5 +1,5 @@
 {
-  "name": "ramuza-nexus-agent-local",
+  "name": "pesohub-agent-local",
   "private": true,
   "version": "0.1.0",
   "description": "Processo que roda dentro da rede da loja, perto das balanças, e faz a ponte TCP real com o hardware.",

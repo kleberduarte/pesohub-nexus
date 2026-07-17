@@ -32,85 +32,122 @@ enum SyncJobItemAction {
 }
 
 enum UserRole {
+  SUPERADMIN
   ADMIN
   OPERADOR
   VIEWER
 }
 
+model Cliente {
+  id              String        @id @default(cuid())
+  nome            String
+  logoUrl         String?
+  corPrimaria     String?
+  corSecundaria   String?
+  corFundo        String?
+  corTexto        String?
+  corBotao        String?
+  corBotaoTexto   String?
+  tagline         String?
+  chavePix        String?
+  suporteEmail    String?
+  suporteWhatsapp String?
+  isDefault       Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  devices         Device[]
+  deviceGroups    DeviceGroup[]
+  agents          Agent[]
+  products        Product[]
+  users           User[]
+}
+
 model Device {
-  id            String        @id @default(cuid())
-  nome          String
-  ip            String
-  porta         Int           @default(33581)
-  grupoId       String?
-  grupo         DeviceGroup?  @relation(fields: [grupoId], references: [id])
-  status        DeviceStatus  @default(OFFLINE)
-  ultimoAcesso  DateTime?
-  agentId       String?
-  agent         Agent?        @relation(fields: [agentId], references: [id])
-  syncJobs      SyncJob[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id           String       @id @default(cuid())
+  clienteId    String
+  cliente      Cliente      @relation(fields: [clienteId], references: [id])
+  nome         String
+  ip           String
+  porta        Int          @default(33581)
+  grupoId      String?
+  grupo        DeviceGroup? @relation(fields: [grupoId], references: [id])
+  status       DeviceStatus @default(OFFLINE)
+  ultimoAcesso DateTime?
+  agentId      String?
+  agent        Agent?       @relation(fields: [agentId], references: [id])
+  syncJobs     SyncJob[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model DeviceGroup {
-  id      String   @id @default(cuid())
-  nome    String
-  devices Device[]
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  nome      String
+  devices   Device[]
 }
 
 model Agent {
-  id               String    @id @default(cuid())
-  token            String    @unique
-  lojaId           String
-  versao           String
-  ultimoHeartbeat  DateTime?
-  devices          Device[]
-  createdAt        DateTime  @default(now())
+  id              String    @id @default(cuid())
+  clienteId       String
+  cliente         Cliente   @relation(fields: [clienteId], references: [id])
+  token           String    @unique
+  lojaId          String
+  versao          String
+  ultimoHeartbeat DateTime?
+  devices         Device[]
+  createdAt       DateTime  @default(now())
 }
 
 model Product {
-  id               String          @id @default(cuid())
-  codigo           String          @unique
-  codigoBarras     String          @unique
+  id               String        @id @default(cuid())
+  clienteId        String
+  cliente          Cliente       @relation(fields: [clienteId], references: [id])
+  codigo           String
+  codigoBarras     String
   nome             String
-  preco            Decimal         @db.Decimal(10, 2)
+  preco            Decimal       @db.Decimal(10, 2)
   categoriaImposto String?
-  ativo            Boolean         @default(true)
-  versao           Int             @default(1)
+  ativo            Boolean       @default(true)
+  versao           Int           @default(1)
   syncJobItems     SyncJobItem[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([clienteId, codigo])
+  @@unique([clienteId, codigoBarras])
 }
 
 model SyncJob {
-  id           String         @id @default(cuid())
-  deviceId     String
-  device       Device         @relation(fields: [deviceId], references: [id])
-  status       SyncJobStatus  @default(PENDING)
-  tipo         SyncJobType
-  iniciadoEm   DateTime?
-  concluidoEm  DateTime?
-  erro         String?
-  items        SyncJobItem[]
+  id          String        @id @default(cuid())
+  deviceId    String
+  device      Device        @relation(fields: [deviceId], references: [id])
+  status      SyncJobStatus @default(PENDING)
+  tipo        SyncJobType
+  iniciadoEm  DateTime?
+  concluidoEm DateTime?
+  erro        String?
+  items       SyncJobItem[]
 }
 
 model SyncJobItem {
-  id         String             @id @default(cuid())
-  jobId      String
-  job        SyncJob            @relation(fields: [jobId], references: [id])
-  productId  String
-  product    Product            @relation(fields: [productId], references: [id])
-  acao       SyncJobItemAction
-  status     SyncJobStatus      @default(PENDING)
+  id        String            @id @default(cuid())
+  jobId     String
+  job       SyncJob           @relation(fields: [jobId], references: [id])
+  productId String
+  product   Product           @relation(fields: [productId], references: [id])
+  acao      SyncJobItemAction
+  status    SyncJobStatus     @default(PENDING)
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
+  id        String   @id @default(cuid())
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
+  email     String   @unique
   senha     String
-  role      UserRole  @default(OPERADOR)
-  createdAt DateTime  @default(now())
+  role      UserRole @default(OPERADOR)
+  createdAt DateTime @default(now())
 }
 
 model AuditLog {

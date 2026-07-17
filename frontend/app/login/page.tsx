@@ -6,7 +6,7 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { login, setToken, ApiError } from "../../lib/api";
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("admin@ramuza.com.br");
+  const [email, setEmail] = useState("admin@pesohub.com.br");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
@@ -32,10 +32,12 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       {/* Logo */}
       <div className="mb-8 flex flex-col items-center">
-        <svg className="w-16 h-16 mb-2" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M50 15 L90 85 L70 85 L50 50 L30 85 L10 85 Z" fill="#E30613" />
-        </svg>
-        <span className="text-3xl font-bold tracking-tight text-slate-800">ramuza</span>
+        <img src="/pesohub-icon.png" alt="PesoHub" className="w-16 h-16 mb-2" />
+        <span className="text-3xl font-bold tracking-tight">
+          <span className="text-brand-600">PESO</span>
+          <span className="text-accent-500">HUB</span>
+        </span>
+        <span className="text-sm text-slate-500 mt-1">Conectando dados, pesando o futuro</span>
       </div>
 
       {/* Login Card */}

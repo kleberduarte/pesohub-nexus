@@ -16,8 +16,8 @@ export class ProductSyncDispatcher {
     @InjectQueue("sync-jobs") private readonly syncQueue: Queue,
   ) {}
 
-  async syncToLinkedDevices(productId: string): Promise<void> {
-    const devices = await this.devices.findAll();
+  async syncToLinkedDevices(productId: string, clienteId: string): Promise<void> {
+    const devices = await this.devices.findAll(clienteId);
     const linkedDevices = devices.filter((device) => !!device.agentId);
 
     if (linkedDevices.length === 0) {
