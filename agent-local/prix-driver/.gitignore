@@ -1,0 +1,5 @@
+# DLLs proprietárias da Toledo — nunca versionar, ver lib/README.md
+lib/*.dll
+
+# Artefatos de build
+bin/

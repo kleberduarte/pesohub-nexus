@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateProductUseCase } from "../../../application/usecases/create-product.usecase";
@@ -7,6 +7,9 @@ import { CreateProductDto } from "../../../application/dtos/create-product.dto";
 import { UpdateProductDto } from "../../../application/dtos/update-product.dto";
 import { PRODUCT_REPOSITORY, ProductRepository } from "../../../domain/repositories/product.repository";
 import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
+import { RolesGuard } from "../../middleware/roles.guard";
+import { Roles } from "../../middleware/roles.decorator";
+import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 
 @ApiTags("products")
 @UseGuards(JwtAuthGuard)
@@ -16,6 +19,7 @@ export class ProductsController {
     private readonly createProduct: CreateProductUseCase,
     private readonly updateProduct: UpdateProductUseCase,
     @Inject(PRODUCT_REPOSITORY) private readonly products: ProductRepository,
+    private readonly auditLog: AuditLogService,
   ) {}
 
   @Get()
@@ -38,7 +42,18 @@ export class ProductsController {
     return this.updateProduct.execute(id, this.clienteId(req), dto);
   }
 
+  @Delete()
+  @UseGuards(RolesGuard)
+  @Roles("ADMIN", "SUPERADMIN")
+  async removeAll(@Req() req: Request) {
+    const clienteId = this.clienteId(req);
+    const count = await this.products.deleteAll(clienteId);
+    await this.auditLog.record(req, "products.delete_all", { count });
+    return { deleted: count };
+  }
+
   @Delete(":id")
+  @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
     return this.products.delete(id, this.clienteId(req));
   }

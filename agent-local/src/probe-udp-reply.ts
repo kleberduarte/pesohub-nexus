@@ -35,7 +35,7 @@ sock.on("message", async (msg, rinfo) => {
   console.log(hexdump(msg));
 
   // Descobre o IP local desta máquina para montar uma resposta plausível
-  const localIp = (sock.address() as dgram.AddressInfo).address;
+  const localIp = sock.address().address;
   replyCandidates[3].bytes = Buffer.from(`UDP\t${localIp}\t3000\t\r\n`, "ascii");
 
   for (const candidate of replyCandidates) {

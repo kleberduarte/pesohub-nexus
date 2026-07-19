@@ -11,14 +11,29 @@
     "probe": "ts-node-dev --transpile-only src/probe.ts",
     "probe:commands": "ts-node-dev --transpile-only src/probe-commands.ts",
     "probe:udp": "ts-node-dev --transpile-only src/probe-udp.ts",
-    "probe:udp:reply": "ts-node-dev --transpile-only src/probe-udp-reply.ts"
+    "probe:udp:reply": "ts-node-dev --transpile-only src/probe-udp-reply.ts",
+    "fake-scale": "ts-node-dev --transpile-only src/fake-scale.ts",
+    "test": "jest",
+    "package:installer": "npm run build && pkg . --targets node22-win-x64 --output installer/bin/agent-local.exe && node installer/pack.js"
+  },
+  "bin": "dist/index.js",
+  "pkg": {
+    "assets": [],
+    "targets": [
+      "node22-win-x64"
+    ]
   },
   "dependencies": {
     "dotenv": "^16.4.7",
     "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.12.3",
+    "@yao-pkg/pkg": "^6.21.0",
+    "archiver": "^7.0.1",
+    "jest": "^30.4.2",
+    "ts-jest": "^29.4.11",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.3"
   }

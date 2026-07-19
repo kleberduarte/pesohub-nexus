@@ -10,6 +10,7 @@ import {
   type ClienteParametros,
   type UpdateClienteParametrosInput,
 } from "../../../lib/api";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 
 const HEX6 = /^#[0-9A-Fa-f]{6}$/;
 const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -52,6 +53,7 @@ export default function EmpresasPage() {
   const [newNome, setNewNome] = useState("");
   const [creating, setCreating] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ClienteParametros | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
@@ -63,6 +65,8 @@ export default function EmpresasPage() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [pendingSwitchId, setPendingSwitchId] = useState<string | null>(null);
+  const [confirmRestoreOpen, setConfirmRestoreOpen] = useState(false);
 
   const loadEmpresas = () =>
     clientesApi
@@ -109,11 +113,7 @@ export default function EmpresasPage() {
   const defaultCompany = empresas.find((e) => e.isDefault) ?? null;
   const canRestore = !!defaultCompany && !!activeCompanyId && activeCompanyId !== defaultCompany.id;
 
-  const handleSelect = async (id: string) => {
-    if (id === activeCompanyId) return;
-    if (hasUnsavedChanges && !window.confirm("Existem alterações não salvas. Deseja trocar de empresa e descartá-las?")) {
-      return;
-    }
+  const doSwitch = async (id: string) => {
     setSwitchingId(id);
     setListError("");
     try {
@@ -123,6 +123,15 @@ export default function EmpresasPage() {
       setListError(err instanceof ApiError ? err.message : "Não foi possível entrar nessa empresa.");
       setSwitchingId(null);
     }
+  };
+
+  const handleSelect = (id: string) => {
+    if (id === activeCompanyId) return;
+    if (hasUnsavedChanges) {
+      setPendingSwitchId(id);
+      return;
+    }
+    void doSwitch(id);
   };
 
   const handleCreate = async () => {
@@ -178,15 +187,14 @@ export default function EmpresasPage() {
     return e;
   }
 
-  const handleRestore = async () => {
+  const handleRestore = () => {
     if (!defaultCompany) return;
-    if (
-      !window.confirm(
-        `Isso vai trocar a empresa ativa de volta para "${defaultCompany.nome}" (empresa padrão). Os dados de ${activeCompany?.nome ?? "esta empresa"} não são alterados. Continuar?`,
-      )
-    ) {
-      return;
-    }
+    setConfirmRestoreOpen(true);
+  };
+
+  const doRestore = async () => {
+    if (!defaultCompany) return;
+    setConfirmRestoreOpen(false);
     setRestoring(true);
     setListError("");
     try {
@@ -380,6 +388,38 @@ export default function EmpresasPage() {
             </p>
           </div>
 
+          {activeCompany?.accessToken && (
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Link de acesso exclusivo da empresa
+              </label>
+              <p className="text-xs text-slate-500 mb-2">
+                Compartilhe este link com os usuários desta empresa: a tela de login já mostra a marca deles antes
+                de entrar, sem precisar de sessão prévia.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={`${typeof window !== "undefined" ? window.location.origin : ""}/acesso/${activeCompany.accessToken}`}
+                  className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      `${window.location.origin}/acesso/${activeCompany.accessToken}`,
+                    );
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  }}
+                  className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors shrink-0"
+                >
+                  {linkCopied ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {formLoading && <p className="text-sm text-slate-500">Carregando parâmetros...</p>}
 
           {!formLoading && form && (
@@ -553,34 +593,50 @@ export default function EmpresasPage() {
         </section>
       )}
 
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">Excluir empresa</h3>
-            <p className="text-sm text-slate-600 mb-6">
-              Tem certeza que deseja excluir <strong>{deleteTarget.nome}</strong>? Esta ação é irreversível.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={deleting}
-                onClick={() => void confirmDelete()}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-60"
-              >
-                {deleting ? "Excluindo..." : "Sim, excluir"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Excluir empresa"
+        message={
+          <>
+            Tem certeza que deseja excluir <strong>{deleteTarget?.nome}</strong>? Esta ação é irreversível.
+          </>
+        }
+        confirmLabel="Sim, excluir"
+        danger
+        loading={deleting}
+        onConfirm={() => void confirmDelete()}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={!!pendingSwitchId}
+        title="Alterações não salvas"
+        message="Existem alterações não salvas. Deseja trocar de empresa e descartá-las?"
+        confirmLabel="Trocar e descartar"
+        danger
+        loading={!!switchingId}
+        onConfirm={() => {
+          const id = pendingSwitchId;
+          setPendingSwitchId(null);
+          if (id) void doSwitch(id);
+        }}
+        onCancel={() => setPendingSwitchId(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmRestoreOpen}
+        title="Restaurar empresa padrão"
+        message={
+          <>
+            Isso vai trocar a empresa ativa de volta para <strong>{defaultCompany?.nome}</strong> (empresa
+            padrão). Os dados de {activeCompany?.nome ?? "esta empresa"} não são alterados. Continuar?
+          </>
+        }
+        confirmLabel="Restaurar"
+        loading={restoring}
+        onConfirm={() => void doRestore()}
+        onCancel={() => setConfirmRestoreOpen(false)}
+      />
     </div>
   );
 }

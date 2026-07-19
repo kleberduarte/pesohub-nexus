@@ -52,3 +52,11 @@ export function applyBranding(branding: Pick<Branding, "corPrimaria">) {
     root.setProperty(`--color-brand-${step}`, scale[step]);
   }
 }
+
+export function resetBranding() {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement.style;
+  for (const step of SHADE_STEPS) {
+    root.removeProperty(`--color-brand-${step}`);
+  }
+}
