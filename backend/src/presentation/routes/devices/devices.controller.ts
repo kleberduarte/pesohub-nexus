@@ -1,9 +1,10 @@
-import { Body, Controller, Delete, Get, Inject, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateDeviceUseCase } from "../../../application/usecases/create-device.usecase";
 import { LinkDeviceAgentUseCase } from "../../../application/usecases/link-device-agent.usecase";
 import { CreateDeviceDto } from "../../../application/dtos/create-device.dto";
+import { UpdateDeviceDto } from "../../../application/dtos/update-device.dto";
 import { LinkAgentDto } from "../../../application/dtos/link-agent.dto";
 import { DEVICE_REPOSITORY, DeviceRepository } from "../../../domain/repositories/device.repository";
 import { AgentGateway } from "../../../infrastructure/realtime/agent.gateway";
@@ -43,7 +44,13 @@ export class DevicesController {
     return this.createDevice.execute(this.clienteId(req), dto);
   }
 
+  @Patch(":id")
+  update(@Param("id") id: string, @Body() dto: UpdateDeviceDto, @Req() req: Request) {
+    return this.devices.update(id, this.clienteId(req), dto);
+  }
+
   @Delete(":id")
+  @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
     return this.devices.delete(id, this.clienteId(req));
   }

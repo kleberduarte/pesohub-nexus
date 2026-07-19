@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CloudUpload, CheckCircle2, XCircle, Clock } from "lucide-react";
-import { devicesApi, syncApi, type Device, ApiError } from "../../../lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { CloudUpload, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { devicesApi, syncApi, type Device, type SyncJob, ApiError } from "../../../lib/api";
+
+interface HistoryEntry extends SyncJob {
+  deviceNome: string;
+}
 
 export default function SyncPage() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -11,13 +15,39 @@ export default function SyncPage() {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+
+  const loadHistory = useCallback(async (deviceList: Device[]) => {
+    setLoadingHistory(true);
+    try {
+      const results = await Promise.all(
+        deviceList.map(async (d) => {
+          const { jobs } = await syncApi.status(d.id);
+          return jobs.map((j) => ({ ...j, deviceNome: d.nome }));
+        }),
+      );
+      const merged = results
+        .flat()
+        .sort((a, b) => (b.iniciadoEm ?? "").localeCompare(a.iniciadoEm ?? ""))
+        .slice(0, 30);
+      setHistory(merged);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível carregar o histórico de sincronização.");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
 
   useEffect(() => {
     devicesApi
       .list()
-      .then(setDevices)
+      .then((list) => {
+        setDevices(list);
+        loadHistory(list);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível carregar as balanças."));
-  }, []);
+  }, [loadHistory]);
 
   const handleStartSync = async () => {
     setStarting(true);
@@ -27,6 +57,7 @@ export default function SyncPage() {
       const deviceIds = selectedDeviceId === "all" ? devices.map((d) => d.id) : [selectedDeviceId];
       const result = await syncApi.create({ deviceIds, tipo });
       setMessage(`${result.queued.length} job(s) de sincronização enfileirado(s) com sucesso.`);
+      setTimeout(() => loadHistory(devices), 2000);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível iniciar a sincronização.");
     } finally {
@@ -123,41 +154,67 @@ export default function SyncPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {([] as { id: string; target: string; items: string; date: string; time: string; status: string }[]).map((item) => (
-                <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-slate-600">
-                    <div className="flex items-center">
-                      <CloudUpload className="w-4 h-4 text-brand-500 mr-2" />
-                      <span className="font-medium text-slate-700">{item.target}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-slate-500">{item.items}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center text-slate-500">
-                      <Clock className="w-4 h-4 mr-1.5" />
-                      {item.date} às {item.time}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {item.status === "success" ? (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
-                        <CheckCircle2 className="w-3 h-3 mr-1.5" />
-                        Concluído
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">
-                        <XCircle className="w-3 h-3 mr-1.5" />
-                        Erro (retry automático)
-                      </span>
-                    )}
+              {loadingHistory && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                    <Loader2 className="w-4 h-4 animate-spin inline mr-2" />
+                    Carregando histórico...
                   </td>
                 </tr>
-              ))}
-              <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                  Histórico de sincronização será exibido aqui assim que a persistência de SyncJob estiver implementada no backend.
-                </td>
-              </tr>
+              )}
+              {!loadingHistory &&
+                history.map((job) => {
+                  const dt = job.iniciadoEm ? new Date(job.iniciadoEm) : null;
+                  return (
+                    <tr key={job.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 text-slate-600">
+                        <div className="flex items-center">
+                          <CloudUpload className="w-4 h-4 text-brand-500 mr-2" />
+                          <span className="font-medium text-slate-700">{job.deviceNome}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500">
+                        {job.items.length} item(ns) — {job.tipo === "TOTAL" ? "Total" : "Incremental"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center text-slate-500">
+                          <Clock className="w-4 h-4 mr-1.5" />
+                          {dt ? `${dt.toLocaleDateString()} às ${dt.toLocaleTimeString()}` : "-"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {job.status === "SUCCESS" && (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                            <CheckCircle2 className="w-3 h-3 mr-1.5" />
+                            Concluído
+                          </span>
+                        )}
+                        {job.status === "ERROR" && (
+                          <span
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700"
+                            title={job.erro ?? undefined}
+                          >
+                            <XCircle className="w-3 h-3 mr-1.5" />
+                            Erro (retry automático)
+                          </span>
+                        )}
+                        {(job.status === "PENDING" || job.status === "IN_PROGRESS") && (
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700">
+                            <Loader2 className="w-3 h-3 mr-1.5 animate-spin" />
+                            Em andamento
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              {!loadingHistory && history.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                    Nenhuma sincronização registrada ainda.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

@@ -23,6 +23,7 @@ import { UpdateClienteParametrosDto } from "../../../application/dtos/update-cli
 
 const CLIENTE_SELECT = {
   id: true,
+  accessToken: true,
   nome: true,
   logoUrl: true,
   corPrimaria: true,
@@ -106,7 +107,15 @@ export class ClientesController {
     const clienteId = (req as unknown as { user: { clienteId: string } }).user.clienteId;
     return this.prisma.cliente.findUniqueOrThrow({
       where: { id: clienteId },
-      select: { id: true, nome: true, logoUrl: true, corPrimaria: true, corSecundaria: true, tagline: true },
+      select: {
+        id: true,
+        nome: true,
+        logoUrl: true,
+        corPrimaria: true,
+        corSecundaria: true,
+        tagline: true,
+        accessToken: true,
+      },
     });
   }
 

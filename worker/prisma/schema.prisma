@@ -32,85 +32,401 @@ enum SyncJobItemAction {
 }
 
 enum UserRole {
+  SUPERADMIN
   ADMIN
   OPERADOR
   VIEWER
 }
 
+enum UnidadeVenda {
+  PESO
+  PECA
+}
+
+enum NutrienteUnidade {
+  KCAL_KJ
+  G
+  MG
+  MCG
+}
+
+enum CodigoBarrasTipo {
+  EAN13
+  EAN128
+}
+
+model Cliente {
+  id                   String                @id @default(cuid())
+  accessToken          String                @unique @default(cuid())
+  nome                 String
+  logoUrl              String?
+  corPrimaria          String?
+  corSecundaria        String?
+  corFundo             String?
+  corTexto             String?
+  corBotao             String?
+  corBotaoTexto        String?
+  tagline              String?
+  chavePix             String?
+  suporteEmail         String?
+  suporteWhatsapp      String?
+  isDefault            Boolean               @default(false)
+  createdAt            DateTime              @default(now())
+  devices              Device[]
+  deviceGroups         DeviceGroup[]
+  agents               Agent[]
+  products             Product[]
+  users                User[]
+  activeForUsers       User[]                @relation("UserActiveCliente")
+  setores              Setor[]
+  subSetores           SubSetor[]
+  fornecedores         Fornecedor[]
+  alergicos            Alergico[]
+  tabelasNutricionais  TabelaNutricional[]
+  operadores           Operador[]
+  imagens              Imagem[]
+  formatosImpressao    FormatoImpressao[]
+  codigosBarrasFormato CodigoBarrasFormato[]
+  textosGlobais        TextoGlobal[]
+  teclasAcessoRapido   TeclaAcessoRapido[]
+  specParametros       SpecParametro[]
+  configuracaoAvancada ConfiguracaoAvancada?
+}
+
 model Device {
-  id            String        @id @default(cuid())
-  nome          String
-  ip            String
-  porta         Int           @default(33581)
-  grupoId       String?
-  grupo         DeviceGroup?  @relation(fields: [grupoId], references: [id])
-  status        DeviceStatus  @default(OFFLINE)
-  ultimoAcesso  DateTime?
-  agentId       String?
-  agent         Agent?        @relation(fields: [agentId], references: [id])
-  syncJobs      SyncJob[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id           String       @id @default(cuid())
+  clienteId    String
+  cliente      Cliente      @relation(fields: [clienteId], references: [id])
+  nome         String
+  ip           String
+  porta        Int          @default(33581)
+  grupoId      String?
+  grupo        DeviceGroup? @relation(fields: [grupoId], references: [id])
+  status       DeviceStatus @default(OFFLINE)
+  ultimoAcesso DateTime?
+  agentId      String?
+  agent        Agent?       @relation(fields: [agentId], references: [id])
+  syncJobs     SyncJob[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 }
 
 model DeviceGroup {
-  id      String   @id @default(cuid())
-  nome    String
-  devices Device[]
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  nome      String
+  devices   Device[]
 }
 
 model Agent {
-  id               String    @id @default(cuid())
-  token            String    @unique
-  lojaId           String
-  versao           String
-  ultimoHeartbeat  DateTime?
-  devices          Device[]
-  createdAt        DateTime  @default(now())
+  id              String    @id @default(cuid())
+  clienteId       String
+  cliente         Cliente   @relation(fields: [clienteId], references: [id])
+  token           String    @unique
+  lojaId          String
+  versao          String
+  ultimoHeartbeat DateTime?
+  devices         Device[]
+  createdAt       DateTime  @default(now())
+}
+
+model Setor {
+  id         String     @id @default(cuid())
+  clienteId  String
+  cliente    Cliente    @relation(fields: [clienteId], references: [id])
+  numero     Int
+  nome       String
+  subSetores SubSetor[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model SubSetor {
+  id                    String               @id @default(cuid())
+  clienteId             String
+  cliente               Cliente              @relation(fields: [clienteId], references: [id])
+  numero                Int
+  nome                  String
+  setorId               String
+  setor                 Setor                @relation(fields: [setorId], references: [id])
+  formatoImpressaoId    String?
+  formatoImpressao      FormatoImpressao?    @relation(fields: [formatoImpressaoId], references: [id])
+  codigoBarrasFormatoId String?
+  codigoBarrasFormato   CodigoBarrasFormato? @relation(fields: [codigoBarrasFormatoId], references: [id])
+  bandeiraCodigoBarras  Int?
+  products              Product[]
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model Fornecedor {
+  id         String    @id @default(cuid())
+  clienteId  String
+  cliente    Cliente   @relation(fields: [clienteId], references: [id])
+  numero     Int
+  nome       String
+  informacao String?
+  products   Product[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model Alergico {
+  id         String    @id @default(cuid())
+  clienteId  String
+  cliente    Cliente   @relation(fields: [clienteId], references: [id])
+  numero     Int
+  nome       String
+  informacao String?
+  products   Product[]
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model TabelaNutricional {
+  id        String                  @id @default(cuid())
+  clienteId String
+  cliente   Cliente                 @relation(fields: [clienteId], references: [id])
+  numero    Int
+  nome      String
+  porcao    String?
+  itens     TabelaNutricionalItem[]
+  products  Product[]
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model TabelaNutricionalItem {
+  id          String            @id @default(cuid())
+  tabelaId    String
+  tabela      TabelaNutricional @relation(fields: [tabelaId], references: [id])
+  ordem       Int
+  ingrediente String
+  unidade     NutrienteUnidade
+  valor       Decimal           @db.Decimal(10, 2)
+  porcentagem Decimal           @db.Decimal(5, 2)
+}
+
+model Operador {
+  id         String   @id @default(cuid())
+  clienteId  String
+  cliente    Cliente  @relation(fields: [clienteId], references: [id])
+  numero     Int
+  nome       String
+  senha      String
+  codigo     String?
+  permissoes Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model Imagem {
+  id        String    @id @default(cuid())
+  clienteId String
+  cliente   Cliente   @relation(fields: [clienteId], references: [id])
+  nome      String
+  url       String
+  larguraMm Decimal?  @db.Decimal(6, 2)
+  alturaMm  Decimal?  @db.Decimal(6, 2)
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model FormatoImpressao {
+  id         String     @id @default(cuid())
+  clienteId  String
+  cliente    Cliente    @relation(fields: [clienteId], references: [id])
+  numero     Int
+  nome       String
+  tipo       Int        @default(1)
+  larguraMm  Int
+  alturaMm   Int
+  layout     Json?
+  subSetores SubSetor[]
+  products   Product[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model CodigoBarrasFormato {
+  id          String           @id @default(cuid())
+  clienteId   String
+  cliente     Cliente          @relation(fields: [clienteId], references: [id])
+  numero      Int
+  nome        String
+  tipo        CodigoBarrasTipo @default(EAN13)
+  verificador Int              @default(0)
+  constante1  Int?
+  constante2  Int?
+  detalhes    Json?
+  subSetores  SubSetor[]
+  products    Product[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model TextoGlobal {
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  indice    Int
+  texto     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clienteId, indice])
+}
+
+model TeclaAcessoRapido {
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  nome      String
+  modelo    String
+  pagina    String
+  layout    Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SpecParametro {
+  id        String   @id @default(cuid())
+  clienteId String
+  cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  numero    Int
+  valor     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clienteId, numero])
+}
+
+model ConfiguracaoAvancada {
+  id                   String   @id @default(cuid())
+  clienteId            String   @unique
+  cliente              Cliente  @relation(fields: [clienteId], references: [id])
+  menusHabilitados     Json?
+  funcaoPluPermitir    Json?
+  fonteExibicao        String?
+  formatoDataHora      String?
+  excluirRegistrosDias Int?
+  importacaoPluCampos  Json?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model Product {
-  id               String          @id @default(cuid())
-  codigo           String          @unique
-  codigoBarras     String          @unique
+  id               String        @id @default(cuid())
+  clienteId        String
+  cliente          Cliente       @relation(fields: [clienteId], references: [id])
+  codigo           String
+  codigoBarras     String
   nome             String
-  preco            Decimal         @db.Decimal(10, 2)
+  preco            Decimal       @db.Decimal(10, 2)
   categoriaImposto String?
-  ativo            Boolean         @default(true)
-  versao           Int             @default(1)
+  ativo            Boolean       @default(true)
+  versao           Int           @default(1)
   syncJobItems     SyncJobItem[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+
+  lote         String?
+  unidadeVenda UnidadeVenda @default(PESO)
+  tara         Decimal?     @db.Decimal(10, 3)
+  taraPorCento Boolean      @default(false)
+  pesoFixo     Boolean      @default(false)
+  desconto     Decimal?     @db.Decimal(10, 2)
+  modoEspecial Int          @default(0)
+
+  subSetorId            String?
+  subSetor              SubSetor?            @relation(fields: [subSetorId], references: [id])
+  tabelaNutricionalId   String?
+  tabelaNutricional     TabelaNutricional?   @relation(fields: [tabelaNutricionalId], references: [id])
+  fornecedorId          String?
+  fornecedor            Fornecedor?          @relation(fields: [fornecedorId], references: [id])
+  alergicoId            String?
+  alergico              Alergico?            @relation(fields: [alergicoId], references: [id])
+  imagemId              String?
+  imagem                Imagem?              @relation(fields: [imagemId], references: [id])
+  formatoImpressaoId    String?
+  formatoImpressao      FormatoImpressao?    @relation(fields: [formatoImpressaoId], references: [id])
+  codigoBarrasFormatoId String?
+  codigoBarrasFormato   CodigoBarrasFormato? @relation(fields: [codigoBarrasFormatoId], references: [id])
+  bandeiraCodigoBarras  Int?
+
+  textoExtra1 String?
+  textoExtra2 String?
+  textoExtra3 String?
+  textoExtra4 String?
+  textoExtra5 String?
+  textoExtra6 String?
+  textoExtra7 String?
+
+  diasDeVenda         Int?
+  tempoDeVenda        Int?
+  validadePacote      Int?
+  validadePacoteHoras Int?
+  validadeDias        Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([clienteId, codigo])
+  @@unique([clienteId, codigoBarras])
 }
 
 model SyncJob {
-  id           String         @id @default(cuid())
-  deviceId     String
-  device       Device         @relation(fields: [deviceId], references: [id])
-  status       SyncJobStatus  @default(PENDING)
-  tipo         SyncJobType
-  iniciadoEm   DateTime?
-  concluidoEm  DateTime?
-  erro         String?
-  items        SyncJobItem[]
+  id          String        @id @default(cuid())
+  deviceId    String
+  device      Device        @relation(fields: [deviceId], references: [id])
+  status      SyncJobStatus @default(PENDING)
+  tipo        SyncJobType
+  iniciadoEm  DateTime?
+  concluidoEm DateTime?
+  erro        String?
+  items       SyncJobItem[]
 }
 
 model SyncJobItem {
-  id         String             @id @default(cuid())
-  jobId      String
-  job        SyncJob            @relation(fields: [jobId], references: [id])
-  productId  String
-  product    Product            @relation(fields: [productId], references: [id])
-  acao       SyncJobItemAction
-  status     SyncJobStatus      @default(PENDING)
+  id        String            @id @default(cuid())
+  jobId     String
+  job       SyncJob           @relation(fields: [jobId], references: [id])
+  productId String
+  product   Product           @relation(fields: [productId], references: [id])
+  acao      SyncJobItemAction
+  status    SyncJobStatus     @default(PENDING)
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  senha     String
-  role      UserRole  @default(OPERADOR)
-  createdAt DateTime  @default(now())
+  id              String   @id @default(cuid())
+  clienteId       String?
+  cliente         Cliente? @relation(fields: [clienteId], references: [id])
+  /// Última empresa selecionada via "trocar de empresa" (só usado por SUPERADMIN).
+  /// Persistido para que a sessão volte pra mesma empresa após logout/login —
+  /// sem isso, o token de login sempre reconstrói a partir de `clienteId` (null
+  /// pro SUPERADMIN), perdendo a troca feita em sessões anteriores.
+  activeClienteId String?
+  activeCliente   Cliente? @relation("UserActiveCliente", fields: [activeClienteId], references: [id], onDelete: SetNull)
+  email           String   @unique
+  senha           String
+  role            UserRole @default(OPERADOR)
+  createdAt       DateTime @default(now())
 }
 
 model AuditLog {

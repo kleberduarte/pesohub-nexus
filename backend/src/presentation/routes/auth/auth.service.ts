@@ -23,7 +23,12 @@ export class AuthService {
       throw new UnauthorizedException("Credenciais inválidas");
     }
 
-    const payload = { sub: user.id, email: user.email, role: user.role, clienteId: user.clienteId };
+    // SUPERADMIN não tem clienteId fixo — usa a última empresa selecionada
+    // via "trocar de empresa" (persistida em activeClienteId), se houver,
+    // pra manter a sessão na mesma empresa após logout/login.
+    const effectiveClienteId = user.role === "SUPERADMIN" ? user.activeClienteId : user.clienteId;
+
+    const payload = { sub: user.id, email: user.email, role: user.role, clienteId: effectiveClienteId };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
       refreshToken: this.jwt.sign(payload, { expiresIn: "7d" }),
@@ -39,6 +44,11 @@ export class AuthService {
     if (!cliente) {
       throw new NotFoundException("Empresa não encontrada");
     }
+
+    await this.prisma.user.update({
+      where: { id: currentUser.sub },
+      data: { activeClienteId: cliente.id },
+    });
 
     const payload = { sub: currentUser.sub, email: currentUser.email, role: currentUser.role, clienteId: cliente.id };
     return {

@@ -13,14 +13,32 @@ import {
   Bell,
   Building2,
   Users,
+  FolderTree,
+  Tags,
+  SlidersHorizontal,
+  Settings,
+  Wand2,
 } from "lucide-react";
-import { clearToken, clientesApi, getCurrentUser, type ClienteBranding, type DecodedUser } from "../../lib/api";
+import {
+  clearToken,
+  clientesApi,
+  getCurrentUser,
+  getToken,
+  setActiveClienteToken,
+  type ClienteBranding,
+  type DecodedUser,
+} from "../../lib/api";
 import { applyBranding } from "../../lib/branding";
 
 const baseNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Balanças", href: "/devices", icon: Scale },
+  { name: "Assistente", href: "/assistente", icon: Wand2 },
   { name: "Produtos (PLU)", href: "/products", icon: PackageSearch },
+  { name: "Cadastros", href: "/cadastros", icon: FolderTree },
+  { name: "Etiquetas", href: "/etiquetas", icon: Tags },
+  { name: "SPEC", href: "/spec", icon: SlidersHorizontal },
+  { name: "Configurações", href: "/configuracoes", icon: Settings },
   { name: "Sincronização", href: "/sync", icon: CloudUpload },
   { name: "Usuários", href: "/usuarios", icon: Users },
 ];
@@ -34,12 +52,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<DecodedUser | null>(null);
 
   useEffect(() => {
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
     setUser(getCurrentUser());
     clientesApi
       .branding()
       .then((data) => {
         setBranding(data);
         applyBranding(data);
+        if (data.accessToken) setActiveClienteToken(data.accessToken);
       })
       .catch(() => {
         // sem tenant resolvido ainda (ex: token expirado) — mantém identidade padrão PesoHub

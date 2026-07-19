@@ -18,7 +18,9 @@ export class ProductPrismaRepository implements ProductRepository {
 
   async create(data: Omit<Product, "id" | "versao">): Promise<Product> {
     try {
-      return (await this.prisma.product.create({ data })) as unknown as Product;
+      return (await this.prisma.product.create({
+        data: data as unknown as Prisma.ProductUncheckedCreateInput,
+      })) as unknown as Product;
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
         throw new ConflictException("Já existe um produto com este código de barras.");
@@ -30,7 +32,7 @@ export class ProductPrismaRepository implements ProductRepository {
   async update(id: string, clienteId: string, data: Partial<Product>): Promise<Product> {
     const result = await this.prisma.product.updateMany({
       where: { id, clienteId },
-      data: { ...data, versao: { increment: 1 } },
+      data: { ...data, versao: { increment: 1 } } as unknown as Prisma.ProductUncheckedUpdateManyInput,
     });
     if (result.count === 0) {
       throw new NotFoundException("Produto não encontrado.");
@@ -47,5 +49,18 @@ export class ProductPrismaRepository implements ProductRepository {
       this.prisma.syncJobItem.deleteMany({ where: { productId: id } }),
       this.prisma.product.delete({ where: { id } }),
     ]);
+  }
+
+  async deleteAll(clienteId: string): Promise<number> {
+    const ids = (
+      await this.prisma.product.findMany({ where: { clienteId }, select: { id: true } })
+    ).map((p) => p.id);
+    if (ids.length === 0) return 0;
+
+    const result = await this.prisma.$transaction([
+      this.prisma.syncJobItem.deleteMany({ where: { productId: { in: ids } } }),
+      this.prisma.product.deleteMany({ where: { clienteId } }),
+    ]);
+    return result[1].count;
   }
 }

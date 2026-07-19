@@ -1,0 +1,3 @@
+bin/agent-local.exe
+bin/nssm.exe
+*.zip

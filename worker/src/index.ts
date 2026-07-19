@@ -2,6 +2,7 @@ import Queue from "bull";
 import { AgentBridge } from "./agent-bridge";
 import { createSyncProcessor } from "./processor";
 import { prisma } from "./prisma";
+import { logger } from "./logger";
 
 const REDIS_HOST = process.env.REDIS_HOST ?? "localhost";
 const REDIS_PORT = Number(process.env.REDIS_PORT ?? 6379);
@@ -19,17 +20,17 @@ const syncQueue = new Queue("sync-jobs", REDIS_URL, {
 syncQueue.process("sync-device", 5, createSyncProcessor(agentBridge));
 
 syncQueue.on("completed", (job) => {
-  console.log(`[sync-jobs] job ${job.id} concluído`, job.returnvalue);
+  logger.info({ jobId: job.id, result: job.returnvalue }, "sync job concluído");
 });
 
 syncQueue.on("failed", (job, err) => {
-  console.error(`[sync-jobs] job ${job.id} falhou:`, err.message);
+  logger.error({ jobId: job?.id, err: err.message }, "sync job falhou");
 });
 
-console.log(`Worker de sincronização ativo — ouvindo fila "sync-jobs" em ${REDIS_URL}`);
+logger.info(`Worker de sincronização ativo — ouvindo fila "sync-jobs" em ${REDIS_URL}`);
 
 async function shutdown() {
-  console.log("Encerrando worker...");
+  logger.info("Encerrando worker...");
   await syncQueue.close();
   await agentBridge.close();
   await prisma.$disconnect();
