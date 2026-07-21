@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
+import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
 import { AuditLogModule } from "./infrastructure/audit/audit-log.module";
@@ -28,6 +30,7 @@ import { ConfiguracaoAvancadaModule } from "./presentation/routes/configuracao-a
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL ?? "info",
@@ -60,5 +63,6 @@ import { ConfiguracaoAvancadaModule } from "./presentation/routes/configuracao-a
     SpecParametrosModule,
     ConfiguracaoAvancadaModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
