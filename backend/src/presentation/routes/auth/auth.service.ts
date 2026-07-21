@@ -31,7 +31,7 @@ export class AuthService {
     const payload = { sub: user.id, email: user.email, role: user.role, clienteId: effectiveClienteId };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
-      refreshToken: this.jwt.sign(payload, { expiresIn: "7d" }),
+      user: payload,
     };
   }
 
@@ -53,7 +53,7 @@ export class AuthService {
     const payload = { sub: currentUser.sub, email: currentUser.email, role: currentUser.role, clienteId: cliente.id };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
-      refreshToken: this.jwt.sign(payload, { expiresIn: "7d" }),
+      user: payload,
     };
   }
 }

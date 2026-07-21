@@ -20,10 +20,10 @@ import {
   Wand2,
 } from "lucide-react";
 import {
-  clearToken,
+  authApi,
+  clearCurrentUser,
   clientesApi,
   getCurrentUser,
-  getToken,
   setActiveClienteToken,
   type ClienteBranding,
   type DecodedUser,
@@ -52,11 +52,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<DecodedUser | null>(null);
 
   useEffect(() => {
-    if (!getToken()) {
+    if (!getCurrentUser()) {
       router.replace("/login");
       return;
     }
-    setUser(getCurrentUser());
+    // Confirma a sessão com o backend (fonte de verdade — o cache local de
+    // usuário é só para gating de UI otimista). Se o cookie de sessão
+    // estiver ausente/expirado, o interceptor 401 do request() redireciona.
+    authApi
+      .me()
+      .then(setUser)
+      .catch(() => {
+        // request() já trata o redirect em caso de 401
+      });
     clientesApi
       .branding()
       .then((data) => {
@@ -73,7 +81,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     user?.role === "SUPERADMIN" ? [...superadminNavigation, ...baseNavigation] : baseNavigation;
 
   const handleLogout = () => {
-    clearToken();
+    authApi.logout().catch(() => {});
+    clearCurrentUser();
     router.push("/login");
   };
 

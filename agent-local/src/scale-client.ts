@@ -69,13 +69,23 @@ function resolvePluNumber(codigo: string, indexInBatch: number): number {
   return indexInBatch + 1;
 }
 
+/**
+ * O protocolo da balança delimita campos por TAB e linhas por CRLF. Um valor
+ * malicioso contendo esses caracteres poderia forjar campos/linhas extras no
+ * stream enviado ao hardware, então removemos qualquer TAB/CR/LF antes de
+ * montar a linha.
+ */
+function sanitizeField(value: string): string {
+  return value.replace(/[\t\r\n]/g, "");
+}
+
 function buildPluRow(product: ScaleSyncPayload, pluNumber: number): string {
   const fields = [...PLU_FIELD_TEMPLATE];
   fields[FIELD_PLU_NUMBER] = String(pluNumber);
-  fields[FIELD_PRODUCT_CODE] = product.codigo;
-  fields[FIELD_EAN13] = product.codigoBarras ?? "";
+  fields[FIELD_PRODUCT_CODE] = sanitizeField(product.codigo);
+  fields[FIELD_EAN13] = sanitizeField(product.codigoBarras ?? "");
   fields[FIELD_PRICE] = encodePrice(product.preco);
-  fields[FIELD_NAME] = product.nome;
+  fields[FIELD_NAME] = sanitizeField(product.nome);
   return fields.join("\t") + "\r\n";
 }
 

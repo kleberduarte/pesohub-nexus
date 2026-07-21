@@ -6,8 +6,30 @@ import { io } from "socket.io-client";
 import { sendProductsToScale } from "./scale-client";
 
 const BACKEND_URL = process.env.AGENT_BACKEND_URL ?? "http://localhost:3000";
-const AGENT_TOKEN = process.env.AGENT_TOKEN ?? "dev-agent-local-token";
+const AGENT_TOKEN = process.env.AGENT_TOKEN;
 const DISCOVERY_PORT = Number(process.env.SCALE_DISCOVERY_PORT ?? 33584);
+
+if (!AGENT_TOKEN) {
+  console.error("AGENT_TOKEN não configurado. Defina a variável de ambiente AGENT_TOKEN antes de iniciar o agente.");
+  process.exit(1);
+}
+
+/**
+ * O backend só deve poder instruir o agente a abrir conexões TCP dentro da
+ * rede local da loja (RFC 1918) ou loopback (dev). Isso evita que um backend
+ * comprometido ou um MITM use o agente como pivô para varrer/atacar redes
+ * externas a partir de dentro da loja.
+ */
+function isAllowedDeviceIp(ip: string): boolean {
+  if (ip === "127.0.0.1" || ip === "::1") return true;
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p))) return false;
+  const [a, b] = parts;
+  if (a === 10) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  return false;
+}
 
 interface SyncCommand {
   correlationId: string;
@@ -94,6 +116,17 @@ socket.on("sync:command", async (command: SyncCommand) => {
     `[sync:command] device=${command.deviceId} ip=${command.deviceIp}:${command.devicePort} ` +
       `tipo=${command.tipo} produtos=${command.products.length}`,
   );
+
+  if (!isAllowedDeviceIp(command.deviceIp)) {
+    console.error(`[sync:command] IP fora da rede local permitida, comando ignorado: ${command.deviceIp}`);
+    socket.emit("sync:result", {
+      correlationId: command.correlationId,
+      ok: false,
+      erro: "deviceIp fora do range de rede local permitido",
+      itensProcessados: 0,
+    });
+    return;
+  }
 
   const outcome = await sendProductsToScale(command.deviceIp, command.devicePort, command.products);
 

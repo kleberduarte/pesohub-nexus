@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, Scale } from "lucide-react";
-import { login, setToken, ApiError, type ClienteBranding } from "../../lib/api";
+import { login, ApiError, type ClienteBranding } from "../../lib/api";
 
 type AuthMode = "login" | "first-access";
 
@@ -53,8 +53,7 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
     setError("");
     setLoading(true);
     try {
-      const { accessToken } = await login(email, password);
-      setToken(accessToken);
+      await login(email, password);
       if (onLoginSuccess) await onLoginSuccess();
       router.push("/");
     } catch (err) {

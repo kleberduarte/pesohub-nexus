@@ -20,7 +20,10 @@ import { PrismaService } from "../database/prisma.service";
  * no Redis (canal agent:command:<agentId>) e espera a resposta em
  * agent:result:<correlationId>. Este gateway faz a ponte final: Redis <-> socket.io.
  */
-@WebSocketGateway({ namespace: "/agents", cors: { origin: "*" } })
+@WebSocketGateway({
+  namespace: "/agents",
+  cors: { origin: (process.env.CORS_ORIGIN ?? "http://localhost:3001").split(",").map((o) => o.trim()) },
+})
 export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly logger = new Logger(AgentGateway.name);
   private readonly sockets = new Map<string, Socket>();

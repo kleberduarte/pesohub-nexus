@@ -1,22 +1,32 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
 
-const TOKEN_KEY = "pesohub_token";
+// A credencial de sessão em si vive só num cookie httpOnly setado pelo backend
+// (não acessível a JS, protege contra roubo de sessão via XSS). Este cache
+// guarda apenas os claims não sensíveis do usuário (role/email/clienteId) para
+// gating de UI síncrono — não serve como credencial de autenticação.
+const USER_CACHE_KEY = "pesohub_user";
 // Empresa ativa persistida separadamente da sessão, para a tela de login
 // continuar mostrando a identidade visual correta após o logout (que
-// só derruba o TOKEN_KEY). Ver ClienteBranding.accessToken.
+// só derruba o USER_CACHE_KEY). Ver ClienteBranding.accessToken.
 const ACTIVE_CLIENTE_TOKEN_KEY = "pesohub_active_cliente_token";
 
-export function getToken(): string | null {
+export function getCurrentUser(): DecodedUser | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  const raw = localStorage.getItem(USER_CACHE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as DecodedUser;
+  } catch {
+    return null;
+  }
 }
 
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+export function setCurrentUser(user: DecodedUser) {
+  localStorage.setItem(USER_CACHE_KEY, JSON.stringify(user));
 }
 
-export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+export function clearCurrentUser() {
+  localStorage.removeItem(USER_CACHE_KEY);
 }
 
 export function getActiveClienteToken(): string | null {
@@ -38,12 +48,11 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
@@ -57,7 +66,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // estamos no /login ou num link público de acesso (/acesso/:token), que
     // esperam 401 legitimamente quando não há sessão ainda.
     if (res.status === 401 && typeof window !== "undefined") {
-      clearToken();
+      clearCurrentUser();
       const { pathname } = window.location;
       if (pathname !== "/login" && !pathname.startsWith("/acesso/")) {
         window.location.href = "/login";
@@ -73,17 +82,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 // ---------- Auth ----------
-export interface LoginResponse {
-  accessToken: string;
-}
-
-export function login(email: string, senha: string) {
-  return request<LoginResponse>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, senha }),
-  });
-}
-
 export type UserRole = "SUPERADMIN" | "ADMIN" | "OPERADOR" | "VIEWER";
 
 export interface DecodedUser {
@@ -93,28 +91,28 @@ export interface DecodedUser {
   clienteId: string | null;
 }
 
-export function decodeToken(token: string | null): DecodedUser | null {
-  if (!token) return null;
-  try {
-    const payload = token.split(".")[1];
-    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    return json as DecodedUser;
-  } catch {
-    return null;
-  }
+export interface LoginResponse {
+  user: DecodedUser;
 }
 
-export function getCurrentUser(): DecodedUser | null {
-  return decodeToken(getToken());
+export async function login(email: string, senha: string) {
+  const data = await request<LoginResponse>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, senha }),
+  });
+  setCurrentUser(data.user);
+  return data;
 }
 
 export const authApi = {
+  me: () => request<DecodedUser>("/auth/me"),
+  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
   switchCompany: async (clienteId: string) => {
     const data = await request<LoginResponse>("/auth/switch-company", {
       method: "POST",
       body: JSON.stringify({ clienteId }),
     });
-    setToken(data.accessToken);
+    setCurrentUser(data.user);
     return data;
   },
 };
