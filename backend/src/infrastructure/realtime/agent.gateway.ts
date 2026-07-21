@@ -31,6 +31,9 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private readonly redisSub: Redis;
   private readonly redisPub: Redis;
   private readonly discoveredByAgent = new Map<string, { ip: string; port: number }[]>();
+  // clienteId de cada agent conectado — necessário pra não misturar balanças
+  // descobertas de agents de clientes diferentes em getDiscoveredDevices().
+  private readonly clienteIdByAgent = new Map<string, string>();
 
   @WebSocketServer()
   server!: Server;
@@ -75,6 +78,7 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     this.sockets.set(agent.id, socket);
+    this.clienteIdByAgent.set(agent.id, agent.clienteId);
     socket.data.agentId = agent.id;
     await this.prisma.agent.update({
       where: { id: agent.id },
@@ -92,6 +96,8 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const agentId = socket.data?.agentId as string | undefined;
     if (agentId) {
       this.sockets.delete(agentId);
+      this.clienteIdByAgent.delete(agentId);
+      this.discoveredByAgent.delete(agentId);
       await this.prisma.device.updateMany({
         where: { agentId },
         data: { status: "OFFLINE" },
@@ -132,11 +138,14 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   /**
    * Balanças anunciadas via broadcast UDP pelos Agents Locais conectados,
-   * deduplicadas por IP (o backend não tem acesso direto à rede da loja).
+   * deduplicadas por IP. Escopado por clienteId — cada tenant só pode ver
+   * as balanças descobertas pelos seus próprios Agents (nunca de outro
+   * cliente conectado ao mesmo backend).
    */
-  getDiscoveredDevices(): { ip: string; port: number }[] {
+  getDiscoveredDevices(clienteId: string): { ip: string; port: number }[] {
     const byIp = new Map<string, { ip: string; port: number }>();
-    for (const devices of this.discoveredByAgent.values()) {
+    for (const [agentId, devices] of this.discoveredByAgent) {
+      if (this.clienteIdByAgent.get(agentId) !== clienteId) continue;
       for (const device of devices) byIp.set(device.ip, device);
     }
     return [...byIp.values()];

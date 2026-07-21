@@ -28,7 +28,7 @@ export class DevicesController {
 
   @Get("discovered")
   async findDiscovered(@Req() req: Request) {
-    const discovered = this.agentGateway.getDiscoveredDevices();
+    const discovered = this.agentGateway.getDiscoveredDevices(this.clienteId(req));
     const registered = await this.devices.findAll(this.clienteId(req));
     const registeredIps = new Set(registered.map((d) => d.ip));
     return discovered.filter((d) => !registeredIps.has(d.ip));
