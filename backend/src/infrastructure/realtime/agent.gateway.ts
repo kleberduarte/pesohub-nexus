@@ -11,6 +11,7 @@ import { Logger } from "@nestjs/common";
 import { Server, Socket } from "socket.io";
 import Redis from "ioredis";
 import { PrismaService } from "../database/prisma.service";
+import { getRedisUrl } from "../queue/redis-connection";
 
 /**
  * Ponte entre o backend e os Agents Locais (processos que rodam dentro da rede
@@ -35,7 +36,7 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server!: Server;
 
   constructor(private readonly prisma: PrismaService) {
-    const url = `redis://${process.env.REDIS_HOST ?? "localhost"}:${process.env.REDIS_PORT ?? 6379}`;
+    const url = getRedisUrl();
     this.redisSub = new Redis(url);
     this.redisPub = new Redis(url);
 
