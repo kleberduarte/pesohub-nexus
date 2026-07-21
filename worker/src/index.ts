@@ -4,9 +4,10 @@ import { createSyncProcessor } from "./processor";
 import { prisma } from "./prisma";
 import { logger } from "./logger";
 
-const REDIS_HOST = process.env.REDIS_HOST ?? "localhost";
-const REDIS_PORT = Number(process.env.REDIS_PORT ?? 6379);
-const REDIS_URL = `redis://${REDIS_HOST}:${REDIS_PORT}`;
+// Provedores gerenciados (ex: Railway) expõem uma única REDIS_URL com
+// credenciais embutidas. Em dev local seguimos aceitando REDIS_HOST/REDIS_PORT.
+const REDIS_URL =
+  process.env.REDIS_URL ?? `redis://${process.env.REDIS_HOST ?? "localhost"}:${process.env.REDIS_PORT ?? 6379}`;
 
 const agentBridge = new AgentBridge(REDIS_URL);
 

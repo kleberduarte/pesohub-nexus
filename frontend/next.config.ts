@@ -19,7 +19,10 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self'",
+      // 'unsafe-inline' é necessário para os scripts inline que o Next.js App
+      // Router injeta pra hidratar a página (payload RSC via self.__next_f.push).
+      // Sem nonce/hash isso não dá pra evitar com Server Components + Next 15.
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       `connect-src 'self' ${apiOrigin}`.trim(),

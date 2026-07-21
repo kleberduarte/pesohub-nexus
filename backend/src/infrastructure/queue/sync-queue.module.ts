@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { BullModule } from "@nestjs/bull";
+import { getRedisUrl } from "./redis-connection";
 
 /**
  * Fila de sincronização (Redis + Bull), conforme SPEC.md Módulo 3.
@@ -8,10 +9,7 @@ import { BullModule } from "@nestjs/bull";
 @Module({
   imports: [
     BullModule.forRoot({
-      redis: {
-        host: process.env.REDIS_HOST ?? "localhost",
-        port: Number(process.env.REDIS_PORT ?? 6379),
-      },
+      redis: getRedisUrl(),
     }),
     BullModule.registerQueue({
       name: "sync-jobs",

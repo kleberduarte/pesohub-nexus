@@ -5,6 +5,7 @@ import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { LoggerModule } from "nestjs-pino";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
 import { AuditLogModule } from "./infrastructure/audit/audit-log.module";
+import { HealthModule } from "./presentation/routes/health/health.module";
 import { DevicesModule } from "./presentation/routes/devices/devices.module";
 import { ProductsModule } from "./presentation/routes/products/products.module";
 import { SyncModule } from "./presentation/routes/sync/sync.module";
@@ -40,6 +41,7 @@ import { ConfiguracaoAvancadaModule } from "./presentation/routes/configuracao-a
       },
     }),
     PrismaModule,
+    HealthModule,
     AuditLogModule,
     AuthModule,
     DevicesModule,
