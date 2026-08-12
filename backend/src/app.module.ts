@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
+import { RedisThrottlerStorageService } from "./infrastructure/throttler/redis-throttler-storage.service";
 import { LoggerModule } from "nestjs-pino";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
 import { AuditLogModule } from "./infrastructure/audit/audit-log.module";
@@ -27,11 +28,19 @@ import { TextosGlobaisModule } from "./presentation/routes/textos-globais/textos
 import { TeclasAcessoRapidoModule } from "./presentation/routes/teclas-acesso-rapido/teclas-acesso-rapido.module";
 import { SpecParametrosModule } from "./presentation/routes/spec-parametros/spec-parametros.module";
 import { ConfiguracaoAvancadaModule } from "./presentation/routes/configuracao-avancada/configuracao-avancada.module";
+import { BillingModule } from "./presentation/routes/billing/billing.module";
+import { LojasModule } from "./presentation/routes/lojas/lojas.module";
+import { PerfisModule } from "./presentation/routes/perfis/perfis.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 100 }]),
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [{ ttl: 60000, limit: 100 }],
+        storage: new RedisThrottlerStorageService(),
+      }),
+    }),
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL ?? "info",
@@ -64,6 +73,9 @@ import { ConfiguracaoAvancadaModule } from "./presentation/routes/configuracao-a
     TeclasAcessoRapidoModule,
     SpecParametrosModule,
     ConfiguracaoAvancadaModule,
+    BillingModule,
+    LojasModule,
+    PerfisModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

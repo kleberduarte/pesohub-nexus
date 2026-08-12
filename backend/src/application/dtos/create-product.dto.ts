@@ -1,9 +1,10 @@
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Length, Matches } from "class-validator";
+import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Length, Matches } from "class-validator";
 
 const UNIDADES_VENDA = ["PESO", "PECA"] as const;
 
 export class CreateProductDto {
   @IsString()
+  @IsNotEmpty()
   codigo!: string;
 
   @IsString()
@@ -12,6 +13,7 @@ export class CreateProductDto {
   codigoBarras!: string;
 
   @IsString()
+  @IsNotEmpty()
   nome!: string;
 
   @IsNumber()

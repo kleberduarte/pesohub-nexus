@@ -20,31 +20,35 @@ export class OperadoresController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.operadores.findAll(this.clienteId(req));
+    return this.operadores.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.operadores.findById(id, this.clienteId(req));
+    return this.operadores.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateOperadorDto, @Req() req: Request) {
-    return this.createOperador.execute(this.clienteId(req), dto);
+    return this.createOperador.execute(this.clienteId(req), this.lojaId(req), dto);
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateOperadorDto, @Req() req: Request) {
-    return this.updateOperador.execute(id, this.clienteId(req), dto);
+    return this.updateOperador.execute(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.operadores.delete(id, this.clienteId(req));
+    return this.operadores.delete(id, this.lojaId(req));
   }
 
   private clienteId(req: Request): string {
     return (req as unknown as { user: { clienteId: string } }).user.clienteId;
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 }

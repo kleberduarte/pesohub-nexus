@@ -4,12 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { EntityCrudPanel } from "../../../components/cadastros/EntityCrudPanel";
-import {
-  codigosBarrasFormatoApi,
-  formatosImpressaoApi,
-  teclasAcessoRapidoApi,
-  setoresApi,
-} from "../../../lib/api";
+import { TeclaAcessoRapidoPanel } from "../../../components/cadastros/TeclaAcessoRapidoPanel";
+import { FormatoImpressaoPanel } from "../../../components/cadastros/FormatoImpressaoPanel";
+import { codigosBarrasFormatoApi, setoresApi } from "../../../lib/api";
 
 const STEPS = [
   { key: "inicio", label: "O que fazer?" },
@@ -95,25 +92,7 @@ export default function AssistentePage() {
 
         {step === 1 && firstConfig && (
           <div className="space-y-6">
-            <EntityCrudPanel
-              title="Formato de Impressão"
-              csv={false}
-              emptyForm={{ numero: 0, nome: "", tipo: 1, larguraMm: 56, alturaMm: 90 }}
-              fields={[
-                { key: "numero", label: "Número", type: "number", required: true },
-                { key: "nome", label: "Nome", type: "text", required: true },
-                { key: "larguraMm", label: "Largura (mm)", type: "number", required: true },
-                { key: "alturaMm", label: "Altura (mm)", type: "number", required: true },
-              ]}
-              columns={[
-                { key: "numero", label: "Número" },
-                { key: "nome", label: "Nome" },
-              ]}
-              list={formatosImpressaoApi.list}
-              create={formatosImpressaoApi.create}
-              update={formatosImpressaoApi.update}
-              remove={formatosImpressaoApi.remove}
-            />
+            <FormatoImpressaoPanel />
             <EntityCrudPanel
               title="Código de Barras"
               csv={false}
@@ -179,46 +158,7 @@ export default function AssistentePage() {
           </div>
         )}
 
-        {step === 4 && firstConfig && (
-          <EntityCrudPanel
-            title="Tecla de Acesso Rápido"
-            csv={false}
-            emptyMessage="Nenhum modelo de teclado cadastrado."
-            emptyForm={{ nome: "", modelo: "Atena II", pagina: "Modo de uma página" }}
-            fields={[
-              { key: "nome", label: "Nome do modelo", type: "text", required: true },
-              {
-                key: "modelo",
-                label: "Modelo",
-                type: "select",
-                required: true,
-                options: [
-                  { value: "Atena II", label: "Atena II" },
-                  { value: "Atena II sem torre", label: "Atena II sem torre" },
-                ],
-              },
-              {
-                key: "pagina",
-                label: "Página",
-                type: "select",
-                required: true,
-                options: [
-                  { value: "Modo de uma página", label: "Modo de uma página (63 teclas)" },
-                  { value: "Modo de duas páginas", label: "Modo de duas páginas (126 teclas)" },
-                  { value: "Modo de três páginas", label: "Modo de três páginas (189 teclas)" },
-                ],
-              },
-            ]}
-            columns={[
-              { key: "nome", label: "Nome" },
-              { key: "modelo", label: "Modelo" },
-            ]}
-            list={teclasAcessoRapidoApi.list}
-            create={teclasAcessoRapidoApi.create}
-            update={teclasAcessoRapidoApi.update}
-            remove={teclasAcessoRapidoApi.remove}
-          />
-        )}
+        {step === 4 && firstConfig && <TeclaAcessoRapidoPanel />}
 
         {(step === STEPS.length - 1 || (!firstConfig && step >= 1)) && (
           <div className="text-center py-8 space-y-4">

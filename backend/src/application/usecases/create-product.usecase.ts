@@ -11,12 +11,13 @@ export class CreateProductUseCase {
     private readonly syncDispatcher: ProductSyncDispatcher,
   ) {}
 
-  async execute(clienteId: string, dto: CreateProductDto) {
+  async execute(clienteId: string, lojaId: string, dto: CreateProductDto) {
     if (!isValidEan13(dto.codigoBarras)) {
       throw new BadRequestException("Código de barras EAN-13 inválido (dígito verificador incorreto)");
     }
     const product = await this.products.create({
       clienteId,
+      lojaId,
       codigo: dto.codigo,
       codigoBarras: dto.codigoBarras,
       nome: dto.nome,
@@ -53,7 +54,7 @@ export class CreateProductUseCase {
     });
 
     if (product.ativo) {
-      await this.syncDispatcher.syncToLinkedDevices(product.id, clienteId);
+      await this.syncDispatcher.syncToLinkedDevices(product.id, lojaId);
     }
 
     return product;

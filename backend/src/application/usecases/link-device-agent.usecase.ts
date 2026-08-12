@@ -15,15 +15,15 @@ export class LinkDeviceAgentUseCase {
     private readonly prisma: PrismaService,
   ) {}
 
-  async execute(deviceId: string, clienteId: string, agentToken: string) {
-    const device = await this.devices.findById(deviceId, clienteId);
+  async execute(deviceId: string, lojaId: string, agentToken: string) {
+    const device = await this.devices.findById(deviceId, lojaId);
     if (!device) throw new NotFoundException("Balança não encontrada.");
 
     const agent = await this.prisma.agent.findUnique({ where: { token: agentToken } });
-    if (!agent || agent.clienteId !== clienteId) {
+    if (!agent || agent.lojaId !== lojaId) {
       throw new NotFoundException("Agent Local não encontrado para o token informado.");
     }
 
-    return this.devices.update(deviceId, clienteId, { agentId: agent.id });
+    return this.devices.update(deviceId, lojaId, { agentId: agent.id });
   }
 }

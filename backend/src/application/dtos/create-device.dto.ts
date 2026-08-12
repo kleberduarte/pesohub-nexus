@@ -1,7 +1,8 @@
-import { IsIP, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsIP, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class CreateDeviceDto {
   @IsString()
+  @IsNotEmpty()
   nome!: string;
 
   @IsIP()

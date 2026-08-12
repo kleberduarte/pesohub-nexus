@@ -1,0 +1,523 @@
+"use client";
+
+import { useMemo, useRef, useState, useEffect } from "react";
+import { Pencil, Plus, Trash2, LayoutTemplate, X } from "lucide-react";
+import { formatosImpressaoApi, ApiError, type FormatoImpressao } from "../../lib/api";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
+
+type ElementoTipo = "nome" | "preco" | "codigoBarras" | "texto" | "imagem";
+
+interface LayoutElemento {
+  id: string;
+  tipo: ElementoTipo;
+  x: number; // mm
+  y: number; // mm
+  largura: number; // mm
+  altura: number; // mm
+  texto?: string;
+}
+
+const TIPO_LABEL: Record<ElementoTipo, string> = {
+  nome: "Nome do Produto",
+  preco: "Preço",
+  codigoBarras: "Código de Barras",
+  texto: "Texto Livre",
+  imagem: "Imagem/Logo",
+};
+
+const TIPO_DEFAULT_SIZE: Record<ElementoTipo, { largura: number; altura: number }> = {
+  nome: { largura: 40, altura: 8 },
+  preco: { largura: 30, altura: 12 },
+  codigoBarras: { largura: 45, altura: 15 },
+  texto: { largura: 30, altura: 6 },
+  imagem: { largura: 20, altura: 20 },
+};
+
+const PX_PER_MM = 4;
+
+function getElementos(layout: Record<string, unknown> | null | undefined): LayoutElemento[] {
+  const el = (layout as { elementos?: LayoutElemento[] } | undefined)?.elementos;
+  return el ?? [];
+}
+
+export function FormatoImpressaoPanel() {
+  const [formatos, setFormatos] = useState<FormatoImpressao[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<FormatoImpressao | null>(null);
+  const [numero, setNumero] = useState(0);
+  const [nome, setNome] = useState("");
+  const [larguraMm, setLarguraMm] = useState(56);
+  const [alturaMm, setAlturaMm] = useState(90);
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<FormatoImpressao | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  // Visual layout editor
+  const [layoutEditing, setLayoutEditing] = useState<FormatoImpressao | null>(null);
+  const [elementos, setElementos] = useState<LayoutElemento[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [savingLayout, setSavingLayout] = useState(false);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ id: string; offsetXMm: number; offsetYMm: number } | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    formatosImpressaoApi
+      .list()
+      .then(setFormatos)
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Erro ao carregar formatos."))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  const openCreate = () => {
+    setEditing(null);
+    setNumero(0);
+    setNome("");
+    setLarguraMm(56);
+    setAlturaMm(90);
+    setModalOpen(true);
+  };
+
+  const openEdit = (f: FormatoImpressao) => {
+    setEditing(f);
+    setNumero(f.numero);
+    setNome(f.nome);
+    setLarguraMm(f.larguraMm);
+    setAlturaMm(f.alturaMm);
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const payload = { numero, nome, tipo: 1, larguraMm, alturaMm };
+      if (editing) {
+        await formatosImpressaoApi.update(editing.id, payload);
+      } else {
+        await formatosImpressaoApi.create({ ...payload, layout: {} });
+      }
+      setModalOpen(false);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Erro ao salvar formato de impressão.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await formatosImpressaoApi.remove(deleteTarget.id);
+      setDeleteTarget(null);
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Erro ao excluir formato de impressão.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const openLayout = (f: FormatoImpressao) => {
+    setLayoutEditing(f);
+    setElementos(getElementos(f.layout));
+    setSelectedId(null);
+  };
+
+  const closeLayout = () => {
+    setLayoutEditing(null);
+    setElementos([]);
+    setSelectedId(null);
+  };
+
+  const addElemento = (tipo: ElementoTipo) => {
+    if (!layoutEditing) return;
+    const size = TIPO_DEFAULT_SIZE[tipo];
+    const novo: LayoutElemento = {
+      id: `${tipo}-${Date.now()}`,
+      tipo,
+      x: Math.max(0, (layoutEditing.larguraMm - size.largura) / 2),
+      y: 4,
+      largura: Math.min(size.largura, layoutEditing.larguraMm),
+      altura: size.altura,
+      texto: tipo === "texto" ? "Texto" : undefined,
+    };
+    setElementos((prev) => [...prev, novo]);
+    setSelectedId(novo.id);
+  };
+
+  const removeElemento = (id: string) => {
+    setElementos((prev) => prev.filter((e) => e.id !== id));
+    if (selectedId === id) setSelectedId(null);
+  };
+
+  const updateElemento = (id: string, patch: Partial<LayoutElemento>) => {
+    setElementos((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
+  };
+
+  const handlePointerDown = (e: React.PointerEvent, el: LayoutElemento) => {
+    e.stopPropagation();
+    setSelectedId(el.id);
+    const canvasRect = canvasRef.current?.getBoundingClientRect();
+    if (!canvasRect) return;
+    const pointerXMm = (e.clientX - canvasRect.left) / PX_PER_MM;
+    const pointerYMm = (e.clientY - canvasRect.top) / PX_PER_MM;
+    dragState.current = { id: el.id, offsetXMm: pointerXMm - el.x, offsetYMm: pointerYMm - el.y };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragState.current || !layoutEditing || !canvasRef.current) return;
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const pointerXMm = (e.clientX - canvasRect.left) / PX_PER_MM;
+    const pointerYMm = (e.clientY - canvasRect.top) / PX_PER_MM;
+    const el = elementos.find((el) => el.id === dragState.current!.id);
+    if (!el) return;
+    const newX = Math.min(
+      Math.max(0, pointerXMm - dragState.current.offsetXMm),
+      layoutEditing.larguraMm - el.largura,
+    );
+    const newY = Math.min(
+      Math.max(0, pointerYMm - dragState.current.offsetYMm),
+      layoutEditing.alturaMm - el.altura,
+    );
+    updateElemento(dragState.current.id, { x: newX, y: newY });
+  };
+
+  const handlePointerUp = () => {
+    dragState.current = null;
+  };
+
+  const handleSaveLayout = async () => {
+    if (!layoutEditing) return;
+    setSavingLayout(true);
+    setError(null);
+    try {
+      await formatosImpressaoApi.update(layoutEditing.id, { layout: { elementos } });
+      closeLayout();
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Erro ao salvar o layout.");
+    } finally {
+      setSavingLayout(false);
+    }
+  };
+
+  const selected = elementos.find((e) => e.id === selectedId) ?? null;
+  const canvasSize = layoutEditing
+    ? { width: layoutEditing.larguraMm * PX_PER_MM, height: layoutEditing.alturaMm * PX_PER_MM }
+    : { width: 0, height: 0 };
+
+  const elementosCount = useMemo(() => (f: FormatoImpressao) => getElementos(f.layout).length, []);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-slate-800">Formato de Impressão</h2>
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors text-sm font-medium"
+        >
+          <Plus className="w-4 h-4" /> Novo
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+      )}
+
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="text-left px-4 py-3 font-medium text-slate-500">Número</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-500">Nome</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-500">Dimensões</th>
+              <th className="text-left px-4 py-3 font-medium text-slate-500">Elementos</th>
+              <th className="w-32" />
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  Carregando...
+                </td>
+              </tr>
+            ) : formatos.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-slate-400">
+                  Nenhum formato de etiqueta cadastrado.
+                </td>
+              </tr>
+            ) : (
+              formatos.map((f) => (
+                <tr key={f.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  <td className="px-4 py-3">{f.numero}</td>
+                  <td className="px-4 py-3">{f.nome}</td>
+                  <td className="px-4 py-3 font-mono text-xs">
+                    {f.larguraMm}mm x {f.alturaMm}mm
+                  </td>
+                  <td className="px-4 py-3">{elementosCount(f)}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+                      <button
+                        onClick={() => openLayout(f)}
+                        className="p-1.5 text-slate-400 hover:text-brand-600 transition-colors"
+                        title="Editar layout visual"
+                      >
+                        <LayoutTemplate className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openEdit(f)}
+                        className="p-1.5 text-slate-400 hover:text-brand-600 transition-colors"
+                        title="Editar número/nome/dimensões"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteTarget(f)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 transition-colors"
+                        title="Excluir"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Basic form modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-slate-800 mb-4">
+              {editing ? "Editar Formato de Impressão" : "Novo Formato de Impressão"}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
+                <input
+                  type="number"
+                  value={numero}
+                  onChange={(e) => setNumero(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
+                <input
+                  type="text"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Largura (mm) *</label>
+                  <input
+                    type="number"
+                    value={larguraMm}
+                    onChange={(e) => setLarguraMm(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Altura (mm) *</label>
+                  <input
+                    type="number"
+                    value={alturaMm}
+                    onChange={(e) => setAlturaMm(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !nome}
+                className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium disabled:opacity-60"
+              >
+                {saving ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Visual layout editor */}
+      {layoutEditing && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-800">
+                Layout — {layoutEditing.nome} ({layoutEditing.larguraMm}mm x {layoutEditing.alturaMm}mm)
+              </h3>
+              <button onClick={closeLayout} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-4">
+              {(Object.keys(TIPO_LABEL) as ElementoTipo[]).map((tipo) => (
+                <button
+                  key={tipo}
+                  onClick={() => addElemento(tipo)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors text-xs font-medium"
+                >
+                  <Plus className="w-3 h-3" /> {TIPO_LABEL[tipo]}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-6">
+              <div
+                ref={canvasRef}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onClick={() => setSelectedId(null)}
+                className="relative bg-white border-2 border-slate-300 rounded shrink-0"
+                style={{ width: canvasSize.width, height: canvasSize.height }}
+              >
+                {elementos.map((el) => (
+                  <div
+                    key={el.id}
+                    onPointerDown={(e) => handlePointerDown(e, el)}
+                    className={`absolute flex items-center justify-center text-center text-[9px] leading-tight cursor-move select-none border ${
+                      selectedId === el.id
+                        ? "border-brand-500 bg-brand-50 text-brand-800 ring-2 ring-brand-300"
+                        : "border-slate-300 bg-slate-50 text-slate-500"
+                    }`}
+                    style={{
+                      left: el.x * PX_PER_MM,
+                      top: el.y * PX_PER_MM,
+                      width: el.largura * PX_PER_MM,
+                      height: el.altura * PX_PER_MM,
+                    }}
+                  >
+                    {el.tipo === "texto" ? el.texto : TIPO_LABEL[el.tipo]}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex-1 min-w-[220px]">
+                {selected ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold text-slate-700">{TIPO_LABEL[selected.tipo]}</p>
+                    {selected.tipo === "texto" && (
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Texto</label>
+                        <input
+                          type="text"
+                          value={selected.texto ?? ""}
+                          onChange={(e) => updateElemento(selected.id, { texto: e.target.value })}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        />
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">X (mm)</label>
+                        <input
+                          type="number"
+                          value={Math.round(selected.x)}
+                          onChange={(e) => updateElemento(selected.id, { x: Number(e.target.value) })}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Y (mm)</label>
+                        <input
+                          type="number"
+                          value={Math.round(selected.y)}
+                          onChange={(e) => updateElemento(selected.id, { y: Number(e.target.value) })}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Largura (mm)</label>
+                        <input
+                          type="number"
+                          value={Math.round(selected.largura)}
+                          onChange={(e) => updateElemento(selected.id, { largura: Number(e.target.value) })}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Altura (mm)</label>
+                        <input
+                          type="number"
+                          value={Math.round(selected.altura)}
+                          onChange={(e) => updateElemento(selected.id, { altura: Number(e.target.value) })}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => removeElemento(selected.id)}
+                      className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" /> Remover elemento
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400">
+                    Clique num botão acima para adicionar um elemento, ou clique num elemento na etiqueta para
+                    editá-lo. Arraste os elementos para reposicionar.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={closeLayout}
+                disabled={savingLayout}
+                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveLayout}
+                disabled={savingLayout}
+                className="px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium disabled:opacity-60"
+              >
+                {savingLayout ? "Salvando..." : "Salvar Layout"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Excluir Formato de Impressão"
+        message="Tem certeza que deseja excluir este formato de impressão? Essa ação não pode ser desfeita."
+        danger
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </div>
+  );
+}

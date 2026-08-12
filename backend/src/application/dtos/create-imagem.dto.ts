@@ -1,10 +1,12 @@
-import { IsNumber, IsOptional, IsString } from "class-validator";
+import { IsNotEmpty, IsNumber, IsOptional, IsString } from "class-validator";
 
 export class CreateImagemDto {
   @IsString()
+  @IsNotEmpty()
   nome!: string;
 
   @IsString()
+  @IsNotEmpty()
   url!: string;
 
   @IsOptional()

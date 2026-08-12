@@ -14,28 +14,32 @@ export class SubSetoresController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.subSetores.findAll(this.clienteId(req));
+    return this.subSetores.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.subSetores.findById(id, this.clienteId(req));
+    return this.subSetores.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateSubSetorDto, @Req() req: Request) {
-    return this.subSetores.create({ ...dto, clienteId: this.clienteId(req) });
+    return this.subSetores.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateSubSetorDto, @Req() req: Request) {
-    return this.subSetores.update(id, this.clienteId(req), dto);
+    return this.subSetores.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.subSetores.delete(id, this.clienteId(req));
+    return this.subSetores.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

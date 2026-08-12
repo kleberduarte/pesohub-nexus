@@ -3,6 +3,7 @@ export type DeviceStatus = "ONLINE" | "OFFLINE" | "NOT_CONFIGURED";
 export class Device {
   id!: string;
   clienteId!: string;
+  lojaId!: string;
   nome!: string;
   ip!: string;
   porta!: number;

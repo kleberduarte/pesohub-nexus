@@ -63,7 +63,10 @@ $exe = Join-Path $InstallDir "agent-local.exe"
 $logOut = Join-Path $InstallDir "agent-local.out.log"
 $logErr = Join-Path $InstallDir "agent-local.err.log"
 
+$prevErrorAction = $ErrorActionPreference
+$ErrorActionPreference = "SilentlyContinue"
 $existing = & $nssm status $ServiceName 2>$null
+$ErrorActionPreference = $prevErrorAction
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Servico ja existe, removendo versao anterior..."
     & $nssm stop $ServiceName 2>$null | Out-Null

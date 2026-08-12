@@ -18,15 +18,19 @@ import {
   SlidersHorizontal,
   Settings,
   Wand2,
+  CreditCard,
+  Store,
 } from "lucide-react";
 import {
   authApi,
   clearCurrentUser,
   clientesApi,
   getCurrentUser,
+  lojasApi,
   setActiveClienteToken,
   type ClienteBranding,
   type DecodedUser,
+  type Loja,
 } from "../../lib/api";
 import { applyBranding } from "../../lib/branding";
 
@@ -41,6 +45,8 @@ const baseNavigation = [
   { name: "Configurações", href: "/configuracoes", icon: Settings },
   { name: "Sincronização", href: "/sync", icon: CloudUpload },
   { name: "Usuários", href: "/usuarios", icon: Users },
+  { name: "Lojas", href: "/lojas", icon: Store },
+  { name: "Assinatura", href: "/assinatura", icon: CreditCard },
 ];
 
 const superadminNavigation = [{ name: "Empresas", href: "/empresas", icon: Building2 }];
@@ -50,6 +56,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [branding, setBranding] = useState<ClienteBranding | null>(null);
   const [user, setUser] = useState<DecodedUser | null>(null);
+  const [lojas, setLojas] = useState<Loja[]>([]);
+  const [switchingLoja, setSwitchingLoja] = useState(false);
 
   useEffect(() => {
     if (!getCurrentUser()) {
@@ -64,6 +72,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .then(setUser)
       .catch(() => {
         // request() já trata o redirect em caso de 401
+      });
+    lojasApi
+      .list()
+      .then(setLojas)
+      .catch(() => {
+        // sem empresa ativa ainda, ou usuário SUPERADMIN sem cliente selecionado
       });
     clientesApi
       .branding()
@@ -145,6 +159,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </h1>
           </div>
           <div className="flex items-center space-x-4">
+            {lojas.length > 0 && (
+              <select
+                value={user?.lojaId ?? ""}
+                disabled={switchingLoja}
+                onChange={async (e) => {
+                  setSwitchingLoja(true);
+                  try {
+                    const { user: updated } = await authApi.switchLoja(e.target.value);
+                    setUser(updated);
+                  } finally {
+                    setSwitchingLoja(false);
+                  }
+                }}
+                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              >
+                {lojas.map((loja) => (
+                  <option key={loja.id} value={loja.id}>
+                    {loja.nome}
+                  </option>
+                ))}
+              </select>
+            )}
             <button className="relative p-2 text-slate-400 hover:text-brand-600 transition-colors">
               <Bell className="w-6 h-6" />
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-600 rounded-full"></span>

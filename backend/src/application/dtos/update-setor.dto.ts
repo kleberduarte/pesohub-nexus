@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class UpdateSetorDto {
   @IsOptional()
@@ -7,5 +7,6 @@ export class UpdateSetorDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   nome?: string;
 }

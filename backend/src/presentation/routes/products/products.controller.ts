@@ -24,30 +24,30 @@ export class ProductsController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.products.findAll(this.clienteId(req));
+    return this.products.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.products.findById(id, this.clienteId(req));
+    return this.products.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateProductDto, @Req() req: Request) {
-    return this.createProduct.execute(this.clienteId(req), dto);
+    return this.createProduct.execute(this.clienteId(req), this.lojaId(req), dto);
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateProductDto, @Req() req: Request) {
-    return this.updateProduct.execute(id, this.clienteId(req), dto);
+    return this.updateProduct.execute(id, this.lojaId(req), dto);
   }
 
   @Delete()
   @UseGuards(RolesGuard)
   @Roles("ADMIN", "SUPERADMIN")
   async removeAll(@Req() req: Request) {
-    const clienteId = this.clienteId(req);
-    const count = await this.products.deleteAll(clienteId);
+    const lojaId = this.lojaId(req);
+    const count = await this.products.deleteAll(lojaId);
     await this.auditLog.record(req, "products.delete_all", { count });
     return { deleted: count };
   }
@@ -55,10 +55,14 @@ export class ProductsController {
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.products.delete(id, this.clienteId(req));
+    return this.products.delete(id, this.lojaId(req));
   }
 
   private clienteId(req: Request): string {
     return (req as unknown as { user: { clienteId: string } }).user.clienteId;
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 }

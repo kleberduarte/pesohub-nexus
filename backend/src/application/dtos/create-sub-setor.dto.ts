@@ -1,13 +1,15 @@
-import { IsInt, IsOptional, IsString } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class CreateSubSetorDto {
   @IsInt()
   numero!: number;
 
   @IsString()
+  @IsNotEmpty()
   nome!: string;
 
   @IsString()
+  @IsNotEmpty()
   setorId!: string;
 
   @IsOptional()

@@ -1,4 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
@@ -8,6 +9,7 @@ interface AuthenticatedUser {
   email: string;
   role: string;
   clienteId: string | null;
+  lojaId: string | null;
 }
 
 @Injectable()
@@ -27,8 +29,15 @@ export class AuthService {
     // via "trocar de empresa" (persistida em activeClienteId), se houver,
     // pra manter a sessão na mesma empresa após logout/login.
     const effectiveClienteId = user.role === "SUPERADMIN" ? user.activeClienteId : user.clienteId;
+    const effectiveLojaId = await this.resolveEffectiveLoja(user.id, effectiveClienteId, user.activeLojaId, user.perfilId);
 
-    const payload = { sub: user.id, email: user.email, role: user.role, clienteId: effectiveClienteId };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      clienteId: effectiveClienteId,
+      lojaId: effectiveLojaId,
+    };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
       user: payload,
@@ -47,13 +56,85 @@ export class AuthService {
 
     await this.prisma.user.update({
       where: { id: currentUser.sub },
-      data: { activeClienteId: cliente.id },
+      data: { activeClienteId: cliente.id, activeLojaId: null },
     });
 
-    const payload = { sub: currentUser.sub, email: currentUser.email, role: currentUser.role, clienteId: cliente.id };
+    const effectiveLojaId = await this.resolveEffectiveLoja(currentUser.sub, cliente.id, null, null);
+
+    const payload = {
+      sub: currentUser.sub,
+      email: currentUser.email,
+      role: currentUser.role,
+      clienteId: cliente.id,
+      lojaId: effectiveLojaId,
+    };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
       user: payload,
     };
+  }
+
+  async switchLoja(currentUser: AuthenticatedUser, lojaId: string) {
+    if (!currentUser.clienteId) {
+      throw new ForbiddenException("Nenhuma empresa ativa");
+    }
+
+    const loja = await this.prisma.loja.findFirst({ where: { id: lojaId, clienteId: currentUser.clienteId } });
+    if (!loja) {
+      throw new NotFoundException("Loja não encontrada");
+    }
+
+    if (currentUser.role !== "SUPERADMIN" && currentUser.role !== "ADMIN") {
+      const permitido = await this.userHasLojaAccess(currentUser.sub, lojaId);
+      if (!permitido) {
+        throw new ForbiddenException("Seu perfil não tem acesso a esta loja");
+      }
+    }
+
+    await this.prisma.user.update({ where: { id: currentUser.sub }, data: { activeLojaId: lojaId } });
+
+    const payload = {
+      sub: currentUser.sub,
+      email: currentUser.email,
+      role: currentUser.role,
+      clienteId: currentUser.clienteId,
+      lojaId,
+    };
+    return {
+      accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
+      user: payload,
+    };
+  }
+
+  /**
+   * ADMIN/SUPERADMIN sem perfil configurado enxergam todas as lojas do Cliente
+   * (dono da conta). Usuários com um Perfil ficam restritos às lojas daquele
+   * perfil (ver PerfilLojaAcesso).
+   */
+  private async userHasLojaAccess(userId: string, lojaId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.perfilId) return true;
+    const acesso = await this.prisma.perfilLojaAcesso.findFirst({ where: { perfilId: user.perfilId, lojaId } });
+    return !!acesso;
+  }
+
+  private async resolveEffectiveLoja(
+    userId: string,
+    clienteId: string | null,
+    activeLojaId: string | null,
+    perfilId: string | null,
+  ): Promise<string | null> {
+    if (!clienteId) return null;
+
+    if (activeLojaId) {
+      const loja = await this.prisma.loja.findFirst({ where: { id: activeLojaId, clienteId } });
+      if (loja) return loja.id;
+    }
+
+    const where = perfilId
+      ? { clienteId, perfilAcessos: { some: { perfilId } } }
+      : { clienteId };
+    const primeiraLoja = await this.prisma.loja.findFirst({ where, orderBy: { createdAt: "asc" } });
+    return primeiraLoja?.id ?? null;
   }
 }

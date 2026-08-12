@@ -1,8 +1,9 @@
-import { IsIP, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsIP, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class UpdateDeviceDto {
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   nome?: string;
 
   @IsOptional()

@@ -8,16 +8,16 @@ import { CodigoBarrasFormatoRepository } from "../../domain/repositories/codigo-
 export class CodigoBarrasFormatoPrismaRepository implements CodigoBarrasFormatoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<CodigoBarrasFormato[]> {
+  findAll(lojaId: string): Promise<CodigoBarrasFormato[]> {
     return this.prisma.codigoBarrasFormato.findMany({
-      where: { clienteId },
+      where: { lojaId },
       orderBy: { numero: "asc" },
     }) as unknown as Promise<CodigoBarrasFormato[]>;
   }
 
-  findById(id: string, clienteId: string): Promise<CodigoBarrasFormato | null> {
+  findById(id: string, lojaId: string): Promise<CodigoBarrasFormato | null> {
     return this.prisma.codigoBarrasFormato.findFirst({
-      where: { id, clienteId },
+      where: { id, lojaId },
     }) as unknown as Promise<CodigoBarrasFormato | null>;
   }
 
@@ -34,21 +34,21 @@ export class CodigoBarrasFormatoPrismaRepository implements CodigoBarrasFormatoR
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<CodigoBarrasFormato>): Promise<CodigoBarrasFormato> {
+  async update(id: string, lojaId: string, data: Partial<CodigoBarrasFormato>): Promise<CodigoBarrasFormato> {
     const result = await this.prisma.codigoBarrasFormato.updateMany({
-      where: { id, clienteId },
+      where: { id, lojaId },
       data: data as unknown as Prisma.CodigoBarrasFormatoUncheckedUpdateManyInput,
     });
     if (result.count === 0) {
       throw new NotFoundException("Formato de código de barras não encontrado.");
     }
     return this.prisma.codigoBarrasFormato.findFirst({
-      where: { id, clienteId },
+      where: { id, lojaId },
     }) as unknown as Promise<CodigoBarrasFormato>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.codigoBarrasFormato.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.codigoBarrasFormato.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Formato de código de barras não encontrado.");
     }

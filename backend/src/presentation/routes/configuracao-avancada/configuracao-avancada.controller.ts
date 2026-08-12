@@ -18,15 +18,19 @@ export class ConfiguracaoAvancadaController {
 
   @Get()
   find(@Req() req: Request) {
-    return this.config.findByCliente(this.clienteId(req));
+    return this.config.findByLoja(this.lojaId(req));
   }
 
   @Put()
   upsert(@Body() dto: UpsertConfiguracaoAvancadaDto, @Req() req: Request) {
-    return this.config.upsert(this.clienteId(req), dto);
+    return this.config.upsert(this.clienteId(req), this.lojaId(req), dto);
   }
 
   private clienteId(req: Request): string {
     return (req as unknown as { user: { clienteId: string } }).user.clienteId;
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 }

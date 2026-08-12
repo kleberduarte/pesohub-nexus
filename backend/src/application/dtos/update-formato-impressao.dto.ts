@@ -1,4 +1,4 @@
-import { IsInt, IsObject, IsOptional, IsString } from "class-validator";
+import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString } from "class-validator";
 
 export class UpdateFormatoImpressaoDto {
   @IsOptional()
@@ -7,6 +7,7 @@ export class UpdateFormatoImpressaoDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   nome?: string;
 
   @IsOptional()

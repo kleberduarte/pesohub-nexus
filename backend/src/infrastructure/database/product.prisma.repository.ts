@@ -50,13 +50,13 @@ function toProduct(row: Record<string, unknown> | null): Product | null {
 export class ProductPrismaRepository implements ProductRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(clienteId: string): Promise<Product[]> {
-    const rows = await this.prisma.product.findMany({ where: { clienteId } });
+  async findAll(lojaId: string): Promise<Product[]> {
+    const rows = await this.prisma.product.findMany({ where: { lojaId } });
     return rows.map((row) => toProduct(row as unknown as Record<string, unknown>) as Product);
   }
 
-  async findById(id: string, clienteId: string): Promise<Product | null> {
-    const row = await this.prisma.product.findFirst({ where: { id, clienteId } });
+  async findById(id: string, lojaId: string): Promise<Product | null> {
+    const row = await this.prisma.product.findFirst({ where: { id, lojaId } });
     return toProduct(row as unknown as Record<string, unknown> | null);
   }
 
@@ -74,20 +74,20 @@ export class ProductPrismaRepository implements ProductRepository {
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<Product>): Promise<Product> {
+  async update(id: string, lojaId: string, data: Partial<Product>): Promise<Product> {
     const result = await this.prisma.product.updateMany({
-      where: { id, clienteId },
+      where: { id, lojaId },
       data: { ...sanitizeRelationIds(data), versao: { increment: 1 } } as unknown as Prisma.ProductUncheckedUpdateManyInput,
     });
     if (result.count === 0) {
       throw new NotFoundException("Produto não encontrado.");
     }
-    const row = await this.prisma.product.findFirst({ where: { id, clienteId } });
+    const row = await this.prisma.product.findFirst({ where: { id, lojaId } });
     return toProduct(row as unknown as Record<string, unknown> | null) as Product;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const product = await this.prisma.product.findFirst({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const product = await this.prisma.product.findFirst({ where: { id, lojaId } });
     if (!product) {
       throw new NotFoundException("Produto não encontrado.");
     }
@@ -97,15 +97,15 @@ export class ProductPrismaRepository implements ProductRepository {
     ]);
   }
 
-  async deleteAll(clienteId: string): Promise<number> {
+  async deleteAll(lojaId: string): Promise<number> {
     const ids = (
-      await this.prisma.product.findMany({ where: { clienteId }, select: { id: true } })
+      await this.prisma.product.findMany({ where: { lojaId }, select: { id: true } })
     ).map((p) => p.id);
     if (ids.length === 0) return 0;
 
     const result = await this.prisma.$transaction([
       this.prisma.syncJobItem.deleteMany({ where: { productId: { in: ids } } }),
-      this.prisma.product.deleteMany({ where: { clienteId } }),
+      this.prisma.product.deleteMany({ where: { lojaId } }),
     ]);
     return result[1].count;
   }

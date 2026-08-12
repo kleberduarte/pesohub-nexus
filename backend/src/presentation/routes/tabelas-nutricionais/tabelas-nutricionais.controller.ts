@@ -19,28 +19,32 @@ export class TabelasNutricionaisController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.tabelas.findAll(this.clienteId(req));
+    return this.tabelas.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.tabelas.findById(id, this.clienteId(req));
+    return this.tabelas.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateTabelaNutricionalDto, @Req() req: Request) {
-    return this.tabelas.create({ ...dto, clienteId: this.clienteId(req) });
+    return this.tabelas.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateTabelaNutricionalDto, @Req() req: Request) {
-    return this.tabelas.update(id, this.clienteId(req), dto);
+    return this.tabelas.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.tabelas.delete(id, this.clienteId(req));
+    return this.tabelas.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

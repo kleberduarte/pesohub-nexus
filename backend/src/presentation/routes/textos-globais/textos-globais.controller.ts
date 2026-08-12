@@ -14,28 +14,32 @@ export class TextosGlobaisController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.textos.findAll(this.clienteId(req));
+    return this.textos.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.textos.findById(id, this.clienteId(req));
+    return this.textos.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateTextoGlobalDto, @Req() req: Request) {
-    return this.textos.create({ ...dto, clienteId: this.clienteId(req) });
+    return this.textos.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateTextoGlobalDto, @Req() req: Request) {
-    return this.textos.update(id, this.clienteId(req), dto);
+    return this.textos.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.textos.delete(id, this.clienteId(req));
+    return this.textos.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

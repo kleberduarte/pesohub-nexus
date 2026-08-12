@@ -7,9 +7,9 @@ import { UpdateOperadorDto } from "../dtos/update-operador.dto";
 export class UpdateOperadorUseCase {
   constructor(@Inject(OPERADOR_REPOSITORY) private readonly operadores: OperadorRepository) {}
 
-  async execute(id: string, clienteId: string, dto: UpdateOperadorDto) {
+  async execute(id: string, lojaId: string, dto: UpdateOperadorDto) {
     const senhaHash = dto.senha ? await bcrypt.hash(dto.senha, 10) : undefined;
-    return this.operadores.update(id, clienteId, {
+    return this.operadores.update(id, lojaId, {
       ...dto,
       senha: senhaHash,
     });

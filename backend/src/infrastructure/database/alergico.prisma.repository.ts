@@ -8,12 +8,12 @@ import { AlergicoRepository } from "../../domain/repositories/alergico.repositor
 export class AlergicoPrismaRepository implements AlergicoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<Alergico[]> {
-    return this.prisma.alergico.findMany({ where: { clienteId }, orderBy: { numero: "asc" } });
+  findAll(lojaId: string): Promise<Alergico[]> {
+    return this.prisma.alergico.findMany({ where: { lojaId }, orderBy: { numero: "asc" } });
   }
 
-  findById(id: string, clienteId: string): Promise<Alergico | null> {
-    return this.prisma.alergico.findFirst({ where: { id, clienteId } });
+  findById(id: string, lojaId: string): Promise<Alergico | null> {
+    return this.prisma.alergico.findFirst({ where: { id, lojaId } });
   }
 
   async create(data: Omit<Alergico, "id">): Promise<Alergico> {
@@ -27,16 +27,16 @@ export class AlergicoPrismaRepository implements AlergicoRepository {
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<Alergico>): Promise<Alergico> {
-    const result = await this.prisma.alergico.updateMany({ where: { id, clienteId }, data });
+  async update(id: string, lojaId: string, data: Partial<Alergico>): Promise<Alergico> {
+    const result = await this.prisma.alergico.updateMany({ where: { id, lojaId }, data });
     if (result.count === 0) {
       throw new NotFoundException("Alérgico não encontrado.");
     }
-    return this.prisma.alergico.findFirst({ where: { id, clienteId } }) as Promise<Alergico>;
+    return this.prisma.alergico.findFirst({ where: { id, lojaId } }) as Promise<Alergico>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.alergico.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.alergico.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Alérgico não encontrado.");
     }

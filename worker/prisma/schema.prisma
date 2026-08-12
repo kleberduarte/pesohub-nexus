@@ -55,29 +55,91 @@ enum CodigoBarrasTipo {
   EAN128
 }
 
+enum StatusAssinatura {
+  TRIAL
+  ATIVA
+  INADIMPLENTE
+  CANCELADA
+}
+
+enum FormaPagamentoAssinatura {
+  PIX
+  BOLETO
+  CARTAO_CREDITO
+}
+
+enum StatusFatura {
+  PENDENTE
+  CONFIRMADA
+  RECEBIDA
+  VENCIDA
+  CANCELADA
+}
+
 model Cliente {
+  id                    String                 @id @default(cuid())
+  accessToken           String                 @unique @default(cuid())
+  nome                  String
+  logoUrl               String?
+  corPrimaria           String?
+  corSecundaria         String?
+  corFundo              String?
+  corTexto              String?
+  corBotao              String?
+  corBotaoTexto         String?
+  tagline               String?
+  chavePix              String?
+  suporteEmail          String?
+  suporteWhatsapp       String?
+  isDefault             Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  lojas                 Loja[]
+  perfis                Perfil[]
+  devices               Device[]
+  deviceGroups          DeviceGroup[]
+  agents                Agent[]
+  products              Product[]
+  users                 User[]
+  activeForUsers        User[]                 @relation("UserActiveCliente")
+  setores               Setor[]
+  subSetores            SubSetor[]
+  fornecedores          Fornecedor[]
+  alergicos             Alergico[]
+  tabelasNutricionais   TabelaNutricional[]
+  operadores            Operador[]
+  imagens               Imagem[]
+  formatosImpressao     FormatoImpressao[]
+  codigosBarrasFormato  CodigoBarrasFormato[]
+  textosGlobais         TextoGlobal[]
+  teclasAcessoRapido    TeclaAcessoRapido[]
+  specParametros        SpecParametro[]
+  assinatura            Assinatura?
+  configuracaoAvancadas ConfiguracaoAvancada[]
+}
+
+/// Uma unidade/loja física onde o Cliente (revendedor, ex.: Ramuza) instala
+/// balanças em nome de um cliente final (ex.: Carrefour, Pão de Açúcar).
+/// Não tem identidade visual própria — herda o branding do Cliente pai.
+model Loja {
   id                   String                @id @default(cuid())
-  accessToken          String                @unique @default(cuid())
+  clienteId            String
+  cliente              Cliente               @relation(fields: [clienteId], references: [id])
   nome                 String
-  logoUrl              String?
-  corPrimaria          String?
-  corSecundaria        String?
-  corFundo             String?
-  corTexto             String?
-  corBotao             String?
-  corBotaoTexto        String?
-  tagline              String?
-  chavePix             String?
-  suporteEmail         String?
-  suporteWhatsapp      String?
-  isDefault            Boolean               @default(false)
+  endereco             String?
+  cep                  String?
+  telefone             String?
+  responsavel          String?
+  email                String?
+  cnpj                 String?
+  ativo                Boolean               @default(true)
   createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  perfilAcessos        PerfilLojaAcesso[]
+  activeForUsers       User[]                @relation("UserActiveLoja")
   devices              Device[]
   deviceGroups         DeviceGroup[]
   agents               Agent[]
   products             Product[]
-  users                User[]
-  activeForUsers       User[]                @relation("UserActiveCliente")
   setores              Setor[]
   subSetores           SubSetor[]
   fornecedores         Fornecedor[]
@@ -93,10 +155,65 @@ model Cliente {
   configuracaoAvancada ConfiguracaoAvancada?
 }
 
+/// Um perfil de acesso configurável (ex.: "Gerente Regional", "Operador Açaí")
+/// que agrupa um conjunto de Lojas visíveis para os usuários vinculados a ele.
+model Perfil {
+  id        String             @id @default(cuid())
+  clienteId String
+  cliente   Cliente            @relation(fields: [clienteId], references: [id])
+  nome      String
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  lojas     PerfilLojaAcesso[]
+  users     User[]
+
+  @@unique([clienteId, nome])
+}
+
+model PerfilLojaAcesso {
+  id       String @id @default(cuid())
+  perfilId String
+  perfil   Perfil @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+  lojaId   String
+  loja     Loja   @relation(fields: [lojaId], references: [id], onDelete: Cascade)
+
+  @@unique([perfilId, lojaId])
+}
+
+model Assinatura {
+  id                  String                   @id @default(cuid())
+  clienteId           String                   @unique
+  cliente             Cliente                  @relation(fields: [clienteId], references: [id])
+  asaasCustomerId     String
+  asaasSubscriptionId String?                  @unique
+  status              StatusAssinatura         @default(TRIAL)
+  formaPagamento      FormaPagamentoAssinatura
+  valor               Decimal                  @db.Decimal(10, 2)
+  proximoVencimento   DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  faturas             Fatura[]
+}
+
+model Fatura {
+  id             String       @id @default(cuid())
+  assinaturaId   String
+  assinatura     Assinatura   @relation(fields: [assinaturaId], references: [id])
+  asaasPaymentId String       @unique
+  valor          Decimal      @db.Decimal(10, 2)
+  status         StatusFatura @default(PENDENTE)
+  linkPagamento  String?
+  dataVencimento DateTime?
+  dataPagamento  DateTime?
+  createdAt      DateTime     @default(now())
+}
+
 model Device {
   id           String       @id @default(cuid())
   clienteId    String
   cliente      Cliente      @relation(fields: [clienteId], references: [id])
+  lojaId       String
+  loja         Loja         @relation(fields: [lojaId], references: [id])
   nome         String
   ip           String
   porta        Int          @default(33581)
@@ -115,6 +232,8 @@ model DeviceGroup {
   id        String   @id @default(cuid())
   clienteId String
   cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  lojaId    String
+  loja      Loja     @relation(fields: [lojaId], references: [id])
   nome      String
   devices   Device[]
 }
@@ -123,8 +242,9 @@ model Agent {
   id              String    @id @default(cuid())
   clienteId       String
   cliente         Cliente   @relation(fields: [clienteId], references: [id])
-  token           String    @unique
   lojaId          String
+  loja            Loja      @relation(fields: [lojaId], references: [id])
+  token           String    @unique
   versao          String
   ultimoHeartbeat DateTime?
   devices         Device[]
@@ -135,19 +255,23 @@ model Setor {
   id         String     @id @default(cuid())
   clienteId  String
   cliente    Cliente    @relation(fields: [clienteId], references: [id])
+  lojaId     String
+  loja       Loja       @relation(fields: [lojaId], references: [id])
   numero     Int
   nome       String
   subSetores SubSetor[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model SubSetor {
   id                    String               @id @default(cuid())
   clienteId             String
   cliente               Cliente              @relation(fields: [clienteId], references: [id])
+  lojaId                String
+  loja                  Loja                 @relation(fields: [lojaId], references: [id])
   numero                Int
   nome                  String
   setorId               String
@@ -161,13 +285,15 @@ model SubSetor {
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model Fornecedor {
   id         String    @id @default(cuid())
   clienteId  String
   cliente    Cliente   @relation(fields: [clienteId], references: [id])
+  lojaId     String
+  loja       Loja      @relation(fields: [lojaId], references: [id])
   numero     Int
   nome       String
   informacao String?
@@ -175,13 +301,15 @@ model Fornecedor {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model Alergico {
   id         String    @id @default(cuid())
   clienteId  String
   cliente    Cliente   @relation(fields: [clienteId], references: [id])
+  lojaId     String
+  loja       Loja      @relation(fields: [lojaId], references: [id])
   numero     Int
   nome       String
   informacao String?
@@ -189,13 +317,15 @@ model Alergico {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model TabelaNutricional {
   id        String                  @id @default(cuid())
   clienteId String
   cliente   Cliente                 @relation(fields: [clienteId], references: [id])
+  lojaId    String
+  loja      Loja                    @relation(fields: [lojaId], references: [id])
   numero    Int
   nome      String
   porcao    String?
@@ -204,7 +334,7 @@ model TabelaNutricional {
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model TabelaNutricionalItem {
@@ -222,6 +352,8 @@ model Operador {
   id         String   @id @default(cuid())
   clienteId  String
   cliente    Cliente  @relation(fields: [clienteId], references: [id])
+  lojaId     String
+  loja       Loja     @relation(fields: [lojaId], references: [id])
   numero     Int
   nome       String
   senha      String
@@ -230,13 +362,15 @@ model Operador {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model Imagem {
   id        String    @id @default(cuid())
   clienteId String
   cliente   Cliente   @relation(fields: [clienteId], references: [id])
+  lojaId    String
+  loja      Loja      @relation(fields: [lojaId], references: [id])
   nome      String
   url       String
   larguraMm Decimal?  @db.Decimal(6, 2)
@@ -250,6 +384,8 @@ model FormatoImpressao {
   id         String     @id @default(cuid())
   clienteId  String
   cliente    Cliente    @relation(fields: [clienteId], references: [id])
+  lojaId     String
+  loja       Loja       @relation(fields: [lojaId], references: [id])
   numero     Int
   nome       String
   tipo       Int        @default(1)
@@ -261,13 +397,15 @@ model FormatoImpressao {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model CodigoBarrasFormato {
   id          String           @id @default(cuid())
   clienteId   String
   cliente     Cliente          @relation(fields: [clienteId], references: [id])
+  lojaId      String
+  loja        Loja             @relation(fields: [lojaId], references: [id])
   numero      Int
   nome        String
   tipo        CodigoBarrasTipo @default(EAN13)
@@ -280,25 +418,29 @@ model CodigoBarrasFormato {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model TextoGlobal {
   id        String   @id @default(cuid())
   clienteId String
   cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  lojaId    String
+  loja      Loja     @relation(fields: [lojaId], references: [id])
   indice    Int
   texto     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([clienteId, indice])
+  @@unique([lojaId, indice])
 }
 
 model TeclaAcessoRapido {
   id        String   @id @default(cuid())
   clienteId String
   cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  lojaId    String
+  loja      Loja     @relation(fields: [lojaId], references: [id])
   nome      String
   modelo    String
   pagina    String
@@ -311,18 +453,22 @@ model SpecParametro {
   id        String   @id @default(cuid())
   clienteId String
   cliente   Cliente  @relation(fields: [clienteId], references: [id])
+  lojaId    String
+  loja      Loja     @relation(fields: [lojaId], references: [id])
   numero    Int
   valor     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([clienteId, numero])
+  @@unique([lojaId, numero])
 }
 
 model ConfiguracaoAvancada {
   id                   String   @id @default(cuid())
-  clienteId            String   @unique
+  clienteId            String
   cliente              Cliente  @relation(fields: [clienteId], references: [id])
+  lojaId               String   @unique
+  loja                 Loja     @relation(fields: [lojaId], references: [id])
   menusHabilitados     Json?
   funcaoPluPermitir    Json?
   fonteExibicao        String?
@@ -337,6 +483,8 @@ model Product {
   id               String        @id @default(cuid())
   clienteId        String
   cliente          Cliente       @relation(fields: [clienteId], references: [id])
+  lojaId           String
+  loja             Loja          @relation(fields: [lojaId], references: [id])
   codigo           String
   codigoBarras     String
   nome             String
@@ -387,8 +535,8 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([clienteId, codigo])
-  @@unique([clienteId, codigoBarras])
+  @@unique([lojaId, codigo])
+  @@unique([lojaId, codigoBarras])
 }
 
 model SyncJob {
@@ -423,6 +571,13 @@ model User {
   /// pro SUPERADMIN), perdendo a troca feita em sessões anteriores.
   activeClienteId String?
   activeCliente   Cliente? @relation("UserActiveCliente", fields: [activeClienteId], references: [id], onDelete: SetNull)
+  /// Perfil configurável que define a quais Lojas este usuário tem acesso
+  /// (dentro do Cliente). Nulo para SUPERADMIN, que não precisa de escopo de loja.
+  perfilId        String?
+  perfil          Perfil?  @relation(fields: [perfilId], references: [id])
+  /// Última loja selecionada via "trocar de loja", dentre as permitidas pelo Perfil.
+  activeLojaId    String?
+  activeLoja      Loja?    @relation("UserActiveLoja", fields: [activeLojaId], references: [id], onDelete: SetNull)
   email           String   @unique
   senha           String
   role            UserRole @default(OPERADOR)

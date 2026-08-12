@@ -8,15 +8,15 @@ import { TeclaAcessoRapidoRepository } from "../../domain/repositories/tecla-ace
 export class TeclaAcessoRapidoPrismaRepository implements TeclaAcessoRapidoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<TeclaAcessoRapido[]> {
+  findAll(lojaId: string): Promise<TeclaAcessoRapido[]> {
     return this.prisma.teclaAcessoRapido.findMany({
-      where: { clienteId },
+      where: { lojaId },
     }) as unknown as Promise<TeclaAcessoRapido[]>;
   }
 
-  findById(id: string, clienteId: string): Promise<TeclaAcessoRapido | null> {
+  findById(id: string, lojaId: string): Promise<TeclaAcessoRapido | null> {
     return this.prisma.teclaAcessoRapido.findFirst({
-      where: { id, clienteId },
+      where: { id, lojaId },
     }) as unknown as Promise<TeclaAcessoRapido | null>;
   }
 
@@ -26,21 +26,21 @@ export class TeclaAcessoRapidoPrismaRepository implements TeclaAcessoRapidoRepos
     })) as unknown as TeclaAcessoRapido;
   }
 
-  async update(id: string, clienteId: string, data: Partial<TeclaAcessoRapido>): Promise<TeclaAcessoRapido> {
+  async update(id: string, lojaId: string, data: Partial<TeclaAcessoRapido>): Promise<TeclaAcessoRapido> {
     const result = await this.prisma.teclaAcessoRapido.updateMany({
-      where: { id, clienteId },
+      where: { id, lojaId },
       data: data as unknown as Prisma.TeclaAcessoRapidoUncheckedUpdateManyInput,
     });
     if (result.count === 0) {
       throw new NotFoundException("Tecla de acesso rápido não encontrada.");
     }
     return this.prisma.teclaAcessoRapido.findFirst({
-      where: { id, clienteId },
+      where: { id, lojaId },
     }) as unknown as Promise<TeclaAcessoRapido>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.teclaAcessoRapido.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.teclaAcessoRapido.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Tecla de acesso rápido não encontrada.");
     }

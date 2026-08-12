@@ -21,9 +21,9 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
 
     const products =
       tipo === "TOTAL"
-        ? await prisma.product.findMany({ where: { ativo: true, clienteId: device.clienteId } })
+        ? await prisma.product.findMany({ where: { ativo: true, lojaId: device.lojaId } })
         : await prisma.product.findMany({
-            where: { id: { in: productIds ?? [] }, clienteId: device.clienteId },
+            where: { id: { in: productIds ?? [] }, lojaId: device.lojaId },
           });
 
     const syncJob = await prisma.syncJob.create({

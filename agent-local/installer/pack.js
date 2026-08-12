@@ -20,6 +20,8 @@ archive.pipe(output);
 
 archive.file(path.join(installerDir, "install.ps1"), { name: "install.ps1" });
 archive.file(path.join(installerDir, "uninstall.ps1"), { name: "uninstall.ps1" });
+archive.file(path.join(installerDir, "Instalar.bat"), { name: "Instalar.bat" });
+archive.file(path.join(installerDir, "Desinstalar.bat"), { name: "Desinstalar.bat" });
 archive.file(path.join(installerDir, "bin", "agent-local.exe"), { name: "bin/agent-local.exe" });
 archive.file(path.join(installerDir, "bin", "nssm.exe"), { name: "bin/nssm.exe" });
 

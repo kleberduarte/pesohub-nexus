@@ -7,14 +7,14 @@ import { SpecParametroRepository } from "../../domain/repositories/spec-parametr
 export class SpecParametroPrismaRepository implements SpecParametroRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<SpecParametro[]> {
-    return this.prisma.specParametro.findMany({ where: { clienteId }, orderBy: { numero: "asc" } });
+  findAll(lojaId: string): Promise<SpecParametro[]> {
+    return this.prisma.specParametro.findMany({ where: { lojaId }, orderBy: { numero: "asc" } });
   }
 
-  upsert(clienteId: string, numero: number, valor: string): Promise<SpecParametro> {
+  upsert(clienteId: string, lojaId: string, numero: number, valor: string): Promise<SpecParametro> {
     return this.prisma.specParametro.upsert({
-      where: { clienteId_numero: { clienteId, numero } },
-      create: { clienteId, numero, valor },
+      where: { lojaId_numero: { lojaId, numero } },
+      create: { clienteId, lojaId, numero, valor },
       update: { valor },
     });
   }
