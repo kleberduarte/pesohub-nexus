@@ -8,12 +8,12 @@ import { TextoGlobalRepository } from "../../domain/repositories/texto-global.re
 export class TextoGlobalPrismaRepository implements TextoGlobalRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<TextoGlobal[]> {
-    return this.prisma.textoGlobal.findMany({ where: { clienteId }, orderBy: { indice: "asc" } });
+  findAll(lojaId: string): Promise<TextoGlobal[]> {
+    return this.prisma.textoGlobal.findMany({ where: { lojaId }, orderBy: { indice: "asc" } });
   }
 
-  findById(id: string, clienteId: string): Promise<TextoGlobal | null> {
-    return this.prisma.textoGlobal.findFirst({ where: { id, clienteId } });
+  findById(id: string, lojaId: string): Promise<TextoGlobal | null> {
+    return this.prisma.textoGlobal.findFirst({ where: { id, lojaId } });
   }
 
   async create(data: Omit<TextoGlobal, "id">): Promise<TextoGlobal> {
@@ -27,16 +27,16 @@ export class TextoGlobalPrismaRepository implements TextoGlobalRepository {
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<TextoGlobal>): Promise<TextoGlobal> {
-    const result = await this.prisma.textoGlobal.updateMany({ where: { id, clienteId }, data });
+  async update(id: string, lojaId: string, data: Partial<TextoGlobal>): Promise<TextoGlobal> {
+    const result = await this.prisma.textoGlobal.updateMany({ where: { id, lojaId }, data });
     if (result.count === 0) {
       throw new NotFoundException("Texto global não encontrado.");
     }
-    return this.prisma.textoGlobal.findFirst({ where: { id, clienteId } }) as Promise<TextoGlobal>;
+    return this.prisma.textoGlobal.findFirst({ where: { id, lojaId } }) as Promise<TextoGlobal>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.textoGlobal.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.textoGlobal.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Texto global não encontrado.");
     }

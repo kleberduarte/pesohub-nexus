@@ -7,28 +7,28 @@ import { DeviceRepository } from "../../domain/repositories/device.repository";
 export class DevicePrismaRepository implements DeviceRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<Device[]> {
-    return this.prisma.device.findMany({ where: { clienteId } });
+  findAll(lojaId: string): Promise<Device[]> {
+    return this.prisma.device.findMany({ where: { lojaId } });
   }
 
-  findById(id: string, clienteId: string): Promise<Device | null> {
-    return this.prisma.device.findFirst({ where: { id, clienteId } });
+  findById(id: string, lojaId: string): Promise<Device | null> {
+    return this.prisma.device.findFirst({ where: { id, lojaId } });
   }
 
   create(data: Omit<Device, "id">): Promise<Device> {
     return this.prisma.device.create({ data });
   }
 
-  async update(id: string, clienteId: string, data: Partial<Device>): Promise<Device> {
-    const result = await this.prisma.device.updateMany({ where: { id, clienteId }, data });
+  async update(id: string, lojaId: string, data: Partial<Device>): Promise<Device> {
+    const result = await this.prisma.device.updateMany({ where: { id, lojaId }, data });
     if (result.count === 0) {
       throw new NotFoundException("Balança não encontrada.");
     }
-    return this.prisma.device.findFirst({ where: { id, clienteId } }) as Promise<Device>;
+    return this.prisma.device.findFirst({ where: { id, lojaId } }) as Promise<Device>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const device = await this.prisma.device.findFirst({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const device = await this.prisma.device.findFirst({ where: { id, lojaId } });
     if (!device) {
       throw new NotFoundException("Balança não encontrada.");
     }

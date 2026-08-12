@@ -14,28 +14,32 @@ export class SetoresController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.setores.findAll(this.clienteId(req));
+    return this.setores.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.setores.findById(id, this.clienteId(req));
+    return this.setores.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateSetorDto, @Req() req: Request) {
-    return this.setores.create({ ...dto, clienteId: this.clienteId(req) });
+    return this.setores.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateSetorDto, @Req() req: Request) {
-    return this.setores.update(id, this.clienteId(req), dto);
+    return this.setores.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.setores.delete(id, this.clienteId(req));
+    return this.setores.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

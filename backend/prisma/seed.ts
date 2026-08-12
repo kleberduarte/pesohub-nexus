@@ -44,6 +44,39 @@ async function main() {
   });
   console.log(`Cliente seed criado: ${acme.nome}`);
 
+  // A Ramuza é revendedora: instala balanças em nome de clientes finais
+  // (Carrefour, Pão de Açúcar, Açaí do Bairro) sem que cada um precise de
+  // identidade visual própria — tudo aparece sob a marca da Ramuza.
+  const lojasSeed = [
+    { id: "loja-default", clienteId: padrao.id, nome: "Loja padrão" },
+    { id: "loja-ramuza-carrefour", clienteId: ramuza.id, nome: "Carrefour" },
+    { id: "loja-ramuza-paodeacucar", clienteId: ramuza.id, nome: "Pão de Açúcar" },
+    { id: "loja-ramuza-acai", clienteId: ramuza.id, nome: "Açaí do Bairro" },
+    { id: "loja-acme-matriz", clienteId: acme.id, nome: "Matriz" },
+  ];
+  const lojas: Record<string, Awaited<ReturnType<typeof prisma.loja.upsert>>> = {};
+  for (const l of lojasSeed) {
+    lojas[l.id] = await prisma.loja.upsert({
+      where: { id: l.id },
+      update: {},
+      create: l,
+    });
+    console.log(`Loja seed criada: ${l.nome} (${l.clienteId})`);
+  }
+
+  const perfilRegional = await prisma.perfil.upsert({
+    where: { clienteId_nome: { clienteId: ramuza.id, nome: "Gerente Regional" } },
+    update: {},
+    create: {
+      clienteId: ramuza.id,
+      nome: "Gerente Regional",
+      lojas: {
+        create: [{ lojaId: lojas["loja-ramuza-carrefour"].id }, { lojaId: lojas["loja-ramuza-paodeacucar"].id }],
+      },
+    },
+  });
+  console.log(`Perfil seed criado: ${perfilRegional.nome} (acesso a Carrefour + Pão de Açúcar)`);
+
   const email = process.env.SEED_ADMIN_EMAIL ?? "admin@pesohub.com.br";
   const senhaPlana = process.env.SEED_ADMIN_PASSWORD ?? "admin123";
   const senha = await bcrypt.hash(senhaPlana, 10);
@@ -51,7 +84,13 @@ async function main() {
   await prisma.user.upsert({
     where: { email },
     update: {},
-    create: { email, senha, role: "ADMIN", clienteId: ramuza.id },
+    create: {
+      email,
+      senha,
+      role: "ADMIN",
+      clienteId: ramuza.id,
+      activeLojaId: lojas["loja-ramuza-carrefour"].id,
+    },
   });
 
   console.log(`Usuário seed criado: ${email}`);
@@ -69,12 +108,13 @@ async function main() {
   console.log(`Usuário seed criado: ${superadminEmail}`);
 
   const agentToken = process.env.SEED_AGENT_TOKEN ?? "dev-agent-local-token";
+  const lojaAgent = lojas["loja-ramuza-carrefour"];
   const agent = await prisma.agent.upsert({
     where: { token: agentToken },
     update: {},
-    create: { token: agentToken, lojaId: "loja-01", versao: "0.1.0", clienteId: ramuza.id },
+    create: { token: agentToken, lojaId: lojaAgent.id, versao: "0.1.0", clienteId: ramuza.id },
   });
-  console.log(`Agent Local seed criado: token=${agentToken}`);
+  console.log(`Agent Local seed criado: token=${agentToken} (loja=${lojaAgent.nome})`);
 
   const deviceIp = process.env.SEED_DEVICE_IP ?? "10.10.40.35";
   await prisma.device.upsert({
@@ -83,13 +123,14 @@ async function main() {
     create: {
       id: `seed-${deviceIp}`,
       clienteId: ramuza.id,
-      nome: "Balança Loja 01",
+      lojaId: lojaAgent.id,
+      nome: "Balança Carrefour 01",
       ip: deviceIp,
       porta: 33581,
       agentId: agent.id,
     },
   });
-  console.log(`Dispositivo seed criado: ${deviceIp}:33581 vinculado ao Agent Local`);
+  console.log(`Dispositivo seed criado: ${deviceIp}:33581 vinculado ao Agent Local (${lojaAgent.nome})`);
 }
 
 main()

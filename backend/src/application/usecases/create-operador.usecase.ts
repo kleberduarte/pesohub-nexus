@@ -7,10 +7,11 @@ import { CreateOperadorDto } from "../dtos/create-operador.dto";
 export class CreateOperadorUseCase {
   constructor(@Inject(OPERADOR_REPOSITORY) private readonly operadores: OperadorRepository) {}
 
-  async execute(clienteId: string, dto: CreateOperadorDto) {
+  async execute(clienteId: string, lojaId: string, dto: CreateOperadorDto) {
     const senhaHash = await bcrypt.hash(dto.senha, 10);
     return this.operadores.create({
       clienteId,
+      lojaId,
       numero: dto.numero,
       nome: dto.nome,
       senha: senhaHash,

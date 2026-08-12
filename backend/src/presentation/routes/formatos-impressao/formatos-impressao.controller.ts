@@ -19,28 +19,32 @@ export class FormatosImpressaoController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.formatos.findAll(this.clienteId(req));
+    return this.formatos.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.formatos.findById(id, this.clienteId(req));
+    return this.formatos.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateFormatoImpressaoDto, @Req() req: Request) {
-    return this.formatos.create({ ...dto, tipo: dto.tipo ?? 1, clienteId: this.clienteId(req) });
+    return this.formatos.create({ ...dto, tipo: dto.tipo ?? 1, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateFormatoImpressaoDto, @Req() req: Request) {
-    return this.formatos.update(id, this.clienteId(req), dto);
+    return this.formatos.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.formatos.delete(id, this.clienteId(req));
+    return this.formatos.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

@@ -8,7 +8,7 @@ describe("CreateOperadorUseCase", () => {
     };
     const usecase = new CreateOperadorUseCase(operadores as any);
 
-    const result = await usecase.execute("cliente-a", {
+    const result = await usecase.execute("cliente-a", "loja-a", {
       numero: 1,
       nome: "Operador 1",
       senha: "1234",
@@ -18,6 +18,7 @@ describe("CreateOperadorUseCase", () => {
     expect(persistedData.senha).not.toBe("1234");
     expect(await bcrypt.compare("1234", persistedData.senha)).toBe(true);
     expect(persistedData.clienteId).toBe("cliente-a");
+    expect(persistedData.lojaId).toBe("loja-a");
     expect(result.id).toBe("op-1");
   });
 });

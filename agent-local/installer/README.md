@@ -16,6 +16,7 @@ Isso vai:
 2. Empacotar `dist/index.js` num executável standalone Windows (`installer/bin/agent-local.exe`), via `pkg`.
 3. Gerar `installer/pesohub-agent-local-installer.zip`, contendo:
    - `install.ps1` / `uninstall.ps1`
+   - `Instalar.bat` / `Desinstalar.bat` (atalhos que pedem elevação e ignoram a política de execução do PowerShell)
    - `bin/agent-local.exe`
    - `bin/nssm.exe` (gerenciador de serviço Windows, https://nssm.cc)
 
@@ -27,9 +28,15 @@ Isso vai:
 ## Instalar na máquina do cliente (sem internet, sem Node.js)
 
 1. Copie `pesohub-agent-local-installer.zip` para a máquina (pendrive, etc.) e extraia.
-2. Clique com o botão direito em `install.ps1` → **Executar com PowerShell** (como Administrador).
-   - Se o PowerShell bloquear por política de execução, rode antes, num
-     PowerShell como Admin: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+2. Dê **duplo-clique em `Instalar.bat`**. Ele pede elevação (UAC) e já roda o
+   `install.ps1` ignorando bloqueio de política de execução — não precisa
+   configurar nada no PowerShell antes.
+   - Alternativa manual: clique com o botão direito em `install.ps1` →
+     **Executar com PowerShell** (como Administrador). Se a janela abrir e
+     fechar sozinha (tela piscando), é a política de execução do PowerShell
+     bloqueando o script sem mostrar erro — use o `Instalar.bat` acima, ou
+     rode manualmente num PowerShell como Admin:
+     `powershell -ExecutionPolicy Bypass -File install.ps1`
 3. Responda os prompts:
    - URL do backend PesoHub
    - Token do agente (por loja)
@@ -56,8 +63,8 @@ Isso vai:
 - Reconfigurar: editar `C:\PesoHub\agent-local\.env` e rodar
   `C:\PesoHub\agent-local\nssm.exe restart PesoHubAgentLocal`
 - Checar status: `C:\PesoHub\agent-local\nssm.exe status PesoHubAgentLocal`
-- Desinstalar: rodar `uninstall.ps1` como Administrador (do zip original, ou
-  copie-o para a máquina também).
+- Desinstalar: duplo-clique em `Desinstalar.bat` (ou rodar `uninstall.ps1`
+  como Administrador, do zip original, ou copie-o para a máquina também).
 
 ## Requisito de rede
 

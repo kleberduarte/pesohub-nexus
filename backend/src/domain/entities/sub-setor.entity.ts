@@ -1,6 +1,7 @@
 export class SubSetor {
   id!: string;
   clienteId!: string;
+  lojaId!: string;
   numero!: number;
   nome!: string;
   setorId!: string;

@@ -1,4 +1,4 @@
-import { IsInt, IsObject, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class UpdateOperadorDto {
   @IsOptional()
@@ -7,10 +7,12 @@ export class UpdateOperadorDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   nome?: string;
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   @MaxLength(7)
   senha?: string;
 

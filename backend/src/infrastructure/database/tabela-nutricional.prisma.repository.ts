@@ -11,17 +11,17 @@ import {
 export class TabelaNutricionalPrismaRepository implements TabelaNutricionalRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<TabelaNutricional[]> {
+  findAll(lojaId: string): Promise<TabelaNutricional[]> {
     return this.prisma.tabelaNutricional.findMany({
-      where: { clienteId },
+      where: { lojaId },
       orderBy: { numero: "asc" },
       include: { itens: { orderBy: { ordem: "asc" } } },
     }) as unknown as Promise<TabelaNutricional[]>;
   }
 
-  findById(id: string, clienteId: string): Promise<TabelaNutricional | null> {
+  findById(id: string, lojaId: string): Promise<TabelaNutricional | null> {
     return this.prisma.tabelaNutricional.findFirst({
-      where: { id, clienteId },
+      where: { id, lojaId },
       include: { itens: { orderBy: { ordem: "asc" } } },
     }) as unknown as Promise<TabelaNutricional | null>;
   }
@@ -31,6 +31,7 @@ export class TabelaNutricionalPrismaRepository implements TabelaNutricionalRepos
       return (await this.prisma.tabelaNutricional.create({
         data: {
           clienteId: data.clienteId,
+          lojaId: data.lojaId,
           numero: data.numero,
           nome: data.nome,
           porcao: data.porcao,
@@ -46,8 +47,8 @@ export class TabelaNutricionalPrismaRepository implements TabelaNutricionalRepos
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<TabelaNutricionalInput>): Promise<TabelaNutricional> {
-    const existing = await this.prisma.tabelaNutricional.findFirst({ where: { id, clienteId } });
+  async update(id: string, lojaId: string, data: Partial<TabelaNutricionalInput>): Promise<TabelaNutricional> {
+    const existing = await this.prisma.tabelaNutricional.findFirst({ where: { id, lojaId } });
     if (!existing) {
       throw new NotFoundException("Tabela nutricional não encontrada.");
     }
@@ -65,11 +66,11 @@ export class TabelaNutricionalPrismaRepository implements TabelaNutricionalRepos
       }
     });
 
-    return this.findById(id, clienteId) as Promise<TabelaNutricional>;
+    return this.findById(id, lojaId) as Promise<TabelaNutricional>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const existing = await this.prisma.tabelaNutricional.findFirst({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const existing = await this.prisma.tabelaNutricional.findFirst({ where: { id, lojaId } });
     if (!existing) {
       throw new NotFoundException("Tabela nutricional não encontrada.");
     }

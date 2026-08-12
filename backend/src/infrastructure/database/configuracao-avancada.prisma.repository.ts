@@ -8,19 +8,20 @@ import { ConfiguracaoAvancadaRepository } from "../../domain/repositories/config
 export class ConfiguracaoAvancadaPrismaRepository implements ConfiguracaoAvancadaRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findByCliente(clienteId: string): Promise<ConfiguracaoAvancada | null> {
+  findByLoja(lojaId: string): Promise<ConfiguracaoAvancada | null> {
     return this.prisma.configuracaoAvancada.findUnique({
-      where: { clienteId },
+      where: { lojaId },
     }) as unknown as Promise<ConfiguracaoAvancada | null>;
   }
 
   async upsert(
     clienteId: string,
-    data: Partial<Omit<ConfiguracaoAvancada, "id" | "clienteId">>,
+    lojaId: string,
+    data: Partial<Omit<ConfiguracaoAvancada, "id" | "clienteId" | "lojaId">>,
   ): Promise<ConfiguracaoAvancada> {
     return (await this.prisma.configuracaoAvancada.upsert({
-      where: { clienteId },
-      create: { clienteId, ...data } as unknown as Prisma.ConfiguracaoAvancadaUncheckedCreateInput,
+      where: { lojaId },
+      create: { clienteId, lojaId, ...data } as unknown as Prisma.ConfiguracaoAvancadaUncheckedCreateInput,
       update: data as unknown as Prisma.ConfiguracaoAvancadaUncheckedUpdateInput,
     })) as unknown as ConfiguracaoAvancada;
   }

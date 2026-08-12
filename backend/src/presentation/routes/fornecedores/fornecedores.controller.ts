@@ -14,28 +14,32 @@ export class FornecedoresController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.fornecedores.findAll(this.clienteId(req));
+    return this.fornecedores.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.fornecedores.findById(id, this.clienteId(req));
+    return this.fornecedores.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateFornecedorDto, @Req() req: Request) {
-    return this.fornecedores.create({ ...dto, clienteId: this.clienteId(req) });
+    return this.fornecedores.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateFornecedorDto, @Req() req: Request) {
-    return this.fornecedores.update(id, this.clienteId(req), dto);
+    return this.fornecedores.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.fornecedores.delete(id, this.clienteId(req));
+    return this.fornecedores.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

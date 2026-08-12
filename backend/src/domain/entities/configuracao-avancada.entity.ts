@@ -1,6 +1,7 @@
 export class ConfiguracaoAvancada {
   id!: string;
   clienteId!: string;
+  lojaId!: string;
   menusHabilitados?: Record<string, boolean> | null;
   funcaoPluPermitir?: Record<string, boolean> | null;
   fonteExibicao?: string | null;

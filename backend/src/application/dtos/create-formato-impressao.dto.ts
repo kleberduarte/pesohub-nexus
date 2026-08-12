@@ -1,10 +1,11 @@
-import { IsInt, IsObject, IsOptional, IsString } from "class-validator";
+import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString } from "class-validator";
 
 export class CreateFormatoImpressaoDto {
   @IsInt()
   numero!: number;
 
   @IsString()
+  @IsNotEmpty()
   nome!: string;
 
   @IsOptional()

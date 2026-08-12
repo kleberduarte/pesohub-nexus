@@ -14,28 +14,32 @@ export class AlergicosController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.alergicos.findAll(this.clienteId(req));
+    return this.alergicos.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.alergicos.findById(id, this.clienteId(req));
+    return this.alergicos.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateAlergicoDto, @Req() req: Request) {
-    return this.alergicos.create({ ...dto, clienteId: this.clienteId(req) });
+    return this.alergicos.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateAlergicoDto, @Req() req: Request) {
-    return this.alergicos.update(id, this.clienteId(req), dto);
+    return this.alergicos.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.alergicos.delete(id, this.clienteId(req));
+    return this.alergicos.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

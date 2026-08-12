@@ -3,6 +3,7 @@ export type UnidadeVenda = "PESO" | "PECA";
 export class Product {
   id!: string;
   clienteId!: string;
+  lojaId!: string;
   codigo!: string;
   codigoBarras!: string;
   nome!: string;

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Search, Trash2, Edit2, Wifi, RefreshCw, X, Link2, Copy, Check } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Plus, Search, Trash2, Edit2, Wifi, RefreshCw, X, Link2, Copy, Check, Upload, Download } from "lucide-react";
 import {
   devicesApi,
   agentsApi,
@@ -11,10 +11,20 @@ import {
   type Agent,
   type CreatedAgent,
   type DiscoveredDevice,
+  type ImportDeviceRow,
+  type ImportDevicesLojaResult,
   ApiError,
 } from "../../../lib/api";
 
 const emptyForm = { nome: "", ip: "", porta: "33581" };
+
+function splitCsvLine(line: string): string[] {
+  return line.split(",").map((field) => field.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
+}
+
+function csvEscape(value: unknown): string {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
 
 export default function DevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
@@ -32,6 +42,13 @@ export default function DevicesPage() {
 
   const [isScanning, setIsScanning] = useState(false);
   const [discovered, setDiscovered] = useState<DiscoveredDevice[] | null>(null);
+
+  // Bulk CSV import
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<ImportDevicesLojaResult[] | null>(null);
+  const [importError, setImportError] = useState("");
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   // Restart communication
   const [restartingId, setRestartingId] = useState<string | null>(null);
@@ -137,6 +154,73 @@ export default function DevicesPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const openImportModal = () => {
+    setImportResult(null);
+    setImportError("");
+    setIsImportModalOpen(true);
+  };
+
+  const closeImportModal = () => {
+    setIsImportModalOpen(false);
+    setImportResult(null);
+    setImportError("");
+  };
+
+  const handleImportClick = () => importFileInputRef.current?.click();
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setImportError("");
+    setImportResult(null);
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) {
+        setImportError("O arquivo CSV não contém nenhuma linha de dados.");
+        return;
+      }
+      const header = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+      const rows: ImportDeviceRow[] = lines.slice(1).map((line) => {
+        const values = splitCsvLine(line);
+        const get = (key: string) => values[header.indexOf(key)] ?? "";
+        const porta = get("porta");
+        return {
+          lojaId: get("lojaid"),
+          nome: get("nome"),
+          ip: get("ip"),
+          porta: porta ? Number(porta) : undefined,
+        };
+      });
+      const result = await devicesApi.import(rows);
+      setImportResult(result);
+      await loadDevices();
+    } catch (err) {
+      setImportError(err instanceof ApiError ? err.message : "Não foi possível importar o arquivo CSV.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExportTokens = () => {
+    if (!importResult) return;
+    const header = ["lojaId", "agentId", "agentToken", "devicesCreated"];
+    const rows = importResult.map((r) =>
+      [r.lojaId, r.agentId, r.agentToken ?? "(já existente)", r.devicesCreated].map(csvEscape).join(","),
+    );
+    const csvContent = [header.join(","), ...rows].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "agents-tokens.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleRemove = async (id: string) => {
@@ -247,6 +331,13 @@ export default function DevicesPage() {
           >
             <Search className="w-4 h-4 mr-2" />
             {isScanning ? "Buscando..." : "Buscar na Rede"}
+          </button>
+          <button
+            onClick={openImportModal}
+            className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Importar CSV
           </button>
           <button
             onClick={openAddModal}
@@ -561,6 +652,98 @@ export default function DevicesPage() {
                   </form>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk CSV Import Modal */}
+      <input
+        ref={importFileInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={handleImportFile}
+      />
+      {isImportModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="text-lg font-semibold text-slate-800">Importar Balanças em Lote</h3>
+              <button onClick={closeImportModal} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6 space-y-4 overflow-y-auto">
+              <p className="text-sm text-slate-500">
+                Envie um CSV com as colunas <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">lojaId</code>,{" "}
+                <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">nome</code>,{" "}
+                <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">ip</code> e opcionalmente{" "}
+                <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">porta</code> (padrão 33581). Uma linha por
+                balança — várias linhas com o mesmo <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">lojaId</code>{" "}
+                reaproveitam o mesmo Agent Local daquela loja.
+              </p>
+
+              {importError && (
+                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{importError}</div>
+              )}
+
+              {!importResult && (
+                <button
+                  onClick={handleImportClick}
+                  disabled={importing}
+                  className="w-full flex items-center justify-center px-4 py-3 bg-white border-2 border-dashed border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {importing ? "Importando..." : "Selecionar arquivo CSV"}
+                </button>
+              )}
+
+              {importResult && (
+                <div className="space-y-4">
+                  <div className="p-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg">
+                    {importResult.reduce((sum, r) => sum + r.devicesCreated, 0)} balança(s) importada(s) em{" "}
+                    {importResult.length} loja(s).
+                  </div>
+                  <div className="border border-slate-100 rounded-lg overflow-hidden">
+                    <table className="w-full text-left text-sm">
+                      <thead className="bg-slate-50 text-slate-500">
+                        <tr>
+                          <th className="px-4 py-2 font-medium">Loja</th>
+                          <th className="px-4 py-2 font-medium">Balanças</th>
+                          <th className="px-4 py-2 font-medium">Agent</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {importResult.map((r) => (
+                          <tr key={r.lojaId}>
+                            <td className="px-4 py-2 text-slate-700">{r.lojaId}</td>
+                            <td className="px-4 py-2 text-slate-500">{r.devicesCreated}</td>
+                            <td className="px-4 py-2 text-xs">
+                              {r.agentToken ? (
+                                <span className="text-emerald-700">novo token gerado</span>
+                              ) : (
+                                <span className="text-slate-400">agent já existente</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Por segurança, o token de cada Agent Local só é exibido uma vez. Baixe a planilha abaixo e
+                    entregue aos técnicos que vão instalar o Agent Local em cada loja nova.
+                  </p>
+                  <button
+                    onClick={handleExportTokens}
+                    className="w-full flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Baixar CSV com os tokens
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

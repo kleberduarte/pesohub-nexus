@@ -12,6 +12,7 @@ export class TabelaNutricionalItem {
 export class TabelaNutricional {
   id!: string;
   clienteId!: string;
+  lojaId!: string;
   numero!: number;
   nome!: string;
   porcao?: string | null;

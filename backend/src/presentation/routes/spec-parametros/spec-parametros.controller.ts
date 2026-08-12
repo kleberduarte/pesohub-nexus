@@ -18,15 +18,19 @@ export class SpecParametrosController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.specParametros.findAll(this.clienteId(req));
+    return this.specParametros.findAll(this.lojaId(req));
   }
 
   @Put()
   upsert(@Body() dto: UpsertSpecParametroDto, @Req() req: Request) {
-    return this.specParametros.upsert(this.clienteId(req), dto.numero, dto.valor);
+    return this.specParametros.upsert(this.clienteId(req), this.lojaId(req), dto.numero, dto.valor);
   }
 
   private clienteId(req: Request): string {
     return (req as unknown as { user: { clienteId: string } }).user.clienteId;
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 }

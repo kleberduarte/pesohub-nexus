@@ -8,16 +8,16 @@ import { FormatoImpressaoRepository } from "../../domain/repositories/formato-im
 export class FormatoImpressaoPrismaRepository implements FormatoImpressaoRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<FormatoImpressao[]> {
+  findAll(lojaId: string): Promise<FormatoImpressao[]> {
     return this.prisma.formatoImpressao.findMany({
-      where: { clienteId },
+      where: { lojaId },
       orderBy: { numero: "asc" },
     }) as unknown as Promise<FormatoImpressao[]>;
   }
 
-  findById(id: string, clienteId: string): Promise<FormatoImpressao | null> {
+  findById(id: string, lojaId: string): Promise<FormatoImpressao | null> {
     return this.prisma.formatoImpressao.findFirst({
-      where: { id, clienteId },
+      where: { id, lojaId },
     }) as unknown as Promise<FormatoImpressao | null>;
   }
 
@@ -34,21 +34,21 @@ export class FormatoImpressaoPrismaRepository implements FormatoImpressaoReposit
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<FormatoImpressao>): Promise<FormatoImpressao> {
+  async update(id: string, lojaId: string, data: Partial<FormatoImpressao>): Promise<FormatoImpressao> {
     const result = await this.prisma.formatoImpressao.updateMany({
-      where: { id, clienteId },
+      where: { id, lojaId },
       data: data as unknown as Prisma.FormatoImpressaoUncheckedUpdateManyInput,
     });
     if (result.count === 0) {
       throw new NotFoundException("Formato de impressão não encontrado.");
     }
     return this.prisma.formatoImpressao.findFirst({
-      where: { id, clienteId },
+      where: { id, lojaId },
     }) as unknown as Promise<FormatoImpressao>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.formatoImpressao.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.formatoImpressao.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Formato de impressão não encontrado.");
     }

@@ -6,12 +6,13 @@ import { AuthService } from "./auth.service";
 import { setAuthCookie, clearAuthCookie } from "./auth-cookie";
 import { LoginDto } from "../../../application/dtos/login.dto";
 import { SwitchCompanyDto } from "../../../application/dtos/switch-company.dto";
+import { SwitchLojaDto } from "../../../application/dtos/switch-loja.dto";
 import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 
 type AuthenticatedRequest = Request & {
-  user: { sub: string; email: string; role: string; clienteId: string | null };
+  user: { sub: string; email: string; role: string; clienteId: string | null; lojaId: string | null };
 };
 
 @ApiTags("auth")
@@ -36,6 +37,18 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, user } = await this.auth.switchCompany(req.user, dto.clienteId);
+    setAuthCookie(res, accessToken);
+    return { user };
+  }
+
+  @Post("switch-loja")
+  @UseGuards(JwtAuthGuard)
+  async switchLoja(
+    @Req() req: AuthenticatedRequest,
+    @Body() dto: SwitchLojaDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, user } = await this.auth.switchLoja(req.user, dto.lojaId);
     setAuthCookie(res, accessToken);
     return { user };
   }

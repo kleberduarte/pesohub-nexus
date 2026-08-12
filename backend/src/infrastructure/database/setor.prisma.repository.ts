@@ -8,12 +8,12 @@ import { SetorRepository } from "../../domain/repositories/setor.repository";
 export class SetorPrismaRepository implements SetorRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<Setor[]> {
-    return this.prisma.setor.findMany({ where: { clienteId }, orderBy: { numero: "asc" } });
+  findAll(lojaId: string): Promise<Setor[]> {
+    return this.prisma.setor.findMany({ where: { lojaId }, orderBy: { numero: "asc" } });
   }
 
-  findById(id: string, clienteId: string): Promise<Setor | null> {
-    return this.prisma.setor.findFirst({ where: { id, clienteId } });
+  findById(id: string, lojaId: string): Promise<Setor | null> {
+    return this.prisma.setor.findFirst({ where: { id, lojaId } });
   }
 
   async create(data: Omit<Setor, "id">): Promise<Setor> {
@@ -27,16 +27,16 @@ export class SetorPrismaRepository implements SetorRepository {
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<Setor>): Promise<Setor> {
-    const result = await this.prisma.setor.updateMany({ where: { id, clienteId }, data });
+  async update(id: string, lojaId: string, data: Partial<Setor>): Promise<Setor> {
+    const result = await this.prisma.setor.updateMany({ where: { id, lojaId }, data });
     if (result.count === 0) {
       throw new NotFoundException("Setor não encontrado.");
     }
-    return this.prisma.setor.findFirst({ where: { id, clienteId } }) as Promise<Setor>;
+    return this.prisma.setor.findFirst({ where: { id, lojaId } }) as Promise<Setor>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.setor.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.setor.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Setor não encontrado.");
     }

@@ -6,9 +6,10 @@ import { CreateDeviceDto } from "../dtos/create-device.dto";
 export class CreateDeviceUseCase {
   constructor(@Inject(DEVICE_REPOSITORY) private readonly devices: DeviceRepository) {}
 
-  async execute(clienteId: string, dto: CreateDeviceDto) {
+  async execute(clienteId: string, lojaId: string, dto: CreateDeviceDto) {
     return this.devices.create({
       clienteId,
+      lojaId,
       nome: dto.nome,
       ip: dto.ip,
       porta: dto.porta,

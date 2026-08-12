@@ -72,10 +72,10 @@ describe("ProductsController.removeAll", () => {
     const auditLog = { record: jest.fn().mockResolvedValue(undefined) };
     const controller = new ProductsController({} as any, {} as any, products as any, auditLog as any);
 
-    const req = { user: { clienteId: "cliente-a", sub: "user-1" } } as any;
+    const req = { user: { clienteId: "cliente-a", lojaId: "loja-a", sub: "user-1" } } as any;
     const result = await controller.removeAll(req);
 
-    expect(products.deleteAll).toHaveBeenCalledWith("cliente-a");
+    expect(products.deleteAll).toHaveBeenCalledWith("loja-a");
     expect(result).toEqual({ deleted: 3 });
     expect(auditLog.record).toHaveBeenCalledWith(req, "products.delete_all", { count: 3 });
   });

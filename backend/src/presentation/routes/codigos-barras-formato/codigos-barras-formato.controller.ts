@@ -19,28 +19,32 @@ export class CodigosBarrasFormatoController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.codigos.findAll(this.clienteId(req));
+    return this.codigos.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.codigos.findById(id, this.clienteId(req));
+    return this.codigos.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateCodigoBarrasFormatoDto, @Req() req: Request) {
-    return this.codigos.create({ ...dto, verificador: dto.verificador ?? 0, clienteId: this.clienteId(req) });
+    return this.codigos.create({ ...dto, verificador: dto.verificador ?? 0, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateCodigoBarrasFormatoDto, @Req() req: Request) {
-    return this.codigos.update(id, this.clienteId(req), dto);
+    return this.codigos.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.codigos.delete(id, this.clienteId(req));
+    return this.codigos.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

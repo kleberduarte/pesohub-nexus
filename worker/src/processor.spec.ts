@@ -19,7 +19,15 @@ const mockedPrisma = prisma as unknown as {
 };
 
 describe("createSyncProcessor", () => {
-  const device = { id: "device-1", clienteId: "cliente-a", agentId: "agent-1", nome: "Balança 1", ip: "10.0.0.5", porta: 33581 };
+  const device = {
+    id: "device-1",
+    clienteId: "cliente-a",
+    lojaId: "loja-a",
+    agentId: "agent-1",
+    nome: "Balança 1",
+    ip: "10.0.0.5",
+    porta: 33581,
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -28,25 +36,25 @@ describe("createSyncProcessor", () => {
     mockedPrisma.syncJob.create.mockResolvedValue({ id: "job-1" });
   });
 
-  it("filtra produtos TOTAL pelo clienteId do device (não vaza entre tenants)", async () => {
+  it("filtra produtos TOTAL pelo lojaId do device (não vaza entre lojas)", async () => {
     const agentBridge = { sendToAgent: jest.fn().mockResolvedValue({ ok: true }) };
     const process = createSyncProcessor(agentBridge as any);
 
     await process({ data: { deviceId: "device-1", tipo: "TOTAL" } });
 
     expect(mockedPrisma.product.findMany).toHaveBeenCalledWith({
-      where: { ativo: true, clienteId: "cliente-a" },
+      where: { ativo: true, lojaId: "loja-a" },
     });
   });
 
-  it("filtra produtos INCREMENTAL por productIds E clienteId do device", async () => {
+  it("filtra produtos INCREMENTAL por productIds E lojaId do device", async () => {
     const agentBridge = { sendToAgent: jest.fn().mockResolvedValue({ ok: true }) };
     const process = createSyncProcessor(agentBridge as any);
 
     await process({ data: { deviceId: "device-1", tipo: "INCREMENTAL", productIds: ["p1", "p2"] } });
 
     expect(mockedPrisma.product.findMany).toHaveBeenCalledWith({
-      where: { id: { in: ["p1", "p2"] }, clienteId: "cliente-a" },
+      where: { id: { in: ["p1", "p2"] }, lojaId: "loja-a" },
     });
   });
 });

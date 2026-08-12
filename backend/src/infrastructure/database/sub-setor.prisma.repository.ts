@@ -8,12 +8,12 @@ import { SubSetorRepository } from "../../domain/repositories/sub-setor.reposito
 export class SubSetorPrismaRepository implements SubSetorRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<SubSetor[]> {
-    return this.prisma.subSetor.findMany({ where: { clienteId }, orderBy: { numero: "asc" } });
+  findAll(lojaId: string): Promise<SubSetor[]> {
+    return this.prisma.subSetor.findMany({ where: { lojaId }, orderBy: { numero: "asc" } });
   }
 
-  findById(id: string, clienteId: string): Promise<SubSetor | null> {
-    return this.prisma.subSetor.findFirst({ where: { id, clienteId } });
+  findById(id: string, lojaId: string): Promise<SubSetor | null> {
+    return this.prisma.subSetor.findFirst({ where: { id, lojaId } });
   }
 
   async create(data: Omit<SubSetor, "id">): Promise<SubSetor> {
@@ -27,16 +27,16 @@ export class SubSetorPrismaRepository implements SubSetorRepository {
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<SubSetor>): Promise<SubSetor> {
-    const result = await this.prisma.subSetor.updateMany({ where: { id, clienteId }, data });
+  async update(id: string, lojaId: string, data: Partial<SubSetor>): Promise<SubSetor> {
+    const result = await this.prisma.subSetor.updateMany({ where: { id, lojaId }, data });
     if (result.count === 0) {
       throw new NotFoundException("Sub-setor não encontrado.");
     }
-    return this.prisma.subSetor.findFirst({ where: { id, clienteId } }) as Promise<SubSetor>;
+    return this.prisma.subSetor.findFirst({ where: { id, lojaId } }) as Promise<SubSetor>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.subSetor.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.subSetor.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Sub-setor não encontrado.");
     }

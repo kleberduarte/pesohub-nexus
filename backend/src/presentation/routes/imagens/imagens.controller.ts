@@ -14,28 +14,32 @@ export class ImagensController {
 
   @Get()
   findAll(@Req() req: Request) {
-    return this.imagens.findAll(this.clienteId(req));
+    return this.imagens.findAll(this.lojaId(req));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.imagens.findById(id, this.clienteId(req));
+    return this.imagens.findById(id, this.lojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateImagemDto, @Req() req: Request) {
-    return this.imagens.create({ ...dto, clienteId: this.clienteId(req) });
+    return this.imagens.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
   }
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateImagemDto, @Req() req: Request) {
-    return this.imagens.update(id, this.clienteId(req), dto);
+    return this.imagens.update(id, this.lojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.imagens.delete(id, this.clienteId(req));
+    return this.imagens.delete(id, this.lojaId(req));
+  }
+
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 
   private clienteId(req: Request): string {

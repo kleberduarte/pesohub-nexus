@@ -5,11 +5,11 @@ export type TabelaNutricionalInput = Omit<TabelaNutricional, "id" | "itens"> & {
 };
 
 export interface TabelaNutricionalRepository {
-  findAll(clienteId: string): Promise<TabelaNutricional[]>;
-  findById(id: string, clienteId: string): Promise<TabelaNutricional | null>;
+  findAll(lojaId: string): Promise<TabelaNutricional[]>;
+  findById(id: string, lojaId: string): Promise<TabelaNutricional | null>;
   create(data: TabelaNutricionalInput): Promise<TabelaNutricional>;
-  update(id: string, clienteId: string, data: Partial<TabelaNutricionalInput>): Promise<TabelaNutricional>;
-  delete(id: string, clienteId: string): Promise<void>;
+  update(id: string, lojaId: string, data: Partial<TabelaNutricionalInput>): Promise<TabelaNutricional>;
+  delete(id: string, lojaId: string): Promise<void>;
 }
 
 export const TABELA_NUTRICIONAL_REPOSITORY = Symbol("TABELA_NUTRICIONAL_REPOSITORY");

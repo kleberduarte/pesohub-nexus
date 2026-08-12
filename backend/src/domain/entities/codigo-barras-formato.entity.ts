@@ -3,6 +3,7 @@ export type CodigoBarrasTipo = "EAN13" | "EAN128";
 export class CodigoBarrasFormato {
   id!: string;
   clienteId!: string;
+  lojaId!: string;
   numero!: number;
   nome!: string;
   tipo!: CodigoBarrasTipo;

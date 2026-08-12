@@ -18,6 +18,12 @@ describe("AuthService", () => {
       cliente: {
         findUnique: jest.fn().mockResolvedValue({ id: "cliente-ramuza" }),
       },
+      loja: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+      perfilLojaAcesso: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
     };
     const jwt = { sign: jest.fn((payload) => JSON.stringify(payload)) };
     const service = new AuthService(prisma as any, jwt as any);
@@ -69,13 +75,13 @@ describe("AuthService", () => {
     });
 
     await service.switchCompany(
-      { sub: "u1", email: "super@pesohub.com.br", role: "SUPERADMIN", clienteId: null },
+      { sub: "u1", email: "super@pesohub.com.br", role: "SUPERADMIN", clienteId: null, lojaId: null },
       "cliente-ramuza",
     );
 
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: "u1" },
-      data: { activeClienteId: "cliente-ramuza" },
+      data: { activeClienteId: "cliente-ramuza", activeLojaId: null },
     });
   });
 });

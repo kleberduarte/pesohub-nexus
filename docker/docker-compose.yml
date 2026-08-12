@@ -4,8 +4,6 @@ services:
       context: ../frontend
     ports:
       - "3001:3001"
-    environment:
-      NEXT_PUBLIC_API_URL: http://pesohub-backend:3000/api/v1
     depends_on:
       - pesohub-backend
 
@@ -19,6 +17,14 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      # Ambos os hosts liberados: nesta máquina de dev a resolução de
+      # "localhost" para portas do Docker é intermitente, então o navegador
+      # às vezes acaba acessando o frontend via 127.0.0.1 em vez de localhost.
+      CORS_ORIGIN: http://localhost:3001,http://127.0.0.1:3001
+      ASAAS_API_KEY: ${ASAAS_API_KEY:-}
+      ASAAS_ENV: ${ASAAS_ENV:-sandbox}
+      ASAAS_BASE_URL: ${ASAAS_BASE_URL:-https://sandbox.asaas.com/api/v3}
+      ASAAS_WEBHOOK_TOKEN: ${ASAAS_WEBHOOK_TOKEN:-}
     depends_on:
       - postgres
       - redis
@@ -48,7 +54,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6380:6379"
+      - "6381:6379"
 
 volumes:
   postgres-data:

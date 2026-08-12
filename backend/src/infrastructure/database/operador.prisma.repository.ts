@@ -8,15 +8,15 @@ import { OperadorRepository } from "../../domain/repositories/operador.repositor
 export class OperadorPrismaRepository implements OperadorRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<Operador[]> {
+  findAll(lojaId: string): Promise<Operador[]> {
     return this.prisma.operador.findMany({
-      where: { clienteId },
+      where: { lojaId },
       orderBy: { numero: "asc" },
     }) as unknown as Promise<Operador[]>;
   }
 
-  findById(id: string, clienteId: string): Promise<Operador | null> {
-    return this.prisma.operador.findFirst({ where: { id, clienteId } }) as unknown as Promise<Operador | null>;
+  findById(id: string, lojaId: string): Promise<Operador | null> {
+    return this.prisma.operador.findFirst({ where: { id, lojaId } }) as unknown as Promise<Operador | null>;
   }
 
   async create(data: Omit<Operador, "id">): Promise<Operador> {
@@ -32,19 +32,19 @@ export class OperadorPrismaRepository implements OperadorRepository {
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<Operador>): Promise<Operador> {
+  async update(id: string, lojaId: string, data: Partial<Operador>): Promise<Operador> {
     const result = await this.prisma.operador.updateMany({
-      where: { id, clienteId },
+      where: { id, lojaId },
       data: data as unknown as Prisma.OperadorUncheckedUpdateManyInput,
     });
     if (result.count === 0) {
       throw new NotFoundException("Operador não encontrado.");
     }
-    return this.prisma.operador.findFirst({ where: { id, clienteId } }) as unknown as Promise<Operador>;
+    return this.prisma.operador.findFirst({ where: { id, lojaId } }) as unknown as Promise<Operador>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.operador.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.operador.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Operador não encontrado.");
     }

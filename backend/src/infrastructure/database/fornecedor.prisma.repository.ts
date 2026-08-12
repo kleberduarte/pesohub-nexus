@@ -8,12 +8,12 @@ import { FornecedorRepository } from "../../domain/repositories/fornecedor.repos
 export class FornecedorPrismaRepository implements FornecedorRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(clienteId: string): Promise<Fornecedor[]> {
-    return this.prisma.fornecedor.findMany({ where: { clienteId }, orderBy: { numero: "asc" } });
+  findAll(lojaId: string): Promise<Fornecedor[]> {
+    return this.prisma.fornecedor.findMany({ where: { lojaId }, orderBy: { numero: "asc" } });
   }
 
-  findById(id: string, clienteId: string): Promise<Fornecedor | null> {
-    return this.prisma.fornecedor.findFirst({ where: { id, clienteId } });
+  findById(id: string, lojaId: string): Promise<Fornecedor | null> {
+    return this.prisma.fornecedor.findFirst({ where: { id, lojaId } });
   }
 
   async create(data: Omit<Fornecedor, "id">): Promise<Fornecedor> {
@@ -27,16 +27,16 @@ export class FornecedorPrismaRepository implements FornecedorRepository {
     }
   }
 
-  async update(id: string, clienteId: string, data: Partial<Fornecedor>): Promise<Fornecedor> {
-    const result = await this.prisma.fornecedor.updateMany({ where: { id, clienteId }, data });
+  async update(id: string, lojaId: string, data: Partial<Fornecedor>): Promise<Fornecedor> {
+    const result = await this.prisma.fornecedor.updateMany({ where: { id, lojaId }, data });
     if (result.count === 0) {
       throw new NotFoundException("Fornecedor não encontrado.");
     }
-    return this.prisma.fornecedor.findFirst({ where: { id, clienteId } }) as Promise<Fornecedor>;
+    return this.prisma.fornecedor.findFirst({ where: { id, lojaId } }) as Promise<Fornecedor>;
   }
 
-  async delete(id: string, clienteId: string): Promise<void> {
-    const result = await this.prisma.fornecedor.deleteMany({ where: { id, clienteId } });
+  async delete(id: string, lojaId: string): Promise<void> {
+    const result = await this.prisma.fornecedor.deleteMany({ where: { id, lojaId } });
     if (result.count === 0) {
       throw new NotFoundException("Fornecedor não encontrado.");
     }

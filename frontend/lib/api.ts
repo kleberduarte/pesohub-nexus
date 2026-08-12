@@ -1,4 +1,16 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api/v1";
+// Sem NEXT_PUBLIC_API_URL definido, usa o mesmo host que serviu a página
+// (nunca hardcoda "localhost": nesta máquina de dev a resolução de
+// "localhost" para portas publicadas pelo Docker é intermitente — ex:
+// "http://localhost:3001" trava, mas "http://127.0.0.1:3001" funciona.
+// Espelhar o hostname real evita esse problema tanto em localhost quanto
+// 127.0.0.1, e ainda funciona em produção com domínio próprio).
+function resolveApiUrl(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== "undefined") return `${window.location.protocol}//${window.location.hostname}:3000/api/v1`;
+  return "http://localhost:3000/api/v1";
+}
+
+const API_URL = resolveApiUrl();
 
 // A credencial de sessão em si vive só num cookie httpOnly setado pelo backend
 // (não acessível a JS, protege contra roubo de sessão via XSS). Este cache
@@ -89,6 +101,7 @@ export interface DecodedUser {
   email: string;
   role: UserRole;
   clienteId: string | null;
+  lojaId: string | null;
 }
 
 export interface LoginResponse {
@@ -115,6 +128,45 @@ export const authApi = {
     setCurrentUser(data.user);
     return data;
   },
+  switchLoja: async (lojaId: string) => {
+    const data = await request<LoginResponse>("/auth/switch-loja", {
+      method: "POST",
+      body: JSON.stringify({ lojaId }),
+    });
+    setCurrentUser(data.user);
+    return data;
+  },
+};
+
+// ---------- Lojas ----------
+export interface Loja {
+  id: string;
+  nome: string;
+  endereco?: string | null;
+  cep?: string | null;
+  telefone?: string | null;
+  responsavel?: string | null;
+  email?: string | null;
+  cnpj?: string | null;
+  ativo: boolean;
+}
+
+export interface CreateLojaInput {
+  nome: string;
+  endereco?: string;
+  cep?: string;
+  telefone?: string;
+  responsavel?: string;
+  email?: string;
+  cnpj?: string;
+}
+
+export const lojasApi = {
+  list: () => request<Loja[]>("/lojas"),
+  create: (data: CreateLojaInput) => request<Loja>("/lojas", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<CreateLojaInput & { ativo: boolean }>) =>
+    request<Loja>(`/lojas/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  remove: (id: string) => request<void>(`/lojas/${id}`, { method: "DELETE" }),
 };
 
 // ---------- Devices ----------
@@ -145,6 +197,20 @@ export interface DiscoveredDevice {
   port: number;
 }
 
+export interface ImportDeviceRow {
+  lojaId: string;
+  nome: string;
+  ip: string;
+  porta?: number;
+}
+
+export interface ImportDevicesLojaResult {
+  lojaId: string;
+  agentId: string;
+  agentToken: string | null;
+  devicesCreated: number;
+}
+
 export const devicesApi = {
   list: () => request<Device[]>("/devices"),
   create: (data: CreateDeviceInput) =>
@@ -155,6 +221,48 @@ export const devicesApi = {
   discover: () => request<DiscoveredDevice[]>("/devices/discovered"),
   linkAgent: (id: string, agentToken: string) =>
     request<Device>(`/devices/${id}/link-agent`, { method: "POST", body: JSON.stringify({ agentToken }) }),
+  import: (rows: ImportDeviceRow[]) =>
+    request<ImportDevicesLojaResult[]>("/devices/import", {
+      method: "POST",
+      body: JSON.stringify({ rows }),
+    }),
+};
+
+// ---------- Billing (Asaas) ----------
+export type FormaPagamentoAssinatura = "PIX" | "BOLETO" | "CARTAO_CREDITO";
+export type StatusAssinatura = "TRIAL" | "ATIVA" | "INADIMPLENTE" | "CANCELADA";
+export type StatusFatura = "PENDENTE" | "CONFIRMADA" | "RECEBIDA" | "VENCIDA" | "CANCELADA";
+
+export interface Fatura {
+  id: string;
+  valor: string;
+  status: StatusFatura;
+  linkPagamento: string | null;
+  dataVencimento: string | null;
+  dataPagamento: string | null;
+  createdAt: string;
+}
+
+export interface Assinatura {
+  id: string;
+  status: StatusAssinatura;
+  formaPagamento: FormaPagamentoAssinatura;
+  valor: string;
+  proximoVencimento: string | null;
+  faturas: Fatura[];
+}
+
+export interface CreateAssinaturaInput {
+  formaPagamento: FormaPagamentoAssinatura;
+  valor: number;
+  cpfCnpj?: string;
+}
+
+export const billingApi = {
+  status: () => request<Assinatura>("/billing/status"),
+  subscribe: (data: CreateAssinaturaInput) =>
+    request<Assinatura>("/billing/subscribe", { method: "POST", body: JSON.stringify(data) }),
+  cancel: () => request<Assinatura>("/billing/cancel", { method: "POST" }),
 };
 
 // ---------- Agents (Agent Local) ----------
