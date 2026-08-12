@@ -37,53 +37,60 @@ DROP INDEX "TabelaNutricional_clienteId_numero_key";
 -- DropIndex
 DROP INDEX "TextoGlobal_clienteId_indice_key";
 
--- AlterTable
-ALTER TABLE "Alergico" ADD COLUMN     "lojaId" TEXT NOT NULL;
+-- AlterTable (add nullable first, backfill below, then enforce NOT NULL)
+ALTER TABLE "Alergico" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "CodigoBarrasFormato" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "CodigoBarrasFormato" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "ConfiguracaoAvancada" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "ConfiguracaoAvancada" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "Device" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "Device" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "DeviceGroup" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "DeviceGroup" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "FormatoImpressao" ADD COLUMN     "lojaId" TEXT NOT NULL;
+-- Agent already has a legacy free-text "lojaId" column (store label, e.g. "Assai Loja 01").
+-- Preserve it under a temp name so its values become the real Loja.nome below,
+-- then repoint "lojaId" to the new Loja relation.
+ALTER TABLE "Agent" RENAME COLUMN "lojaId" TO "_legacyLojaLabel";
+ALTER TABLE "Agent" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "Fornecedor" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "FormatoImpressao" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "Imagem" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "Fornecedor" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "Operador" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "Imagem" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "Product" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "Operador" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "Setor" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "Product" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "SpecParametro" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "Setor" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "SubSetor" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "SpecParametro" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "TabelaNutricional" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "SubSetor" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "TeclaAcessoRapido" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "TabelaNutricional" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
-ALTER TABLE "TextoGlobal" ADD COLUMN     "lojaId" TEXT NOT NULL;
+ALTER TABLE "TeclaAcessoRapido" ADD COLUMN     "lojaId" TEXT;
+
+-- AlterTable
+ALTER TABLE "TextoGlobal" ADD COLUMN     "lojaId" TEXT;
 
 -- AlterTable
 ALTER TABLE "User" ADD COLUMN     "activeLojaId" TEXT,
@@ -126,6 +133,55 @@ CREATE TABLE "PerfilLojaAcesso" (
 
     CONSTRAINT "PerfilLojaAcesso_pkey" PRIMARY KEY ("id")
 );
+
+-- Backfill: create one default "Matriz" Loja per existing Cliente
+INSERT INTO "Loja" ("id", "clienteId", "nome", "updatedAt")
+SELECT 'loja_' || substr(md5(random()::text || clock_timestamp()::text || c."id"), 1, 20), c."id", 'Matriz', CURRENT_TIMESTAMP
+FROM "Cliente" c;
+
+-- Backfill: turn each distinct legacy Agent store label into a real Loja
+INSERT INTO "Loja" ("id", "clienteId", "nome", "updatedAt")
+SELECT 'loja_' || substr(md5(random()::text || clock_timestamp()::text || d."clienteId" || d."_legacyLojaLabel"), 1, 20), d."clienteId", d."_legacyLojaLabel", CURRENT_TIMESTAMP
+FROM (SELECT DISTINCT "clienteId", "_legacyLojaLabel" FROM "Agent") d;
+
+-- Backfill: point every existing row at its Cliente's default Loja
+UPDATE "Alergico" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "CodigoBarrasFormato" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "ConfiguracaoAvancada" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "Device" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "DeviceGroup" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "Agent" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId" AND l."nome" = t."_legacyLojaLabel";
+UPDATE "FormatoImpressao" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "Fornecedor" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "Imagem" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "Operador" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "Product" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "Setor" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "SpecParametro" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "SubSetor" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "TabelaNutricional" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "TeclaAcessoRapido" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+UPDATE "TextoGlobal" t SET "lojaId" = l."id" FROM "Loja" l WHERE l."clienteId" = t."clienteId";
+
+-- Enforce NOT NULL now that every row has a lojaId
+ALTER TABLE "Alergico" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "CodigoBarrasFormato" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "ConfiguracaoAvancada" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Device" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "DeviceGroup" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Agent" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Agent" DROP COLUMN "_legacyLojaLabel";
+ALTER TABLE "FormatoImpressao" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Fornecedor" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Imagem" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Operador" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Product" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "Setor" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "SpecParametro" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "SubSetor" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "TabelaNutricional" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "TeclaAcessoRapido" ALTER COLUMN "lojaId" SET NOT NULL;
+ALTER TABLE "TextoGlobal" ALTER COLUMN "lojaId" SET NOT NULL;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Perfil_clienteId_nome_key" ON "Perfil"("clienteId", "nome");
@@ -240,4 +296,3 @@ ALTER TABLE "User" ADD CONSTRAINT "User_perfilId_fkey" FOREIGN KEY ("perfilId") 
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_activeLojaId_fkey" FOREIGN KEY ("activeLojaId") REFERENCES "Loja"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
