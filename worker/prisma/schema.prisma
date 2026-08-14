@@ -91,6 +91,7 @@ model Cliente {
   chavePix              String?
   suporteEmail          String?
   suporteWhatsapp       String?
+  dominio               String?                @unique
   isDefault             Boolean                @default(false)
   createdAt             DateTime               @default(now())
   lojas                 Loja[]

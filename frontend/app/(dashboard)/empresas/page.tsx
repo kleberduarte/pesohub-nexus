@@ -31,6 +31,7 @@ function formFromParametros(p: ClienteParametros): UpdateClienteParametrosInput 
     chavePix: p.chavePix ?? "",
     suporteEmail: p.suporteEmail ?? "",
     suporteWhatsapp: p.suporteWhatsapp ?? "",
+    dominio: p.dominio ?? "",
   };
 }
 
@@ -184,6 +185,10 @@ export default function EmpresasPage() {
     if (se && !EMAIL_OK.test(se)) e.suporteEmail = "E-mail inválido.";
     const sw = (f.suporteWhatsapp ?? "").trim();
     if (sw.length > 32) e.suporteWhatsapp = "WhatsApp de suporte: máximo 32 caracteres.";
+    const dominio = (f.dominio ?? "").trim();
+    if (dominio && !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(dominio)) {
+      e.dominio = "Informe um domínio válido, ex.: empresa.com.br.";
+    }
     return e;
   }
 
@@ -234,6 +239,7 @@ export default function EmpresasPage() {
       chavePix: (form.chavePix ?? "").trim() || undefined,
       suporteEmail: (form.suporteEmail ?? "").trim() || undefined,
       suporteWhatsapp: (form.suporteWhatsapp ?? "").trim() || undefined,
+      dominio: (form.dominio ?? "").trim().toLowerCase() || undefined,
     };
     try {
       const saved = await clientesApi.updateMe(payload);
@@ -442,6 +448,21 @@ export default function EmpresasPage() {
                     }`}
                   />
                   {fieldErrors.nome && <p className="text-xs text-red-600 mt-1">{fieldErrors.nome}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Domínio de e-mail</label>
+                  <input
+                    value={form.dominio ?? ""}
+                    onChange={(e) => setForm({ ...form, dominio: e.target.value })}
+                    placeholder="empresa.com.br"
+                    className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
+                      fieldErrors.dominio ? "border-red-400" : "border-slate-200"
+                    }`}
+                  />
+                  {fieldErrors.dominio && <p className="text-xs text-red-600 mt-1">{fieldErrors.dominio}</p>}
+                  <p className="text-xs text-slate-500 mt-1">
+                    Um usuário SUPERADMIN cadastrado com e-mail desse domínio fica travado nesta empresa, sem acesso às demais.
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">URL do logo</label>

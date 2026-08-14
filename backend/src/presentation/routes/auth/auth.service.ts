@@ -10,6 +10,7 @@ interface AuthenticatedUser {
   role: string;
   clienteId: string | null;
   lojaId: string | null;
+  scoped?: boolean;
 }
 
 @Injectable()
@@ -25,10 +26,14 @@ export class AuthService {
       throw new UnauthorizedException("Credenciais inválidas");
     }
 
-    // SUPERADMIN não tem clienteId fixo — usa a última empresa selecionada
-    // via "trocar de empresa" (persistida em activeClienteId), se houver,
-    // pra manter a sessão na mesma empresa após logout/login.
-    const effectiveClienteId = user.role === "SUPERADMIN" ? user.activeClienteId : user.clienteId;
+    // SUPERADMIN "global" (clienteId nulo, vinculado ao domínio da empresa
+    // padrão) não tem clienteId fixo — usa a última empresa selecionada via
+    // "trocar de empresa" (persistida em activeClienteId), se houver, pra
+    // manter a sessão na mesma empresa após logout/login. Já um SUPERADMIN
+    // vinculado ao domínio de uma empresa específica (ex.: @ramuza.com.br)
+    // tem clienteId fixo e fica travado nela, sem poder trocar de empresa.
+    const scoped = user.role === "SUPERADMIN" && user.clienteId !== null;
+    const effectiveClienteId = user.role === "SUPERADMIN" ? (user.clienteId ?? user.activeClienteId) : user.clienteId;
     const effectiveLojaId = await this.resolveEffectiveLoja(user.id, effectiveClienteId, user.activeLojaId, user.perfilId);
 
     const payload = {
@@ -37,6 +42,7 @@ export class AuthService {
       role: user.role,
       clienteId: effectiveClienteId,
       lojaId: effectiveLojaId,
+      scoped,
     };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
@@ -47,6 +53,9 @@ export class AuthService {
   async switchCompany(currentUser: AuthenticatedUser, clienteId: string) {
     if (currentUser.role !== "SUPERADMIN") {
       throw new ForbiddenException("Apenas SUPERADMIN pode trocar de empresa");
+    }
+    if (currentUser.scoped) {
+      throw new ForbiddenException("Seu acesso é restrito à empresa vinculada à sua conta");
     }
 
     const cliente = await this.prisma.cliente.findUnique({ where: { id: clienteId } });
@@ -67,6 +76,7 @@ export class AuthService {
       role: currentUser.role,
       clienteId: cliente.id,
       lojaId: effectiveLojaId,
+      scoped: false,
     };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
@@ -99,6 +109,7 @@ export class AuthService {
       role: currentUser.role,
       clienteId: currentUser.clienteId,
       lojaId,
+      scoped: currentUser.scoped ?? false,
     };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),

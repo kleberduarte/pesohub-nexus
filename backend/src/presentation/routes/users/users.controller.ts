@@ -61,9 +61,25 @@ export class UsersController {
       throw new ConflictException("Já existe um usuário com este e-mail");
     }
 
+    // Um SUPERADMIN é vinculado à empresa dona do domínio do seu e-mail (ex.:
+    // superadmin@ramuza.com.br → empresa Ramuza) e fica travado nela. O domínio
+    // da empresa padrão (PesoHub) é a exceção: continua "global", sem clienteId
+    // fixo, podendo trocar de empresa livremente como hoje.
+    let clienteIdParaUsuario: string | null = clienteId;
+    if (dto.role === "SUPERADMIN") {
+      const dominio = dto.email.split("@")[1]?.toLowerCase();
+      const clienteDoDominio = dominio ? await this.prisma.cliente.findUnique({ where: { dominio } }) : null;
+      if (!clienteDoDominio) {
+        throw new ConflictException(
+          `Nenhuma empresa cadastrada com o domínio @${dominio} — cadastre o domínio da empresa antes de criar este usuário`,
+        );
+      }
+      clienteIdParaUsuario = clienteDoDominio.isDefault ? null : clienteDoDominio.id;
+    }
+
     const senha = await bcrypt.hash(dto.senha, 10);
     return this.prisma.user.create({
-      data: { email: dto.email, senha, role: dto.role, clienteId },
+      data: { email: dto.email, senha, role: dto.role, clienteId: clienteIdParaUsuario },
       select: { id: true, email: true, role: true, createdAt: true },
     });
   }

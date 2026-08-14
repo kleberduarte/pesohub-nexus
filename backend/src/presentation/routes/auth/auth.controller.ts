@@ -12,7 +12,7 @@ import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 
 type AuthenticatedRequest = Request & {
-  user: { sub: string; email: string; role: string; clienteId: string | null; lojaId: string | null };
+  user: { sub: string; email: string; role: string; clienteId: string | null; lojaId: string | null; scoped?: boolean };
 };
 
 @ApiTags("auth")

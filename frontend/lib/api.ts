@@ -681,6 +681,7 @@ export interface ClienteParametros extends ClienteBranding {
   chavePix?: string | null;
   suporteEmail?: string | null;
   suporteWhatsapp?: string | null;
+  dominio?: string | null;
   isDefault: boolean;
 }
 
@@ -697,6 +698,7 @@ export interface UpdateClienteParametrosInput {
   chavePix?: string;
   suporteEmail?: string;
   suporteWhatsapp?: string;
+  dominio?: string;
 }
 
 export const clientesApi = {

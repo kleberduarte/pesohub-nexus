@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 async function main() {
   const padrao = await prisma.cliente.upsert({
     where: { id: "cliente-default" },
-    update: { isDefault: true },
+    update: { isDefault: true, dominio: "pesohub.com.br" },
     create: {
       id: "cliente-default",
       nome: "PesoHub",
@@ -16,18 +16,20 @@ async function main() {
       corBotao: "#004080",
       corBotaoTexto: "#ffffff",
       isDefault: true,
+      dominio: "pesohub.com.br",
     },
   });
   console.log(`Cliente seed criado: ${padrao.nome} (default)`);
 
   const ramuza = await prisma.cliente.upsert({
     where: { id: "cliente-ramuza" },
-    update: { isDefault: false },
+    update: { isDefault: false, dominio: "ramuza.com.br" },
     create: {
       id: "cliente-ramuza",
       nome: "Ramuza",
       corPrimaria: "#E30613",
       corSecundaria: "#333333",
+      dominio: "ramuza.com.br",
     },
   });
   console.log(`Cliente seed criado: ${ramuza.nome}`);
