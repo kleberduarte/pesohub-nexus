@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
@@ -50,7 +50,44 @@ export class LojasController {
   @UseGuards(RolesGuard)
   @Roles("ADMIN", "SUPERADMIN")
   async remove(@Param("id") id: string, @Req() req: Request) {
-    await this.prisma.loja.deleteMany({ where: { id, clienteId: this.clienteId(req) } });
+    const clienteId = this.clienteId(req);
+    const loja = await this.prisma.loja.findFirst({ where: { id, clienteId } });
+    if (!loja) {
+      throw new NotFoundException();
+    }
+
+    // Loja não tem onDelete: Cascade pra maioria das relações no schema (só
+    // PerfilLojaAcesso tem) — deleteMany direto na Loja quebra com FK violation
+    // assim que existe qualquer Device/Product/etc. vinculado. Apaga tudo em
+    // ordem (filhos antes de pais) numa transação só, senão fica órfão.
+    await this.prisma.$transaction([
+      this.prisma.syncJobItem.deleteMany({
+        where: {
+          OR: [{ product: { lojaId: id } }, { job: { device: { lojaId: id } } }],
+        },
+      }),
+      this.prisma.syncJob.deleteMany({ where: { device: { lojaId: id } } }),
+      this.prisma.tabelaNutricionalItem.deleteMany({ where: { tabela: { lojaId: id } } }),
+      this.prisma.product.deleteMany({ where: { lojaId: id } }),
+      this.prisma.device.deleteMany({ where: { lojaId: id } }),
+      this.prisma.deviceGroup.deleteMany({ where: { lojaId: id } }),
+      this.prisma.agent.deleteMany({ where: { lojaId: id } }),
+      this.prisma.subSetor.deleteMany({ where: { lojaId: id } }),
+      this.prisma.setor.deleteMany({ where: { lojaId: id } }),
+      this.prisma.fornecedor.deleteMany({ where: { lojaId: id } }),
+      this.prisma.alergico.deleteMany({ where: { lojaId: id } }),
+      this.prisma.tabelaNutricional.deleteMany({ where: { lojaId: id } }),
+      this.prisma.operador.deleteMany({ where: { lojaId: id } }),
+      this.prisma.imagem.deleteMany({ where: { lojaId: id } }),
+      this.prisma.formatoImpressao.deleteMany({ where: { lojaId: id } }),
+      this.prisma.codigoBarrasFormato.deleteMany({ where: { lojaId: id } }),
+      this.prisma.textoGlobal.deleteMany({ where: { lojaId: id } }),
+      this.prisma.teclaAcessoRapido.deleteMany({ where: { lojaId: id } }),
+      this.prisma.specParametro.deleteMany({ where: { lojaId: id } }),
+      this.prisma.configuracaoAvancada.deleteMany({ where: { lojaId: id } }),
+      this.prisma.perfilLojaAcesso.deleteMany({ where: { lojaId: id } }),
+      this.prisma.loja.delete({ where: { id } }),
+    ]);
   }
 
   private clienteId(req: Request): string {
