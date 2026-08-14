@@ -77,16 +77,47 @@ export class ClientesController {
       throw new ForbiddenException("A empresa padrão não pode ser excluída");
     }
 
-    const [users, devices, products] = await Promise.all([
-      this.prisma.user.count({ where: { clienteId: id } }),
-      this.prisma.device.count({ where: { clienteId: id } }),
-      this.prisma.product.count({ where: { clienteId: id } }),
-    ]);
-    if (users > 0 || devices > 0 || products > 0) {
-      throw new ConflictException("Empresa possui usuários, balanças ou produtos vinculados");
+    const users = await this.prisma.user.count({ where: { clienteId: id } });
+    if (users > 0) {
+      throw new ConflictException("Empresa possui usuários vinculados — remova-os antes de excluir");
     }
 
-    await this.prisma.cliente.delete({ where: { id } });
+    // Cliente não tem onDelete: Cascade pra quase nenhuma relação no schema —
+    // deleteMany direto quebra com FK violation assim que existe qualquer
+    // Loja/Device/Product/Assinatura/etc. vinculado. Apaga tudo em ordem
+    // (filhos antes de pais) numa transação só, senão fica órfão.
+    await this.prisma.$transaction([
+      this.prisma.syncJobItem.deleteMany({
+        where: {
+          OR: [{ product: { clienteId: id } }, { job: { device: { clienteId: id } } }],
+        },
+      }),
+      this.prisma.syncJob.deleteMany({ where: { device: { clienteId: id } } }),
+      this.prisma.tabelaNutricionalItem.deleteMany({ where: { tabela: { clienteId: id } } }),
+      this.prisma.product.deleteMany({ where: { clienteId: id } }),
+      this.prisma.device.deleteMany({ where: { clienteId: id } }),
+      this.prisma.deviceGroup.deleteMany({ where: { clienteId: id } }),
+      this.prisma.agent.deleteMany({ where: { clienteId: id } }),
+      this.prisma.subSetor.deleteMany({ where: { clienteId: id } }),
+      this.prisma.setor.deleteMany({ where: { clienteId: id } }),
+      this.prisma.fornecedor.deleteMany({ where: { clienteId: id } }),
+      this.prisma.alergico.deleteMany({ where: { clienteId: id } }),
+      this.prisma.tabelaNutricional.deleteMany({ where: { clienteId: id } }),
+      this.prisma.operador.deleteMany({ where: { clienteId: id } }),
+      this.prisma.imagem.deleteMany({ where: { clienteId: id } }),
+      this.prisma.formatoImpressao.deleteMany({ where: { clienteId: id } }),
+      this.prisma.codigoBarrasFormato.deleteMany({ where: { clienteId: id } }),
+      this.prisma.textoGlobal.deleteMany({ where: { clienteId: id } }),
+      this.prisma.teclaAcessoRapido.deleteMany({ where: { clienteId: id } }),
+      this.prisma.specParametro.deleteMany({ where: { clienteId: id } }),
+      this.prisma.configuracaoAvancada.deleteMany({ where: { clienteId: id } }),
+      this.prisma.perfilLojaAcesso.deleteMany({ where: { loja: { clienteId: id } } }),
+      this.prisma.loja.deleteMany({ where: { clienteId: id } }),
+      this.prisma.perfil.deleteMany({ where: { clienteId: id } }),
+      this.prisma.fatura.deleteMany({ where: { assinatura: { clienteId: id } } }),
+      this.prisma.assinatura.deleteMany({ where: { clienteId: id } }),
+      this.prisma.cliente.delete({ where: { id } }),
+    ]);
     return { deleted: true };
   }
 

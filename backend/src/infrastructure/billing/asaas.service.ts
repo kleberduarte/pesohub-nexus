@@ -38,7 +38,7 @@ export class AsaasService {
   private readonly baseUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    this.apiKey = this.config.getOrThrow<string>("ASAAS_API_KEY");
+    this.apiKey = this.config.get<string>("ASAAS_API_KEY") ?? "";
     this.baseUrl = this.config.get<string>("ASAAS_BASE_URL") ?? "https://sandbox.asaas.com/api/v3";
   }
 
