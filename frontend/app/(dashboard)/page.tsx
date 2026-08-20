@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Scale, Package, Wifi, WifiOff, Building2 } from "lucide-react";
-import { devicesApi, productsApi, getCurrentUser, type Device, ApiError } from "../../lib/api";
+import { devicesApi, productsApi, getCurrentUser, type Device, type DeviceStats, ApiError } from "../../lib/api";
 
 export default function DashboardPage() {
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [recentDevices, setRecentDevices] = useState<Device[]>([]);
+  const [deviceStats, setDeviceStats] = useState<DeviceStats | null>(null);
   const [productCount, setProductCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -20,9 +21,10 @@ export default function DashboardPage() {
       return;
     }
 
-    Promise.all([devicesApi.list(), productsApi.list()])
-      .then(([devicesRes, productsRes]) => {
-        setDevices(devicesRes);
+    Promise.all([devicesApi.stats(), devicesApi.list(1, 5), productsApi.list()])
+      .then(([statsRes, devicesRes, productsRes]) => {
+        setDeviceStats(statsRes);
+        setRecentDevices(devicesRes.data);
         setProductCount(productsRes.length);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível carregar o painel."))
@@ -44,13 +46,8 @@ export default function DashboardPage() {
     );
   }
 
-  const activeDevices = devices.filter((d) => d.status === "ONLINE").length;
-  const recentDevices = [...devices]
-    .sort((a, b) => (b.ultimoAcesso ?? "").localeCompare(a.ultimoAcesso ?? ""))
-    .slice(0, 5);
-
   const stats = [
-    { name: "Balanças Ativas", value: String(activeDevices), icon: Scale },
+    { name: "Balanças Ativas", value: deviceStats ? String(deviceStats.online) : "—", icon: Scale },
     { name: "Produtos (PLU)", value: productCount !== null ? productCount.toLocaleString("pt-BR") : "—", icon: Package },
   ];
 

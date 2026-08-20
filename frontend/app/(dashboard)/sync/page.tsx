@@ -41,10 +41,10 @@ export default function SyncPage() {
 
   useEffect(() => {
     devicesApi
-      .list()
-      .then((list) => {
-        setDevices(list);
-        loadHistory(list);
+      .list(1, 200)
+      .then((page) => {
+        setDevices(page.data);
+        loadHistory(page.data);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível carregar as balanças."));
   }, [loadHistory]);

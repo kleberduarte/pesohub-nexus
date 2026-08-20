@@ -91,6 +91,9 @@ model Cliente {
   chavePix              String?
   suporteEmail          String?
   suporteWhatsapp       String?
+  /// Domínio de e-mail (ex.: "ramuza.com.br") usado para vincular automaticamente
+  /// um novo usuário SUPERADMIN a esta empresa, restringindo seu acesso a ela.
+  dominio               String?                @unique
   isDefault             Boolean                @default(false)
   createdAt             DateTime               @default(now())
   lojas                 Loja[]

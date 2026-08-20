@@ -1,11 +1,17 @@
 import { IsEmail, IsOptional, IsString, Length, Matches, MaxLength } from "class-validator";
 
 const HEX6 = /^#[0-9A-Fa-f]{6}$/;
+const DOMINIO = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 export class UpdateClienteParametrosDto {
   @IsString()
   @Length(3, 200)
   nome!: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(DOMINIO, { message: "dominio deve ser um domínio válido, ex.: empresa.com.br" })
+  dominio?: string;
 
   @IsOptional()
   @IsString()

@@ -28,3 +28,7 @@ dist-ssr
 *.sw?
 backend/tsconfig.tsbuildinfo
 frontend/tsconfig.tsbuildinfo
+
+# Client-specific operational files, not project code
+/propostas/
+/scripts/

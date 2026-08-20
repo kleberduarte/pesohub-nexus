@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateDeviceUseCase } from "../../../application/usecases/create-device.usecase";
@@ -28,9 +28,22 @@ export class DevicesController {
     private readonly auditLog: AuditLogService,
   ) {}
 
+  private static readonly DEFAULT_PAGE_SIZE = 50;
+  private static readonly MAX_PAGE_SIZE = 200;
+
   @Get()
-  findAll(@Req() req: Request) {
-    return this.devices.findAll(this.lojaId(req));
+  findAll(@Req() req: Request, @Query("page") pageQuery?: string, @Query("pageSize") pageSizeQuery?: string) {
+    const page = Math.max(1, parseInt(pageQuery ?? "1", 10) || 1);
+    const pageSize = Math.min(
+      DevicesController.MAX_PAGE_SIZE,
+      Math.max(1, parseInt(pageSizeQuery ?? "", 10) || DevicesController.DEFAULT_PAGE_SIZE),
+    );
+    return this.devices.findAllPaginated(this.lojaId(req), page, pageSize);
+  }
+
+  @Get("stats")
+  stats(@Req() req: Request) {
+    return this.devices.countStats(this.lojaId(req));
   }
 
   @Get("discovered")

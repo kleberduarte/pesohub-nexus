@@ -21,7 +21,7 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException("Token ausente");
     }
 
-    let user: { clienteId: string; role: string };
+    let user: { clienteId: string; role: string; scoped?: boolean };
     try {
       user = this.jwt.verify(token);
       request.user = user;
@@ -34,7 +34,10 @@ export class JwtAuthGuard implements CanActivate {
       context.getClass(),
     ]);
 
-    if (skipBillingCheck || user.role === "SUPERADMIN") {
+    // SUPERADMIN "global" (não vinculado a uma empresa por domínio) segue sem
+    // checagem de billing; um SUPERADMIN travado numa empresa (scoped) é
+    // tratado como usuário normal daquela empresa para fins de cobrança.
+    if (skipBillingCheck || (user.role === "SUPERADMIN" && !user.scoped)) {
       return true;
     }
 

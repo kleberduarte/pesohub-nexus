@@ -36,6 +36,7 @@ const CLIENTE_SELECT = {
   chavePix: true,
   suporteEmail: true,
   suporteWhatsapp: true,
+  dominio: true,
   isDefault: true,
 };
 
@@ -45,10 +46,20 @@ const CLIENTE_SELECT = {
 export class ClientesController {
   constructor(private readonly prisma: PrismaService) {}
 
+  // SUPERADMIN vinculado a um domínio de empresa (ex.: superadmin@ramuza.com.br)
+  // fica travado naquela empresa e não pode gerenciar a lista de empresas —
+  // esse endpoint é exclusivo do SUPERADMIN "global" (domínio da empresa padrão).
+  private assertUnscoped(req: Request): void {
+    if ((req as unknown as { user: { scoped?: boolean } }).user.scoped) {
+      throw new ForbiddenException("Seu acesso é restrito à empresa vinculada à sua conta");
+    }
+  }
+
   @Get()
   @UseGuards(RolesGuard)
   @Roles("SUPERADMIN")
-  async list() {
+  async list(@Req() req: Request) {
+    this.assertUnscoped(req);
     return this.prisma.cliente.findMany({
       select: CLIENTE_SELECT,
       orderBy: { nome: "asc" },
@@ -58,9 +69,10 @@ export class ClientesController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles("SUPERADMIN")
-  async create(@Body() dto: CreateClienteDto) {
+  async create(@Body() dto: CreateClienteDto, @Req() req: Request) {
+    this.assertUnscoped(req);
     return this.prisma.cliente.create({
-      data: { nome: dto.nome.trim() },
+      data: { nome: dto.nome.trim(), dominio: dto.dominio?.trim().toLowerCase() || null },
       select: CLIENTE_SELECT,
     });
   }
@@ -68,7 +80,8 @@ export class ClientesController {
   @Delete(":id")
   @UseGuards(RolesGuard)
   @Roles("SUPERADMIN")
-  async remove(@Param("id") id: string) {
+  async remove(@Param("id") id: string, @Req() req: Request) {
+    this.assertUnscoped(req);
     const cliente = await this.prisma.cliente.findUnique({ where: { id } });
     if (!cliente) {
       throw new NotFoundException("Empresa não encontrada");
@@ -183,6 +196,7 @@ export class ClientesController {
         chavePix: dto.chavePix ?? null,
         suporteEmail: dto.suporteEmail ?? null,
         suporteWhatsapp: dto.suporteWhatsapp ?? null,
+        dominio: dto.dominio?.trim().toLowerCase() || null,
       },
       select: CLIENTE_SELECT,
     });
