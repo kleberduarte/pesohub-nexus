@@ -33,6 +33,10 @@ export default function DevicesPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const pageSize = 50;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // Add / edit device modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -71,8 +75,9 @@ export default function DevicesPage() {
       return;
     }
     try {
-      const [deviceList, agentList] = await Promise.all([devicesApi.list(), agentsApi.list()]);
-      setDevices(deviceList);
+      const [devicePage, agentList] = await Promise.all([devicesApi.list(page, pageSize), agentsApi.list()]);
+      setDevices(devicePage.data);
+      setTotal(devicePage.total);
       setAgents(agentList);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível carregar as balanças.");
@@ -83,7 +88,8 @@ export default function DevicesPage() {
 
   useEffect(() => {
     loadDevices();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   useEffect(() => {
     if (!notice) return;
@@ -317,7 +323,7 @@ export default function DevicesPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar balança por nome ou IP..."
+            placeholder="Buscar balança por nome ou IP (nesta página)..."
             className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -479,6 +485,32 @@ export default function DevicesPage() {
             </tbody>
           </table>
         </div>
+        {!loading && total > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 text-sm text-slate-500">
+            <span>
+              Mostrando {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} de {total} balança(s)
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Anterior
+              </button>
+              <span className="px-2">
+                Página {page} de {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Próxima
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add / Edit Device Modal */}

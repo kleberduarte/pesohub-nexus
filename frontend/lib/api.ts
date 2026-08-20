@@ -211,8 +211,22 @@ export interface ImportDevicesLojaResult {
   devicesCreated: number;
 }
 
+export interface PaginatedDevices {
+  data: Device[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface DeviceStats {
+  total: number;
+  online: number;
+}
+
 export const devicesApi = {
-  list: () => request<Device[]>("/devices"),
+  list: (page = 1, pageSize = 50) =>
+    request<PaginatedDevices>(`/devices?page=${page}&pageSize=${pageSize}`),
+  stats: () => request<DeviceStats>("/devices/stats"),
   create: (data: CreateDeviceInput) =>
     request<Device>("/devices", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: UpdateDeviceInput) =>

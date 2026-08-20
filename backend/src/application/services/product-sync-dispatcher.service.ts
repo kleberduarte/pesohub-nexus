@@ -16,25 +16,29 @@ export class ProductSyncDispatcher {
     @InjectQueue("sync-jobs") private readonly syncQueue: Queue,
   ) {}
 
-  async syncToLinkedDevices(productId: string, lojaId: string): Promise<void> {
-    const devices = await this.devices.findAll(lojaId);
-    const linkedDevices = devices.filter((device) => !!device.agentId);
+  private static readonly DISPATCH_BATCH_SIZE = 500;
 
-    if (linkedDevices.length === 0) {
+  async syncToLinkedDevices(productId: string, lojaId: string): Promise<void> {
+    const linkedDeviceIds = await this.devices.findLinkedDeviceIds(lojaId);
+
+    if (linkedDeviceIds.length === 0) {
       this.logger.warn(
         `Produto ${productId} salvo, mas nenhum device com Agent Local vinculado — sync não disparado.`,
       );
       return;
     }
 
-    await Promise.all(
-      linkedDevices.map((device) =>
-        this.syncQueue.add("sync-device", {
-          deviceId: device.id,
-          tipo: "INCREMENTAL",
-          productIds: [productId],
-        }),
-      ),
-    );
+    for (let i = 0; i < linkedDeviceIds.length; i += ProductSyncDispatcher.DISPATCH_BATCH_SIZE) {
+      const batch = linkedDeviceIds.slice(i, i + ProductSyncDispatcher.DISPATCH_BATCH_SIZE);
+      await Promise.all(
+        batch.map((deviceId) =>
+          this.syncQueue.add("sync-device", {
+            deviceId,
+            tipo: "INCREMENTAL",
+            productIds: [productId],
+          }),
+        ),
+      );
+    }
   }
 }
