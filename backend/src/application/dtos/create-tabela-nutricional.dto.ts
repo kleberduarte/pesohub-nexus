@@ -1,6 +1,7 @@
 import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
+  IsArray,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -23,9 +24,11 @@ export class TabelaNutricionalItemDto {
   @IsIn(UNIDADES)
   unidade!: (typeof UNIDADES)[number];
 
+  @Type(() => Number)
   @IsNumber()
   valor!: number;
 
+  @Type(() => Number)
   @IsNumber()
   porcentagem!: number;
 }
@@ -41,6 +44,19 @@ export class CreateTabelaNutricionalDto {
   @IsOptional()
   @IsString()
   porcao?: string;
+
+  @IsOptional()
+  @IsInt()
+  porcoesPorEmbalagem?: number;
+
+  @IsOptional()
+  @IsString()
+  ingredientes?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  selos?: string[];
 
   @ArrayMaxSize(17)
   @ValidateNested({ each: true })

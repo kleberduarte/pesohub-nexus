@@ -491,6 +491,9 @@ export interface TabelaNutricional {
   numero: number;
   nome: string;
   porcao?: string | null;
+  porcoesPorEmbalagem?: number | null;
+  ingredientes?: string | null;
+  selos: string[];
   itens: TabelaNutricionalItem[];
 }
 
