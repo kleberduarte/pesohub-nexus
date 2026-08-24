@@ -35,6 +35,9 @@ export class TabelaNutricionalPrismaRepository implements TabelaNutricionalRepos
           numero: data.numero,
           nome: data.nome,
           porcao: data.porcao,
+          porcoesPorEmbalagem: data.porcoesPorEmbalagem,
+          ingredientes: data.ingredientes,
+          selos: data.selos ?? [],
           itens: { create: data.itens },
         },
         include: { itens: { orderBy: { ordem: "asc" } } },
@@ -56,7 +59,14 @@ export class TabelaNutricionalPrismaRepository implements TabelaNutricionalRepos
     await this.prisma.$transaction(async (tx) => {
       await tx.tabelaNutricional.update({
         where: { id },
-        data: { numero: data.numero, nome: data.nome, porcao: data.porcao },
+        data: {
+          numero: data.numero,
+          nome: data.nome,
+          porcao: data.porcao,
+          porcoesPorEmbalagem: data.porcoesPorEmbalagem,
+          ingredientes: data.ingredientes,
+          selos: data.selos,
+        },
       });
       if (data.itens) {
         await tx.tabelaNutricionalItem.deleteMany({ where: { tabelaId: id } });

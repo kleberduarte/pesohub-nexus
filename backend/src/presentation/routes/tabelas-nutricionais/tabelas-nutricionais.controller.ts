@@ -29,7 +29,12 @@ export class TabelasNutricionaisController {
 
   @Post()
   create(@Body() dto: CreateTabelaNutricionalDto, @Req() req: Request) {
-    return this.tabelas.create({ ...dto, clienteId: this.clienteId(req), lojaId: this.lojaId(req) });
+    return this.tabelas.create({
+      ...dto,
+      selos: dto.selos ?? [],
+      clienteId: this.clienteId(req),
+      lojaId: this.lojaId(req),
+    });
   }
 
   @Patch(":id")

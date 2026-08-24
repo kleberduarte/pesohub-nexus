@@ -1,11 +1,22 @@
 "use client";
 
 import { useMemo, useRef, useState, useEffect } from "react";
-import { Pencil, Plus, Trash2, LayoutTemplate, X } from "lucide-react";
-import { formatosImpressaoApi, ApiError, type FormatoImpressao } from "../../lib/api";
+import { Pencil, Plus, Trash2, LayoutTemplate, Tag, X } from "lucide-react";
+import {
+  formatosImpressaoApi,
+  productsApi,
+  imagensApi,
+  tabelasNutricionaisApi,
+  ApiError,
+  type FormatoImpressao,
+  type Product,
+  type Imagem,
+  type TabelaNutricional,
+} from "../../lib/api";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { EtiquetaPreview } from "../products/EtiquetaPreview";
 
-type ElementoTipo = "nome" | "preco" | "codigoBarras" | "texto" | "imagem";
+type ElementoTipo = "nome" | "preco" | "codigoBarras" | "texto" | "imagem" | "tabelaNutricional" | "selos" | "ingredientes";
 
 interface LayoutElemento {
   id: string;
@@ -23,6 +34,9 @@ const TIPO_LABEL: Record<ElementoTipo, string> = {
   codigoBarras: "Código de Barras",
   texto: "Texto Livre",
   imagem: "Imagem/Logo",
+  tabelaNutricional: "Tabela Nutricional",
+  selos: "Selos (Alto em...)",
+  ingredientes: "Ingredientes",
 };
 
 const TIPO_DEFAULT_SIZE: Record<ElementoTipo, { largura: number; altura: number }> = {
@@ -31,6 +45,9 @@ const TIPO_DEFAULT_SIZE: Record<ElementoTipo, { largura: number; altura: number 
   codigoBarras: { largura: 45, altura: 15 },
   texto: { largura: 30, altura: 6 },
   imagem: { largura: 20, altura: 20 },
+  tabelaNutricional: { largura: 50, altura: 40 },
+  selos: { largura: 50, altura: 10 },
+  ingredientes: { largura: 50, altura: 16 },
 };
 
 const PX_PER_MM = 4;
@@ -63,6 +80,11 @@ export function FormatoImpressaoPanel() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const dragState = useRef<{ id: string; offsetXMm: number; offsetYMm: number } | null>(null);
 
+  const [products, setProducts] = useState<Product[]>([]);
+  const [imagens, setImagens] = useState<Imagem[]>([]);
+  const [tabelasNutricionais, setTabelasNutricionais] = useState<TabelaNutricional[]>([]);
+  const [previewFormato, setPreviewFormato] = useState<FormatoImpressao | null>(null);
+
   const load = () => {
     setLoading(true);
     formatosImpressaoApi
@@ -73,6 +95,11 @@ export function FormatoImpressaoPanel() {
   };
 
   useEffect(load, []);
+  useEffect(() => {
+    productsApi.list().then(setProducts).catch(() => setProducts([]));
+    imagensApi.list().then(setImagens).catch(() => setImagens([]));
+    tabelasNutricionaisApi.list().then(setTabelasNutricionais).catch(() => setTabelasNutricionais([]));
+  }, []);
 
   const openCreate = () => {
     setEditing(null);
@@ -269,6 +296,13 @@ export function FormatoImpressaoPanel() {
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       <button
+                        onClick={() => setPreviewFormato(f)}
+                        className="p-1.5 text-slate-400 hover:text-brand-600 transition-colors"
+                        title="Pré-visualizar etiqueta"
+                      >
+                        <Tag className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => openLayout(f)}
                         className="p-1.5 text-slate-400 hover:text-brand-600 transition-colors"
                         title="Editar layout visual"
@@ -395,7 +429,9 @@ export function FormatoImpressaoPanel() {
                 ref={canvasRef}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
-                onClick={() => setSelectedId(null)}
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setSelectedId(null);
+                }}
                 className="relative bg-white border-2 border-slate-300 rounded shrink-0"
                 style={{ width: canvasSize.width, height: canvasSize.height }}
               >
@@ -507,6 +543,17 @@ export function FormatoImpressaoPanel() {
             </div>
           </div>
         </div>
+      )}
+
+      {previewFormato && (
+        <EtiquetaPreview
+          products={products}
+          formatos={formatos}
+          imagens={imagens}
+          tabelasNutricionais={tabelasNutricionais}
+          initialFormatoId={previewFormato.id}
+          onClose={() => setPreviewFormato(null)}
+        />
       )}
 
       <ConfirmDialog

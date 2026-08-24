@@ -10,6 +10,7 @@ import {
   fornecedoresApi,
   alergicosApi,
   imagensApi,
+  formatosImpressaoApi,
   type Product,
   type CreateProductInput,
   type SubSetor,
@@ -17,6 +18,7 @@ import {
   type Fornecedor,
   type Alergico,
   type Imagem,
+  type FormatoImpressao,
   ApiError,
 } from "../../../lib/api";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
@@ -40,6 +42,7 @@ const emptyForm: CreateProductInput = {
   fornecedorId: "",
   alergicoId: "",
   imagemId: "",
+  formatoImpressaoId: "",
   textoExtra1: "",
   textoExtra2: "",
   textoExtra3: "",
@@ -128,6 +131,7 @@ export default function ProductsPage() {
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [alergicos, setAlergicos] = useState<Alergico[]>([]);
   const [imagens, setImagens] = useState<Imagem[]>([]);
+  const [formatosImpressao, setFormatosImpressao] = useState<FormatoImpressao[]>([]);
 
   useEffect(() => {
     subSetoresApi.list().then(setSubSetores).catch(() => setSubSetores([]));
@@ -135,6 +139,7 @@ export default function ProductsPage() {
     fornecedoresApi.list().then(setFornecedores).catch(() => setFornecedores([]));
     alergicosApi.list().then(setAlergicos).catch(() => setAlergicos([]));
     imagensApi.list().then(setImagens).catch(() => setImagens([]));
+    formatosImpressaoApi.list().then(setFormatosImpressao).catch(() => setFormatosImpressao([]));
   }, []);
 
   const loadProducts = async () => {
@@ -199,6 +204,7 @@ export default function ProductsPage() {
       fornecedorId: product.fornecedorId ?? "",
       alergicoId: product.alergicoId ?? "",
       imagemId: product.imagemId ?? "",
+      formatoImpressaoId: product.formatoImpressaoId ?? "",
       textoExtra1: product.textoExtra1 ?? "",
       textoExtra2: product.textoExtra2 ?? "",
       textoExtra3: product.textoExtra3 ?? "",
@@ -764,6 +770,21 @@ export default function ProductsPage() {
                           {imagens.map((img) => (
                             <option key={img.id} value={img.id}>
                               {img.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Formato de Impressão</label>
+                        <select
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+                          value={form.formatoImpressaoId ?? ""}
+                          onChange={(e) => setForm({ ...form, formatoImpressaoId: e.target.value })}
+                        >
+                          <option value="">—</option>
+                          {formatosImpressao.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.numero} - {f.nome}
                             </option>
                           ))}
                         </select>

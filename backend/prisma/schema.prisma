@@ -118,6 +118,7 @@ model Cliente {
   specParametros        SpecParametro[]
   assinatura            Assinatura?
   configuracaoAvancadas ConfiguracaoAvancada[]
+  integracaoVeltrix     IntegracaoVeltrix?
 }
 
 /// Uma unidade/loja física onde o Cliente (revendedor, ex.: Ramuza) instala
@@ -156,6 +157,7 @@ model Loja {
   teclasAcessoRapido   TeclaAcessoRapido[]
   specParametros       SpecParametro[]
   configuracaoAvancada ConfiguracaoAvancada?
+  integracaoVeltrix    IntegracaoVeltrix?
 }
 
 /// Um perfil de acesso configurável (ex.: "Gerente Regional", "Operador Açaí")
@@ -329,13 +331,16 @@ model TabelaNutricional {
   cliente   Cliente                 @relation(fields: [clienteId], references: [id])
   lojaId    String
   loja      Loja                    @relation(fields: [lojaId], references: [id])
-  numero    Int
-  nome      String
-  porcao    String?
-  itens     TabelaNutricionalItem[]
-  products  Product[]
-  createdAt DateTime                @default(now())
-  updatedAt DateTime                @updatedAt
+  numero              Int
+  nome                String
+  porcao              String?
+  porcoesPorEmbalagem Int?
+  ingredientes        String?
+  selos               String[]                @default([])
+  itens               TabelaNutricionalItem[]
+  products            Product[]
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 
   @@unique([lojaId, numero])
 }
@@ -593,4 +598,25 @@ model AuditLog {
   acao      String
   payload   Json?
   timestamp DateTime @default(now())
+}
+
+/// Configuração de integração com o ERP Veltrix (`C:\Projetos\veltrix`) para um
+/// Cliente do PesoHub. Puxa produtos via polling (GET /products autenticado por
+/// login de serviço) e faz upsert na Loja de destino — Veltrix não expõe webhook.
+model IntegracaoVeltrix {
+  id                 String    @id @default(cuid())
+  clienteId          String    @unique
+  cliente            Cliente   @relation(fields: [clienteId], references: [id])
+  lojaId             String    @unique
+  loja               Loja      @relation(fields: [lojaId], references: [id])
+  baseUrl            String
+  email              String
+  senha              String
+  ativo              Boolean   @default(true)
+  intervaloMinutos   Int       @default(15)
+  ultimaSincronizacao DateTime?
+  ultimoStatus       String?
+  ultimoErro         String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 }

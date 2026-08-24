@@ -33,6 +33,9 @@ export function TabelaNutricionalPanel() {
   const [numero, setNumero] = useState(0);
   const [nome, setNome] = useState("");
   const [porcao, setPorcao] = useState("");
+  const [porcoesPorEmbalagem, setPorcoesPorEmbalagem] = useState<number | undefined>(undefined);
+  const [ingredientes, setIngredientes] = useState("");
+  const [selosTexto, setSelosTexto] = useState("");
   const [itens, setItens] = useState<TabelaNutricionalItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TabelaNutricional | null>(null);
@@ -54,6 +57,9 @@ export function TabelaNutricionalPanel() {
     setNumero(0);
     setNome("");
     setPorcao("");
+    setPorcoesPorEmbalagem(undefined);
+    setIngredientes("");
+    setSelosTexto("");
     setItens([emptyItem(1)]);
     setModalOpen(true);
   };
@@ -63,6 +69,9 @@ export function TabelaNutricionalPanel() {
     setNumero(t.numero);
     setNome(t.nome);
     setPorcao(t.porcao ?? "");
+    setPorcoesPorEmbalagem(t.porcoesPorEmbalagem ?? undefined);
+    setIngredientes(t.ingredientes ?? "");
+    setSelosTexto((t.selos ?? []).join(", "));
     setItens(t.itens.length > 0 ? t.itens : [emptyItem(1)]);
     setModalOpen(true);
   };
@@ -84,7 +93,18 @@ export function TabelaNutricionalPanel() {
     setSaving(true);
     setError(null);
     try {
-      const payload = { numero, nome, porcao, itens: itens.filter((it) => it.ingrediente.trim() !== "") };
+      const payload = {
+        numero,
+        nome,
+        porcao,
+        porcoesPorEmbalagem,
+        ingredientes: ingredientes.trim() || undefined,
+        selos: selosTexto
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        itens: itens.filter((it) => it.ingrediente.trim() !== ""),
+      };
       if (editing) {
         await tabelasNutricionaisApi.update(editing.id, payload);
       } else {
@@ -215,6 +235,38 @@ export function TabelaNutricionalPanel() {
                   placeholder="Porção de 30g"
                   value={porcao}
                   onChange={(e) => setPorcao(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Porções por embalagem</label>
+                <input
+                  type="number"
+                  value={porcoesPorEmbalagem ?? ""}
+                  onChange={(e) =>
+                    setPorcoesPorEmbalagem(e.target.value === "" ? undefined : Number(e.target.value))
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Selos (Alto em...)</label>
+                <input
+                  type="text"
+                  placeholder="Açúcar adicionado, Gordura saturada, Sódio"
+                  value={selosTexto}
+                  onChange={(e) => setSelosTexto(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                />
+                <p className="text-xs text-slate-400 mt-1">Separe múltiplos selos por vírgula.</p>
+              </div>
+              <div className="md:col-span-3">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Ingredientes</label>
+                <textarea
+                  rows={3}
+                  placeholder="Água, açúcar, leite em pó..."
+                  value={ingredientes}
+                  onChange={(e) => setIngredientes(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 />
               </div>
