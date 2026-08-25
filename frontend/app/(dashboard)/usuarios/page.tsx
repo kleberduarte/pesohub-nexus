@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
-import { usersApi, ApiError, getCurrentUser, type AppUser, type UserRole } from "../../../lib/api";
+import { usersApi, clientesApi, lojasApi, ApiError, getCurrentUser, type AppUser, type Loja, type UserRole } from "../../../lib/api";
+
+const ROLES_RESTRINGIVEIS_A_LOJA: UserRole[] = ["OPERADOR", "VIEWER"];
 
 const ROLE_OPTIONS: UserRole[] = ["ADMIN", "OPERADOR", "VIEWER"];
 
@@ -14,8 +16,10 @@ export default function UsuariosPage() {
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [role, setRole] = useState<UserRole>("OPERADOR");
+  const [lojaId, setLojaId] = useState("");
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
+  const [lojas, setLojas] = useState<Loja[]>([]);
 
   const [editTarget, setEditTarget] = useState<AppUser | null>(null);
   const [editRole, setEditRole] = useState<UserRole>("OPERADOR");
@@ -27,7 +31,12 @@ export default function UsuariosPage() {
   const [deleting, setDeleting] = useState(false);
 
   const currentUser = getCurrentUser();
-  const roleOptions = currentUser?.role === "SUPERADMIN" ? (["SUPERADMIN", ...ROLE_OPTIONS] as UserRole[]) : ROLE_OPTIONS;
+  // SUPERADMIN só existe na empresa padrão — não faz sentido oferecer o
+  // perfil pra empresas clientes (Ramuza, etc.), mesmo que quem esteja
+  // cadastrando já seja um SUPERADMIN "global" navegando ali.
+  const [isDefaultCliente, setIsDefaultCliente] = useState(false);
+  const roleOptions =
+    currentUser?.role === "SUPERADMIN" && isDefaultCliente ? (["SUPERADMIN", ...ROLE_OPTIONS] as UserRole[]) : ROLE_OPTIONS;
 
   const loadUsers = () => {
     setLoading(true);
@@ -40,17 +49,28 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     loadUsers();
+    clientesApi
+      .getMe()
+      .then((cliente) => setIsDefaultCliente(cliente.isDefault))
+      .catch(() => setIsDefaultCliente(false));
+    lojasApi
+      .list()
+      .then(setLojas)
+      .catch(() => setLojas([]));
   }, []);
+
+  const restringeALoja = ROLES_RESTRINGIVEIS_A_LOJA.includes(role);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
     setCreating(true);
     try {
-      await usersApi.create({ email, senha, role });
+      await usersApi.create({ email, senha, role, ...(restringeALoja && lojaId ? { lojaId } : {}) });
       setEmail("");
       setSenha("");
       setRole("OPERADOR");
+      setLojaId("");
       loadUsers();
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : "Não foi possível cadastrar o usuário.");
@@ -100,6 +120,17 @@ export default function UsuariosPage() {
     }
   };
 
+  // Gestão de usuários é exclusiva de quem administra a empresa. O link some
+  // do menu pra outros perfis, mas alguém pode digitar a URL direto — aqui é
+  // a segunda camada (a real é o backend, que já recusa list/create/etc.).
+  if (currentUser && currentUser.role !== "SUPERADMIN" && currentUser.role !== "ADMIN") {
+    return (
+      <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
+        Você não tem permissão para acessar esta página.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -113,9 +144,9 @@ export default function UsuariosPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <h3 className="text-sm font-semibold text-slate-700 mb-4">Novo usuário</h3>
-        <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+        <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-end">
           {formError && (
-            <div className="sm:col-span-4 p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
+            <div className="sm:col-span-5 p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
               {formError}
             </div>
           )}
@@ -144,12 +175,34 @@ export default function UsuariosPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Perfil</label>
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value as UserRole)}
+              onChange={(e) => {
+                const novoRole = e.target.value as UserRole;
+                setRole(novoRole);
+                if (!ROLES_RESTRINGIVEIS_A_LOJA.includes(novoRole)) setLojaId("");
+              }}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               {roleOptions.map((r) => (
                 <option key={r} value={r}>
                   {r}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Loja {restringeALoja ? "" : <span className="text-slate-400 font-normal">(opcional)</span>}
+            </label>
+            <select
+              value={lojaId}
+              onChange={(e) => setLojaId(e.target.value)}
+              disabled={!restringeALoja}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-400"
+            >
+              <option value="">Todas as lojas</option>
+              {lojas.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.nome}
                 </option>
               ))}
             </select>
@@ -162,6 +215,11 @@ export default function UsuariosPage() {
             {creating ? "Cadastrando..." : "Cadastrar"}
           </button>
         </form>
+        {restringeALoja && !lojaId && (
+          <p className="text-xs text-amber-600 mt-2">
+            Sem uma loja selecionada, esse usuário vai enxergar todas as lojas da empresa.
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
@@ -186,13 +244,28 @@ export default function UsuariosPage() {
               {!loading &&
                 users.map((user) => {
                   const isSelf = user.id === currentUser?.sub;
+                  // Backend recusa editar/excluir um SUPERADMIN se quem está agindo
+                  // não for SUPERADMIN — a UI espelha essa regra pra não deixar o
+                  // botão clicável só pra devolver um erro.
+                  const targetIsSuperadmin = user.role === "SUPERADMIN";
+                  const lacksPermission = targetIsSuperadmin && currentUser?.role !== "SUPERADMIN";
+                  const editDisabled = lacksPermission;
+                  const deleteDisabled = isSelf || lacksPermission;
+                  const permissionTitle = "Apenas SUPERADMIN pode gerenciar um usuário SUPERADMIN";
                   return (
                     <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-800">
                         {user.email}
                         {isSelf && <span className="ml-2 text-xs text-slate-400">(você)</span>}
                       </td>
-                      <td className="px-6 py-4 text-slate-500">{user.role}</td>
+                      <td className="px-6 py-4 text-slate-500">
+                        {user.role}
+                        {user.perfil && (
+                          <span className="ml-2 text-xs text-slate-400">
+                            ({user.perfil.nome.replace(/^Loja: /, "")})
+                          </span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-slate-500">
                         {new Date(user.createdAt).toLocaleDateString("pt-BR")}
                       </td>
@@ -200,18 +273,25 @@ export default function UsuariosPage() {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
+                            disabled={editDisabled}
                             onClick={() => openEdit(user)}
-                            className="p-2 text-slate-400 hover:text-brand-600 transition-colors rounded-lg hover:bg-brand-50"
-                            title="Editar usuário"
+                            className="p-2 text-slate-400 hover:text-brand-600 transition-colors rounded-lg hover:bg-brand-50 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                            title={editDisabled ? permissionTitle : "Editar usuário"}
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
-                            disabled={isSelf}
+                            disabled={deleteDisabled}
                             onClick={() => setDeleteTarget(user)}
-                            className="p-2 text-slate-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed"
-                            title={isSelf ? "Você não pode excluir seu próprio usuário" : "Excluir usuário"}
+                            className="p-2 text-slate-400 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                            title={
+                              isSelf
+                                ? "Você não pode excluir seu próprio usuário"
+                                : lacksPermission
+                                  ? permissionTitle
+                                  : "Excluir usuário"
+                            }
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>

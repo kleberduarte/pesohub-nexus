@@ -33,13 +33,15 @@ export class UsersController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @UseGuards(RolesGuard)
+  @Roles("SUPERADMIN", "ADMIN")
   async list(@Req() req: AuthenticatedRequest) {
     const clienteId = req.user.clienteId;
     if (!clienteId) return [];
 
     return this.prisma.user.findMany({
       where: { clienteId },
-      select: { id: true, email: true, role: true, createdAt: true },
+      select: { id: true, email: true, role: true, createdAt: true, perfil: { select: { nome: true } } },
       orderBy: { createdAt: "asc" },
     });
   }
@@ -61,10 +63,10 @@ export class UsersController {
       throw new ConflictException("Já existe um usuário com este e-mail");
     }
 
-    // Um SUPERADMIN é vinculado à empresa dona do domínio do seu e-mail (ex.:
-    // superadmin@ramuza.com.br → empresa Ramuza) e fica travado nela. O domínio
-    // da empresa padrão (PesoHub) é a exceção: continua "global", sem clienteId
-    // fixo, podendo trocar de empresa livremente como hoje.
+    // SUPERADMIN só existe na empresa padrão (PesoHub) — é o perfil "global"
+    // que administra a lista de empresas do sistema. Uma empresa cliente
+    // (Ramuza, Rede da Avó etc.) se administra inteiramente com ADMIN; não
+    // tem por que ter um SUPERADMIN próprio.
     let clienteIdParaUsuario: string | null = clienteId;
     if (dto.role === "SUPERADMIN") {
       const dominio = dto.email.split("@")[1]?.toLowerCase();
@@ -74,13 +76,48 @@ export class UsersController {
           `Nenhuma empresa cadastrada com o domínio @${dominio} — cadastre o domínio da empresa antes de criar este usuário`,
         );
       }
-      clienteIdParaUsuario = clienteDoDominio.isDefault ? null : clienteDoDominio.id;
+      if (!clienteDoDominio.isDefault) {
+        throw new ForbiddenException("O perfil SUPERADMIN só é permitido na empresa padrão");
+      }
+      clienteIdParaUsuario = null;
+    }
+
+    // Restringe o novo usuário a uma única Loja: reaproveita o mecanismo de
+    // Perfil (PerfilLojaAcesso) que já existe pra multi-loja, criando um
+    // Perfil dedicado "Loja: <nome>" com acesso só àquela Loja. Sem isso, o
+    // usuário enxerga (e pode trocar entre) todas as Lojas do Cliente.
+    let perfilId: string | null = null;
+    if (dto.lojaId) {
+      if (dto.role === "SUPERADMIN" || dto.role === "ADMIN") {
+        throw new ForbiddenException("ADMIN e SUPERADMIN administram todas as lojas — não é possível restringi-los a uma só");
+      }
+      const loja = await this.prisma.loja.findFirst({ where: { id: dto.lojaId, clienteId } });
+      if (!loja) {
+        throw new NotFoundException("Loja não encontrada");
+      }
+      const perfil = await this.prisma.perfil.upsert({
+        where: { clienteId_nome: { clienteId, nome: `Loja: ${loja.nome}` } },
+        update: {},
+        create: {
+          clienteId,
+          nome: `Loja: ${loja.nome}`,
+          lojas: { create: { lojaId: loja.id } },
+        },
+      });
+      perfilId = perfil.id;
     }
 
     const senha = await bcrypt.hash(dto.senha, 10);
     return this.prisma.user.create({
-      data: { email: dto.email, senha, role: dto.role, clienteId: clienteIdParaUsuario },
-      select: { id: true, email: true, role: true, createdAt: true },
+      data: {
+        email: dto.email,
+        senha,
+        role: dto.role,
+        clienteId: clienteIdParaUsuario,
+        perfilId,
+        activeLojaId: dto.lojaId ?? null,
+      },
+      select: { id: true, email: true, role: true, createdAt: true, perfil: { select: { nome: true } } },
     });
   }
 
@@ -95,6 +132,9 @@ export class UsersController {
     }
     if ((dto.role === "SUPERADMIN" || target.role === "SUPERADMIN") && creatorRole !== "SUPERADMIN") {
       throw new ForbiddenException("Apenas SUPERADMIN pode alterar um usuário SUPERADMIN");
+    }
+    if (dto.role === "SUPERADMIN" && target.clienteId !== null) {
+      throw new ForbiddenException("O perfil SUPERADMIN só é permitido na empresa padrão");
     }
 
     const data: { role?: typeof dto.role; senha?: string } = {};

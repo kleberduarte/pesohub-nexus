@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsString, MinLength } from "class-validator";
+import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
 import { UserRole } from "@prisma/client";
 
 export class CreateUserDto {
@@ -11,4 +11,9 @@ export class CreateUserDto {
 
   @IsEnum(UserRole)
   role!: UserRole;
+
+  /** Restringe o usuário a uma única Loja (via Perfil dedicado a ela). Sem isso, ele enxerga todas as Lojas do Cliente. */
+  @IsOptional()
+  @IsString()
+  lojaId?: string;
 }

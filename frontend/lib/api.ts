@@ -736,12 +736,14 @@ export interface AppUser {
   email: string;
   role: UserRole;
   createdAt: string;
+  perfil?: { nome: string } | null;
 }
 
 export interface CreateUserInput {
   email: string;
   senha: string;
   role: UserRole;
+  lojaId?: string;
 }
 
 export interface UpdateUserInput {
