@@ -10,6 +10,7 @@ interface AuthenticatedUser {
   role: string;
   clienteId: string | null;
   lojaId: string | null;
+  perfilId?: string | null;
   scoped?: boolean;
 }
 
@@ -42,6 +43,7 @@ export class AuthService {
       role: user.role,
       clienteId: effectiveClienteId,
       lojaId: effectiveLojaId,
+      perfilId: user.perfilId,
       scoped,
     };
     return {
@@ -76,6 +78,9 @@ export class AuthService {
       role: currentUser.role,
       clienteId: cliente.id,
       lojaId: effectiveLojaId,
+      // Trocar de empresa é exclusivo de SUPERADMIN "global" (nunca tem
+      // Perfil, que é um conceito por-Cliente) — sempre null aqui.
+      perfilId: null,
       scoped: false,
     };
     return {
@@ -109,6 +114,7 @@ export class AuthService {
       role: currentUser.role,
       clienteId: currentUser.clienteId,
       lojaId,
+      perfilId: currentUser.perfilId ?? null,
       scoped: currentUser.scoped ?? false,
     };
     return {

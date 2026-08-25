@@ -44,6 +44,12 @@ const baseNavigation = [
   { name: "SPEC", href: "/spec", icon: SlidersHorizontal },
   { name: "Configurações", href: "/configuracoes", icon: Settings },
   { name: "Sincronização", href: "/sync", icon: CloudUpload },
+];
+
+// Gestão de usuários/lojas/assinatura é coisa de quem administra a empresa —
+// um usuário criado pra operar só numa Loja (OPERADOR/VIEWER) não deve nem
+// ver esses links, muito menos acessar as telas por trás deles.
+const adminNavigation = [
   { name: "Usuários", href: "/usuarios", icon: Users },
   { name: "Lojas", href: "/lojas", icon: Store },
   { name: "Assinatura", href: "/assinatura", icon: CreditCard },
@@ -91,8 +97,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       });
   }, []);
 
-  const navigation =
-    user?.role === "SUPERADMIN" ? [...superadminNavigation, ...baseNavigation] : baseNavigation;
+  const isAdmin = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+  const navigation = [
+    ...(user?.role === "SUPERADMIN" ? superadminNavigation : []),
+    ...baseNavigation,
+    ...(isAdmin ? adminNavigation : []),
+  ];
 
   const handleLogout = () => {
     authApi.logout().catch(() => {});

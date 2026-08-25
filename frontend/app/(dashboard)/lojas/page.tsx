@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Plus, Edit2, Trash2, X, Store } from "lucide-react";
 import { lojasApi, ApiError, type Loja, type CreateLojaInput } from "../../../lib/api";
+import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 
 const emptyForm: CreateLojaInput = { nome: "", endereco: "", telefone: "", responsavel: "", email: "", cnpj: "" };
 
@@ -16,6 +17,8 @@ export default function LojasPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState<CreateLojaInput>(emptyForm);
+  const [deleteTarget, setDeleteTarget] = useState<Loja | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -79,14 +82,19 @@ export default function LojasPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Excluir esta loja? Balanças e cadastros vinculados a ela impedem a exclusão.")) return;
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setError("");
     try {
-      await lojasApi.remove(id);
+      await lojasApi.remove(deleteTarget.id);
       setNotice("Loja excluída.");
+      setDeleteTarget(null);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível excluir a loja.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -149,7 +157,7 @@ export default function LojasPage() {
                     <button onClick={() => openEditModal(loja)} className="text-slate-400 hover:text-brand-600">
                       <Edit2 className="w-4 h-4 inline" />
                     </button>
-                    <button onClick={() => handleDelete(loja.id)} className="text-slate-400 hover:text-red-600">
+                    <button onClick={() => setDeleteTarget(loja)} className="text-slate-400 hover:text-red-600">
                       <Trash2 className="w-4 h-4 inline" />
                     </button>
                   </td>
@@ -235,6 +243,22 @@ export default function LojasPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Excluir loja"
+        message={
+          <>
+            Excluir a loja <strong>{deleteTarget?.nome}</strong>? Balanças, produtos e outros cadastros vinculados a
+            ela também serão removidos.
+          </>
+        }
+        confirmLabel="Excluir"
+        danger
+        loading={deleting}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

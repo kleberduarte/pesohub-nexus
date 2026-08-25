@@ -15,8 +15,20 @@ export class LojasController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  findAll(@Req() req: Request) {
-    return this.prisma.loja.findMany({ where: { clienteId: this.clienteId(req) }, orderBy: { nome: "asc" } });
+  async findAll(@Req() req: Request) {
+    const clienteId = this.clienteId(req);
+    const perfilId = this.perfilId(req);
+    // Usuário com Perfil configurado (ex.: restrito a uma única Loja) só
+    // enxerga as Lojas liberadas pra ele — sem isso, o dropdown "trocar de
+    // loja" e as demais telas expunham todas as Lojas do Cliente pra
+    // qualquer um, mesmo alguém cadastrado só pra operar uma Loja específica.
+    if (perfilId) {
+      return this.prisma.loja.findMany({
+        where: { clienteId, perfilAcessos: { some: { perfilId } } },
+        orderBy: { nome: "asc" },
+      });
+    }
+    return this.prisma.loja.findMany({ where: { clienteId }, orderBy: { nome: "asc" } });
   }
 
   @Get(":id")
@@ -86,11 +98,16 @@ export class LojasController {
       this.prisma.specParametro.deleteMany({ where: { lojaId: id } }),
       this.prisma.configuracaoAvancada.deleteMany({ where: { lojaId: id } }),
       this.prisma.perfilLojaAcesso.deleteMany({ where: { lojaId: id } }),
+      this.prisma.integracaoVeltrix.deleteMany({ where: { lojaId: id } }),
       this.prisma.loja.delete({ where: { id } }),
     ]);
   }
 
   private clienteId(req: Request): string {
     return (req as unknown as { user: { clienteId: string } }).user.clienteId;
+  }
+
+  private perfilId(req: Request): string | null {
+    return (req as unknown as { user: { perfilId?: string | null } }).user.perfilId ?? null;
   }
 }
