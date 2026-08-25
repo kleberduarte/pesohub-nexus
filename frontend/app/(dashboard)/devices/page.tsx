@@ -140,7 +140,9 @@ export default function DevicesPage() {
     setIsScanning(true);
     setError("");
     try {
-      setDiscovered(await devicesApi.discover());
+      const found = await devicesApi.discover();
+      const knownIps = new Set(devices.map((d) => d.ip));
+      setDiscovered(found.filter((d) => !knownIps.has(d.ip)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível buscar balanças na rede.");
     } finally {
