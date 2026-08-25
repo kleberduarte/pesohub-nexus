@@ -22,9 +22,9 @@ export class SyncController {
 
   @Post()
   async create(@Body() dto: CreateSyncJobDto, @Req() req: Request) {
-    const clienteId = this.clienteId(req);
+    const lojaId = this.lojaId(req);
 
-    const owned = await Promise.all(dto.deviceIds.map((id) => this.devices.findById(id, clienteId)));
+    const owned = await Promise.all(dto.deviceIds.map((id) => this.devices.findById(id, lojaId)));
     const notOwned = dto.deviceIds.filter((_, i) => !owned[i]);
     if (notOwned.length > 0) {
       throw new BadRequestException(
@@ -49,7 +49,7 @@ export class SyncController {
 
   @Get(":deviceId")
   async status(@Param("deviceId") deviceId: string, @Req() req: Request) {
-    const device = await this.devices.findById(deviceId, this.clienteId(req));
+    const device = await this.devices.findById(deviceId, this.lojaId(req));
     if (!device) throw new NotFoundException("Dispositivo não encontrado.");
 
     const jobs = await this.prisma.syncJob.findMany({
@@ -62,7 +62,7 @@ export class SyncController {
     return { deviceId, jobs };
   }
 
-  private clienteId(req: Request): string {
-    return (req as unknown as { user: { clienteId: string } }).user.clienteId;
+  private lojaId(req: Request): string {
+    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
   }
 }
