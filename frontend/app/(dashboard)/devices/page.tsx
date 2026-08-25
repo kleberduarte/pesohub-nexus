@@ -60,7 +60,6 @@ export default function DevicesPage() {
   // Link to Agent Local modal
   const [linkingDevice, setLinkingDevice] = useState<Device | null>(null);
   const [tokenInput, setTokenInput] = useState("");
-  const [newLojaId, setNewLojaId] = useState("");
   const [creatingAgent, setCreatingAgent] = useState(false);
   const [linking, setLinking] = useState(false);
   const [createdAgent, setCreatedAgent] = useState<CreatedAgent | null>(null);
@@ -141,7 +140,9 @@ export default function DevicesPage() {
     setIsScanning(true);
     setError("");
     try {
-      setDiscovered(await devicesApi.discover());
+      const found = await devicesApi.discover();
+      const knownIps = new Set(devices.map((d) => d.ip));
+      setDiscovered(found.filter((d) => !knownIps.has(d.ip)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível buscar balanças na rede.");
     } finally {
@@ -254,7 +255,6 @@ export default function DevicesPage() {
   const openLinkModal = (device: Device) => {
     setLinkingDevice(device);
     setTokenInput("");
-    setNewLojaId("");
     setCreatedAgent(null);
     setCopied(false);
   };
@@ -262,17 +262,20 @@ export default function DevicesPage() {
   const closeLinkModal = () => {
     setLinkingDevice(null);
     setTokenInput("");
-    setNewLojaId("");
     setCreatedAgent(null);
     setCopied(false);
   };
 
-  const handleCreateAgent = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleCreateAgent = async () => {
+    const lojaId = getCurrentUser()?.lojaId;
+    if (!lojaId) {
+      setError("Nenhuma loja ativa selecionada. Troque de loja antes de gerar um Agent Local.");
+      return;
+    }
     setCreatingAgent(true);
     setError("");
     try {
-      const agent = await agentsApi.create(newLojaId.trim());
+      const agent = await agentsApi.create(lojaId);
       setCreatedAgent(agent);
       setTokenInput(agent.token);
       await loadDevices();
@@ -665,23 +668,14 @@ export default function DevicesPage() {
                     </p>
                   </div>
                 ) : (
-                  <form onSubmit={handleCreateAgent} className="flex gap-2">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Identificador da loja (ex: loja-centro)"
-                      className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      value={newLojaId}
-                      onChange={(e) => setNewLojaId(e.target.value)}
-                    />
-                    <button
-                      type="submit"
-                      disabled={creatingAgent}
-                      className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60 whitespace-nowrap"
-                    >
-                      {creatingAgent ? "Gerando..." : "Gerar Agent"}
-                    </button>
-                  </form>
+                  <button
+                    type="button"
+                    onClick={handleCreateAgent}
+                    disabled={creatingAgent}
+                    className="w-full px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
+                  >
+                    {creatingAgent ? "Gerando..." : "Gerar Agent para a loja atual"}
+                  </button>
                 )}
               </div>
             </div>
