@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Length, Matches } from "class-validator";
+import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Matches } from "class-validator";
 
 const UNIDADES_VENDA = ["PESO", "PECA"] as const;
 
@@ -10,7 +10,6 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsString()
-  @Length(13, 13)
   @Matches(/^\d{13}$/, { message: "codigoBarras deve conter 13 dígitos (EAN-13)" })
   codigoBarras?: string;
 

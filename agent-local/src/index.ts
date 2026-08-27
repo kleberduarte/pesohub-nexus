@@ -3,7 +3,7 @@ dotenv.config();
 
 import * as dgram from "dgram";
 import { io } from "socket.io-client";
-import { sendProductsToScale } from "./scale-client";
+import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
 
 const BACKEND_URL = process.env.AGENT_BACKEND_URL ?? "http://localhost:3000";
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
@@ -37,13 +37,7 @@ interface SyncCommand {
   deviceIp: string;
   devicePort: number;
   tipo: "TOTAL" | "INCREMENTAL";
-  products: Array<{
-    codigo: string;
-    codigoBarras: string;
-    nome: string;
-    preco: number;
-    categoriaImposto?: string;
-  }>;
+  products: ScaleSyncPayload[];
 }
 
 const socket = io(`${BACKEND_URL}/agents`, {
