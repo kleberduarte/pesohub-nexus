@@ -115,6 +115,7 @@ export default function ProductsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<CreateProductInput>(emptyForm);
+  const [precoInput, setPrecoInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -180,6 +181,7 @@ export default function ProductsPage() {
   const openCreateModal = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setPrecoInput("");
     setIsModalOpen(true);
   };
 
@@ -218,6 +220,7 @@ export default function ProductsPage() {
       validadePacoteHoras: product.validadePacoteHoras ?? undefined,
       validadeDias: product.validadeDias ?? undefined,
     });
+    setPrecoInput(String(product.preco).replace(".", ","));
     setIsModalOpen(true);
   };
 
@@ -550,6 +553,9 @@ export default function ProductsPage() {
                           type="text"
                           required
                           maxLength={13}
+                          pattern="\d{13}"
+                          title="Deve conter exatamente 13 dígitos numéricos (EAN-13)"
+                          placeholder="0000000000000"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 font-mono"
                           value={form.codigoBarras}
                           onChange={(e) => setForm({ ...form, codigoBarras: e.target.value })}
@@ -584,12 +590,21 @@ export default function ProductsPage() {
                       <div>
                         <label className="block text-xs font-medium text-slate-700 mb-1">Preço Unitário (R$)</label>
                         <input
-                          type="number"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           required
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
-                          value={form.preco}
-                          onChange={(e) => setForm({ ...form, preco: Number(e.target.value) })}
+                          value={precoInput}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            // aceita dígitos e um único separador decimal (, ou .) enquanto o
+                            // usuário ainda está digitando, sem forçar re-formatação a cada tecla
+                            if (!/^\d*[.,]?\d*$/.test(raw)) return;
+                            setPrecoInput(raw);
+                            const parsed = Number(raw.replace(",", "."));
+                            if (!Number.isNaN(parsed)) setForm({ ...form, preco: parsed });
+                          }}
+                          onBlur={() => setPrecoInput(String(form.preco).replace(".", ","))}
                         />
                       </div>
                       <div>

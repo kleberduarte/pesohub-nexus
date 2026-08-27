@@ -1,4 +1,8 @@
+import { Transform } from "class-transformer";
 import { IsEmail, IsNotEmpty, IsOptional, IsString } from "class-validator";
+
+/** Converte string vazia em undefined, já que @IsOptional() do class-validator só pula @IsEmail() para undefined/null, não para "". */
+const emptyToUndefined = ({ value }: { value: unknown }) => (value === "" ? undefined : value);
 
 export class CreateLojaDto {
   @IsString()
@@ -22,6 +26,7 @@ export class CreateLojaDto {
   responsavel?: string;
 
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsEmail()
   email?: string;
 
