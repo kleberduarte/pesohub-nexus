@@ -530,6 +530,12 @@ export default function ProductsPage() {
               </div>
             </div>
 
+            {error && (
+              <div className="mx-6 mt-4 p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg shrink-0">
+                {error}
+              </div>
+            )}
+
             <form onSubmit={handleSave} className="contents">
               <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
                 <div className="space-y-6">

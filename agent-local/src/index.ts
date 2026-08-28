@@ -3,7 +3,8 @@ dotenv.config();
 
 import * as dgram from "dgram";
 import { io } from "socket.io-client";
-import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
+import { ScaleSyncPayload } from "./scale-client";
+import { ScaleConnection } from "./scale-connection";
 
 const BACKEND_URL = process.env.AGENT_BACKEND_URL ?? "http://localhost:3000";
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
@@ -105,6 +106,26 @@ discoverySocket.bind(DISCOVERY_PORT, () => {
 
 setInterval(reportDiscovered, 15_000);
 
+/**
+ * Uma conexão TCP persistente por balança (chave `ip:porta`), reaproveitada
+ * entre syncs em vez de abrir/fechar uma conexão nova a cada comando. Ver
+ * [[project_scale_protocol_field_gap]] — a única escrita DWL/NU3 confirmada
+ * como persistida veio de uma conexão real que ficou aberta ~28 minutos com
+ * heartbeats e escritas reais antes do NU3; conexões novas e efêmeras nunca
+ * conseguiram persistir o conteúdo do NU3 em 20+ tentativas.
+ */
+const scaleConnections = new Map<string, ScaleConnection>();
+
+function getScaleConnection(ip: string, port: number): ScaleConnection {
+  const key = `${ip}:${port}`;
+  let conn = scaleConnections.get(key);
+  if (!conn) {
+    conn = new ScaleConnection(ip, port);
+    scaleConnections.set(key, conn);
+  }
+  return conn;
+}
+
 socket.on("sync:command", async (command: SyncCommand) => {
   console.log(
     `[sync:command] device=${command.deviceId} ip=${command.deviceIp}:${command.devicePort} ` +
@@ -122,7 +143,9 @@ socket.on("sync:command", async (command: SyncCommand) => {
     return;
   }
 
-  const outcome = await sendProductsToScale(command.deviceIp, command.devicePort, command.products);
+  const conn = getScaleConnection(command.deviceIp, command.devicePort);
+  console.log(`[sync:command] usando conexão persistente (idade: ${(conn.ageMs / 1000).toFixed(0)}s)`);
+  const outcome = await conn.sendProducts(command.products);
 
   socket.emit("sync:result", {
     correlationId: command.correlationId,

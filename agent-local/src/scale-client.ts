@@ -103,6 +103,14 @@ const FIELD_VINCULO_TABELA_NUTRICIONAL = 59;
  * gorduras totais, gorduras saturadas, gorduras trans, fibra alimentar, sódio
  * — nessa ordem fixa — e idx27-56 dez grupos de 3 (nome, valor, %VD) pra
  * nutrientes extras além dos 10 padrão.
+ *
+ * O idx57 final é um campo VAZIO obrigatório (o registro termina com tab antes
+ * do CRLF, igual ao PLU). Faltava aqui até 2026-08-28 e era a causa raiz da
+ * não-persistência do NU3: a balança dava ACK normal e descartava o registro em
+ * silêncio por vir com 57 campos em vez de 58 — mesma classe de bug do descarte
+ * silencioso do PLU por código não-numérico. Confirmado por diff campo a campo
+ * contra uma escrita real do software oficial que persistiu (única diferença
+ * entre as duas linhas era este campo). Ver [[project_scale_protocol_field_gap]].
  */
 const NU3_FIELD_TEMPLATE = [
   "NU3", "0", "", "", "0", "", "",
@@ -111,6 +119,7 @@ const NU3_FIELD_TEMPLATE = [
   "", "0,0", "0,0", "", "0,0", "0,0", "", "0,0", "0,0", "", "0,0", "0,0",
   "", "0,0", "0,0", "", "0,0", "0,0", "", "0,0", "0,0", "", "0,0", "0,0",
   "", "0,0", "0,0", "", "0,0", "0,0",
+  "",
 ];
 const NU3_FIELD_INDEX = 1;
 const NU3_FIELD_NOME = 2;
@@ -205,7 +214,7 @@ function parsePorcao(porcao: string): { quantidade: string; unidade: string } {
   return { quantidade: match[1].replace(".", ","), unidade: sanitizeField(match[2].trim()) };
 }
 
-function buildNu3Row(tabela: TabelaNutricionalPayload): string {
+export function buildNu3Row(tabela: TabelaNutricionalPayload): string {
   const fields = [...NU3_FIELD_TEMPLATE];
   fields[NU3_FIELD_INDEX] = String(tabela.numero);
   fields[NU3_FIELD_NOME] = sanitizeField(tabela.nome);
@@ -235,7 +244,7 @@ function buildNu3Row(tabela: TabelaNutricionalPayload): string {
   return fields.join("\t") + "\r\n";
 }
 
-function buildPluRow(product: ScaleSyncPayload, pluNumber: number): string {
+export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): string {
   const fields = [...PLU_FIELD_TEMPLATE];
   fields[FIELD_PLU_NUMBER] = String(pluNumber);
   fields[FIELD_PRODUCT_CODE] = sanitizeField(resolveWireCodigo(product.codigo, pluNumber));
@@ -253,10 +262,54 @@ function buildPluRow(product: ScaleSyncPayload, pluNumber: number): string {
 }
 
 /**
+ * Monta o corpo DWL/PLU(+NU3)/UPL-TIM pra um lote de produtos — extraído de
+ * `sendProductsToScale` pra ser reaproveitado tanto pela conexão efêmera
+ * (probes, compat) quanto pela conexão persistente (`ScaleConnection`, ver
+ * scale-connection.ts) usada em produção pelo agent-local.
+ */
+export function buildSyncBody(products: ScaleSyncPayload[]): string {
+  const pluNumbers = products.map((p, i) => resolvePluNumber(p.codigo, i));
+
+  // Dedupe por número da tabela: vários produtos podem apontar pra mesma
+  // tabela nutricional, e a balança só precisa receber cada NU3 uma vez
+  // (visto na captura oficial: DWL/NU3 vem uma vez só, com todas as
+  // tabelas relevantes, não uma vez por produto).
+  const tabelasNutricionais = new Map<number, TabelaNutricionalPayload>();
+  for (const p of products) {
+    if (p.tabelaNutricional != null) {
+      tabelasNutricionais.set(p.tabelaNutricional.numero, p.tabelaNutricional);
+    }
+  }
+
+  const nu3Block =
+    tabelasNutricionais.size > 0
+      ? `DWL\tNU3\t\r\n` + [...tabelasNutricionais.values()].map(buildNu3Row).join("") + `END\tNU3\t\r\n`
+      : "";
+
+  return (
+    `DWL\tPLU\t\r\n` +
+    products.map((p, i) => buildPluRow(p, pluNumbers[i])).join("") +
+    `END\tPLU\t\r\n` +
+    nu3Block +
+    `UPL\tTIM\t\r\n`
+  );
+}
+
+/**
  * Cliente TCP real para a balança Ramuza/Atena (protocolo TXT-MODE, porta 33581).
  * Handshake replicado do que o software oficial faz ao clicar "Download" na tela
  * Ethernet: envia o bloco DWL/PLU/END com os produtos, pede sincronismo de hora
  * (UPL TIM) e fecha a sessão com UPL END. Ver [[ramuza-scale-protocol]].
+ *
+ * ATENÇÃO — 2026-08-27: esta função abre e fecha uma conexão nova a cada
+ * chamada. Uma captura Wireshark real (`captura06.json`, ver
+ * [[project_scale_protocol_field_gap]]) mostrou que a única escrita `DWL/NU3`
+ * confirmada como persistida veio de uma conexão que ficou aberta ~28 minutos,
+ * com bastante atividade real antes da escrita do NU3 — uma conexão nova e
+ * efêmera como esta NUNCA conseguiu persistir o conteúdo do NU3 em nenhum dos
+ * 22+ testes feitos. Pra produção, usar `ScaleConnection`
+ * (scale-connection.ts), que mantém uma conexão persistente por dispositivo.
+ * Esta função continua existindo pra compat com os scripts `probe-*.ts`.
  */
 export async function sendProductsToScale(
   ip: string,
@@ -279,31 +332,7 @@ export async function sendProductsToScale(
     };
 
     socket.connect(port, ip, () => {
-      const pluNumbers = products.map((p, i) => resolvePluNumber(p.codigo, i));
-
-      // Dedupe por número da tabela: vários produtos podem apontar pra mesma
-      // tabela nutricional, e a balança só precisa receber cada NU3 uma vez
-      // (visto na captura oficial: DWL/NU3 vem uma vez só, com todas as
-      // tabelas relevantes, não uma vez por produto).
-      const tabelasNutricionais = new Map<number, TabelaNutricionalPayload>();
-      for (const p of products) {
-        if (p.tabelaNutricional != null) {
-          tabelasNutricionais.set(p.tabelaNutricional.numero, p.tabelaNutricional);
-        }
-      }
-
-      const nu3Block =
-        tabelasNutricionais.size > 0
-          ? `DWL\tNU3\t\r\n` + [...tabelasNutricionais.values()].map(buildNu3Row).join("") + `END\tNU3\t\r\n`
-          : "";
-
-      const body =
-        `DWL\tPLU\t\r\n` +
-        products.map((p, i) => buildPluRow(p, pluNumbers[i])).join("") +
-        `END\tPLU\t\r\n` +
-        nu3Block +
-        `UPL\tTIM\t\r\n`;
-      socket.write(body, "latin1");
+      socket.write(buildSyncBody(products), "latin1");
     });
 
     socket.on("data", (chunk: string) => {
