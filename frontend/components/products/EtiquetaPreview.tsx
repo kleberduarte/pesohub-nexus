@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
 import { X, Search } from "lucide-react";
 import type { Product, FormatoImpressao, Imagem, TabelaNutricional } from "../../lib/api";
+import { NUTRIENTES_PADRAO } from "../../lib/nutrientes-padrao";
 
 type ElementoTipo = "nome" | "preco" | "codigoBarras" | "texto" | "imagem" | "tabelaNutricional" | "selos" | "ingredientes";
 
@@ -35,27 +36,9 @@ const UNIDADE_LABEL: Record<string, string> = {
   MCG: "mcg",
 };
 
-/**
- * A balança grava a tabela nutricional num formato de wire FIXO: 10 slots
- * padrão (idx7-26 do NU3, ver [[project_scale_protocol_field_gap]]) sempre
- * nessa ordem, preenchidos com 0 quando o usuário não cadastrou aquele
- * nutriente — nunca omitidos. `ordem` 1-10 mapeia POSICIONALMENTE pra esses
- * slots (não pelo texto de `ingrediente`); só `ordem` acima de 10 vira
- * nutriente extra de verdade. O preview replica isso pra bater com o que a
- * etiqueta impressa na balança física realmente mostra.
- */
-const NUTRIENTES_PADRAO: { nome: string; unidade: string }[] = [
-  { nome: "Valor energético", unidade: "kcal" },
-  { nome: "Carboidratos", unidade: "g" },
-  { nome: "Açúcares totais", unidade: "g" },
-  { nome: "Açúcares adicionados", unidade: "g" },
-  { nome: "Proteínas", unidade: "g" },
-  { nome: "Gorduras totais", unidade: "g" },
-  { nome: "Gorduras saturadas", unidade: "g" },
-  { nome: "Gordura trans", unidade: "g" },
-  { nome: "Fibra alimentar", unidade: "g" },
-  { nome: "Sódio", unidade: "mg" },
-];
+// A tabela fixa dos 10 nutrientes padrão vive em ../../lib/nutrientes-padrao
+// (compartilhada com o formulário de cadastro) — ver o comentário lá pra por
+// que a posição (`ordem`) e não o nome é o que importa pro wire da balança.
 
 const PX_PER_MM = 5;
 
@@ -277,7 +260,7 @@ export function EtiquetaPreview({
                                       </td>
                                       <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-700 whitespace-nowrap">
                                         {item?.valor ?? 0}
-                                        {padrao.unidade}
+                                        {UNIDADE_LABEL[padrao.unidade]}
                                       </td>
                                       <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-500 whitespace-nowrap">
                                         {item?.porcentagem ?? 0}%

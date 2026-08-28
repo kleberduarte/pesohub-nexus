@@ -10,6 +10,7 @@ import {
   type NutrienteUnidade,
 } from "../../lib/api";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { NUTRIENTES_PADRAO } from "../../lib/nutrientes-padrao";
 
 const UNIDADES: { value: NutrienteUnidade; label: string }[] = [
   { value: "KCAL_KJ", label: "kcal e kj" },
@@ -18,10 +19,33 @@ const UNIDADES: { value: NutrienteUnidade; label: string }[] = [
   { value: "MCG", label: "mcg" },
 ];
 
-const MAX_ITENS = 17;
+// 10 slots padrão (posição fixa, ver ../../lib/nutrientes-padrao) + até 10
+// nutrientes extras de nome livre — bate com o limite real do wire da balança.
+const MAX_ITENS = NUTRIENTES_PADRAO.length + 10;
 
 function emptyItem(ordem: number): TabelaNutricionalItem {
   return { ordem, ingrediente: "", unidade: "G", valor: 0, porcentagem: 0 };
+}
+
+/** As 10 linhas padrão, prontas pra só preencher o valor — ver NUTRIENTES_PADRAO. */
+function padraoItems(): TabelaNutricionalItem[] {
+  return NUTRIENTES_PADRAO.map((n, i) => ({
+    ordem: i + 1,
+    ingrediente: n.nome,
+    unidade: n.unidade,
+    valor: 0,
+    porcentagem: 0,
+  }));
+}
+
+/** Junta as 10 linhas padrão (preenchidas com o que já existir) + extras (ordem > 10). */
+function withPadrao(itensExistentes: TabelaNutricionalItem[]): TabelaNutricionalItem[] {
+  const padrao = padraoItems().map((p) => {
+    const existente = itensExistentes.find((it) => it.ordem === p.ordem);
+    return existente ? { ...p, valor: existente.valor, porcentagem: existente.porcentagem } : p;
+  });
+  const extras = itensExistentes.filter((it) => it.ordem > NUTRIENTES_PADRAO.length);
+  return [...padrao, ...extras];
 }
 
 export function TabelaNutricionalPanel() {
@@ -60,7 +84,7 @@ export function TabelaNutricionalPanel() {
     setPorcoesPorEmbalagem(undefined);
     setIngredientes("");
     setSelosTexto("");
-    setItens([emptyItem(1)]);
+    setItens(padraoItems());
     setModalOpen(true);
   };
 
@@ -72,7 +96,7 @@ export function TabelaNutricionalPanel() {
     setPorcoesPorEmbalagem(t.porcoesPorEmbalagem ?? undefined);
     setIngredientes(t.ingredientes ?? "");
     setSelosTexto((t.selos ?? []).join(", "));
-    setItens(t.itens.length > 0 ? t.itens : [emptyItem(1)]);
+    setItens(withPadrao(t.itens));
     setModalOpen(true);
   };
 
@@ -82,7 +106,15 @@ export function TabelaNutricionalPanel() {
   };
 
   const removeItem = (index: number) => {
-    setItens(itens.filter((_, i) => i !== index).map((it, i) => ({ ...it, ordem: i + 1 })));
+    // Só os extras (ordem > 10) podem ser removidos — os 10 padrão são slots
+    // fixos do wire da balança, não dá pra "tirar" um, só zerar o valor.
+    if (itens[index].ordem <= NUTRIENTES_PADRAO.length) return;
+    const padrao = itens.slice(0, NUTRIENTES_PADRAO.length);
+    const extras = itens
+      .slice(NUTRIENTES_PADRAO.length)
+      .filter((_, i) => i + NUTRIENTES_PADRAO.length !== index)
+      .map((it, i) => ({ ...it, ordem: NUTRIENTES_PADRAO.length + 1 + i }));
+    setItens([...padrao, ...extras]);
   };
 
   const updateItem = (index: number, patch: Partial<TabelaNutricionalItem>) => {
@@ -274,7 +306,7 @@ export function TabelaNutricionalPanel() {
 
             <div className="flex items-center justify-between mb-2">
               <label className="block text-sm font-medium text-slate-700">
-                Ingredientes ({itens.length}/{MAX_ITENS})
+                Nutrientes ({itens.length}/{MAX_ITENS})
               </label>
               <button
                 type="button"
@@ -282,14 +314,18 @@ export function TabelaNutricionalPanel() {
                 disabled={itens.length >= MAX_ITENS}
                 className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700 disabled:opacity-40"
               >
-                <Plus className="w-4 h-4" /> Adicionar linha
+                <Plus className="w-4 h-4" /> Adicionar nutriente extra
               </button>
             </div>
+            <p className="text-xs text-slate-400 mb-2">
+              Os 10 primeiros são fixos (posição fixa no protocolo da balança) — preencha só o valor. Linhas
+              extras têm nome livre.
+            </p>
             <div className="border border-slate-200 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="text-left px-3 py-2 font-medium text-slate-500">Ingrediente</th>
+                    <th className="text-left px-3 py-2 font-medium text-slate-500">Nutriente</th>
                     <th className="text-left px-3 py-2 font-medium text-slate-500 w-28">Unidade</th>
                     <th className="text-left px-3 py-2 font-medium text-slate-500 w-24">Valor</th>
                     <th className="text-left px-3 py-2 font-medium text-slate-500 w-24">%</th>
@@ -297,58 +333,73 @@ export function TabelaNutricionalPanel() {
                   </tr>
                 </thead>
                 <tbody>
-                  {itens.map((item, index) => (
-                    <tr key={index} className="border-t border-slate-100">
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="text"
-                          value={item.ingrediente}
-                          onChange={(e) => updateItem(index, { ingrediente: e.target.value })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <select
-                          value={item.unidade}
-                          onChange={(e) => updateItem(index, { unidade: e.target.value as NutrienteUnidade })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
-                        >
-                          {UNIDADES.map((u) => (
-                            <option key={u.value} value={u.value}>
-                              {u.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.valor}
-                          onChange={(e) => updateItem(index, { valor: Number(e.target.value) })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.porcentagem}
-                          onChange={(e) => updateItem(index, { porcentagem: Number(e.target.value) })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
-                        />
-                      </td>
-                      <td className="px-2 py-1.5 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-slate-400 hover:text-red-600"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {itens.map((item, index) => {
+                    const padrao = item.ordem <= NUTRIENTES_PADRAO.length;
+                    return (
+                      <tr key={index} className="border-t border-slate-100">
+                        <td className="px-2 py-1.5">
+                          {padrao ? (
+                            <span className="block px-2 py-1.5 text-slate-700">{item.ingrediente}</span>
+                          ) : (
+                            <input
+                              type="text"
+                              value={item.ingrediente}
+                              onChange={(e) => updateItem(index, { ingrediente: e.target.value })}
+                              className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                            />
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          {padrao ? (
+                            <span className="block px-2 py-1.5 text-slate-500">
+                              {UNIDADES.find((u) => u.value === item.unidade)?.label}
+                            </span>
+                          ) : (
+                            <select
+                              value={item.unidade}
+                              onChange={(e) => updateItem(index, { unidade: e.target.value as NutrienteUnidade })}
+                              className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                            >
+                              {UNIDADES.map((u) => (
+                                <option key={u.value} value={u.value}>
+                                  {u.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.valor}
+                            onChange={(e) => updateItem(index, { valor: Number(e.target.value) })}
+                            className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={item.porcentagem}
+                            onChange={(e) => updateItem(index, { porcentagem: Number(e.target.value) })}
+                            className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                          />
+                        </td>
+                        <td className="px-2 py-1.5 text-center">
+                          {!padrao && (
+                            <button
+                              type="button"
+                              onClick={() => removeItem(index)}
+                              className="text-slate-400 hover:text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
