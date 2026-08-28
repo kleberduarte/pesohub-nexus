@@ -35,6 +35,28 @@ const UNIDADE_LABEL: Record<string, string> = {
   MCG: "mcg",
 };
 
+/**
+ * A balança grava a tabela nutricional num formato de wire FIXO: 10 slots
+ * padrão (idx7-26 do NU3, ver [[project_scale_protocol_field_gap]]) sempre
+ * nessa ordem, preenchidos com 0 quando o usuário não cadastrou aquele
+ * nutriente — nunca omitidos. `ordem` 1-10 mapeia POSICIONALMENTE pra esses
+ * slots (não pelo texto de `ingrediente`); só `ordem` acima de 10 vira
+ * nutriente extra de verdade. O preview replica isso pra bater com o que a
+ * etiqueta impressa na balança física realmente mostra.
+ */
+const NUTRIENTES_PADRAO: { nome: string; unidade: string }[] = [
+  { nome: "Valor energético", unidade: "kcal" },
+  { nome: "Carboidratos", unidade: "g" },
+  { nome: "Açúcares totais", unidade: "g" },
+  { nome: "Açúcares adicionados", unidade: "g" },
+  { nome: "Proteínas", unidade: "g" },
+  { nome: "Gorduras totais", unidade: "g" },
+  { nome: "Gorduras saturadas", unidade: "g" },
+  { nome: "Gordura trans", unidade: "g" },
+  { nome: "Fibra alimentar", unidade: "g" },
+  { nome: "Sódio", unidade: "mg" },
+];
+
 const PX_PER_MM = 5;
 
 function getElementos(layout: Record<string, unknown> | null | undefined): LayoutElemento[] {
@@ -219,7 +241,7 @@ export function EtiquetaPreview({
                           <span className="text-[9px] text-slate-400">{TIPO_LABEL.imagem}</span>
                         ))}
                       {el.tipo === "tabelaNutricional" &&
-                        (tabelaNutricional && tabelaNutricional.itens.length > 0 ? (
+                        (tabelaNutricional ? (
                           <div className="w-full h-full overflow-auto text-left px-0.5">
                             <p className="text-[7px] font-bold text-slate-900 leading-tight">INFORMAÇÃO NUTRICIONAL</p>
                             {tabelaNutricional.porcao && (
@@ -245,20 +267,40 @@ export function EtiquetaPreview({
                                 </tr>
                               </thead>
                               <tbody>
-                                {tabelaNutricional.itens.map((item) => (
-                                  <tr key={item.ordem}>
-                                    <td className="border border-slate-400 py-0.5 pr-1 pl-1 text-slate-700">
-                                      {item.ingrediente}
-                                    </td>
-                                    <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-700 whitespace-nowrap">
-                                      {item.valor}
-                                      {UNIDADE_LABEL[item.unidade] ?? ""}
-                                    </td>
-                                    <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-500 whitespace-nowrap">
-                                      {item.porcentagem}%
-                                    </td>
-                                  </tr>
-                                ))}
+                                {NUTRIENTES_PADRAO.map((padrao, i) => {
+                                  const ordem = i + 1;
+                                  const item = tabelaNutricional.itens.find((it) => it.ordem === ordem);
+                                  return (
+                                    <tr key={ordem}>
+                                      <td className="border border-slate-400 py-0.5 pr-1 pl-1 text-slate-700">
+                                        {padrao.nome}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-700 whitespace-nowrap">
+                                        {item?.valor ?? 0}
+                                        {padrao.unidade}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-500 whitespace-nowrap">
+                                        {item?.porcentagem ?? 0}%
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                {tabelaNutricional.itens
+                                  .filter((item) => item.ordem > 10)
+                                  .map((item) => (
+                                    <tr key={item.ordem}>
+                                      <td className="border border-slate-400 py-0.5 pr-1 pl-1 text-slate-700">
+                                        {item.ingrediente}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-700 whitespace-nowrap">
+                                        {item.valor}
+                                        {UNIDADE_LABEL[item.unidade] ?? ""}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-500 whitespace-nowrap">
+                                        {item.porcentagem}%
+                                      </td>
+                                    </tr>
+                                  ))}
                               </tbody>
                             </table>
                             <p className="text-[5px] text-slate-400 leading-tight mt-0.5">
