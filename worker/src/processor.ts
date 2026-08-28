@@ -19,11 +19,19 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
       );
     }
 
+    const tabelaNutricionalInclude = {
+      tabelaNutricional: { include: { itens: { orderBy: { ordem: "asc" as const } } } },
+    };
+
     const products =
       tipo === "TOTAL"
-        ? await prisma.product.findMany({ where: { ativo: true, lojaId: device.lojaId } })
+        ? await prisma.product.findMany({
+            where: { ativo: true, lojaId: device.lojaId },
+            include: tabelaNutricionalInclude,
+          })
         : await prisma.product.findMany({
             where: { id: { in: productIds ?? [] }, lojaId: device.lojaId },
+            include: tabelaNutricionalInclude,
           });
 
     const syncJob = await prisma.syncJob.create({
@@ -53,6 +61,24 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
         nome: p.nome,
         preco: Number(p.preco),
         categoriaImposto: p.categoriaImposto ?? undefined,
+        tara: p.tara != null ? Number(p.tara) : undefined,
+        desconto: p.desconto != null ? Number(p.desconto) : undefined,
+        textoExtra1: p.textoExtra1 ?? undefined,
+        validadeDias: p.validadeDias ?? undefined,
+        tabelaNutricional: p.tabelaNutricional
+          ? {
+              numero: p.tabelaNutricional.numero,
+              nome: p.tabelaNutricional.nome,
+              porcao: p.tabelaNutricional.porcao ?? undefined,
+              porcoesPorEmbalagem: p.tabelaNutricional.porcoesPorEmbalagem ?? undefined,
+              itens: p.tabelaNutricional.itens.map((it) => ({
+                ordem: it.ordem,
+                valor: Number(it.valor),
+                porcentagem: Number(it.porcentagem),
+                ingrediente: it.ingrediente,
+              })),
+            }
+          : undefined,
       })),
     };
 

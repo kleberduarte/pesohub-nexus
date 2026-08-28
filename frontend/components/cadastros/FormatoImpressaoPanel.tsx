@@ -167,17 +167,27 @@ export function FormatoImpressaoPanel() {
   const addElemento = (tipo: ElementoTipo) => {
     if (!layoutEditing) return;
     const size = TIPO_DEFAULT_SIZE[tipo];
-    const novo: LayoutElemento = {
-      id: `${tipo}-${Date.now()}`,
-      tipo,
-      x: Math.max(0, (layoutEditing.larguraMm - size.largura) / 2),
-      y: 4,
-      largura: Math.min(size.largura, layoutEditing.larguraMm),
-      altura: size.altura,
-      texto: tipo === "texto" ? "Texto" : undefined,
-    };
-    setElementos((prev) => [...prev, novo]);
-    setSelectedId(novo.id);
+    const id = `${tipo}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setElementos((prev) => {
+      // Escalona a posição default em cascata (passo de 6mm) pra cliques rápidos em
+      // "adicionar elemento" não empilharem tudo nas mesmas coordenadas — eles ficariam
+      // visualmente sobrepostos como se fosse um único elemento, mas são N entradas
+      // distintas salvas no layout (risco de conteúdo duplicado na etiqueta impressa).
+      const step = 6;
+      const maxY = Math.max(0, layoutEditing.alturaMm - size.altura);
+      const offset = maxY > 0 ? (prev.length * step) % (maxY + step) : 0;
+      const novo: LayoutElemento = {
+        id,
+        tipo,
+        x: Math.max(0, (layoutEditing.larguraMm - size.largura) / 2),
+        y: Math.min(4 + offset, maxY),
+        largura: Math.min(size.largura, layoutEditing.larguraMm),
+        altura: size.altura,
+        texto: tipo === "texto" ? "Texto" : undefined,
+      };
+      return [...prev, novo];
+    });
+    setSelectedId(id);
   };
 
   const removeElemento = (id: string) => {

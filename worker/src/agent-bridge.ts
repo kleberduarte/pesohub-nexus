@@ -7,6 +7,21 @@ import { randomUUID } from "crypto";
  * WebSocket com o backend (AgentGateway). O backend relaciona os canais Redis
  * abaixo com o socket do agente correto.
  */
+export interface TabelaNutricionalItemPayload {
+  ordem: number;
+  valor: number;
+  porcentagem?: number;
+  ingrediente?: string;
+}
+
+export interface TabelaNutricionalPayload {
+  numero: number;
+  nome: string;
+  porcao?: string;
+  porcoesPorEmbalagem?: number;
+  itens: TabelaNutricionalItemPayload[];
+}
+
 export interface SyncCommandPayload {
   deviceId: string;
   deviceIp: string;
@@ -18,6 +33,11 @@ export interface SyncCommandPayload {
     nome: string;
     preco: number;
     categoriaImposto?: string;
+    tara?: number;
+    desconto?: number;
+    textoExtra1?: string;
+    validadeDias?: number;
+    tabelaNutricional?: TabelaNutricionalPayload;
   }>;
 }
 
