@@ -18,6 +18,12 @@ const mockedPrisma = prisma as unknown as {
   syncJobItem: { updateMany: jest.Mock };
 };
 
+const expectedInclude = {
+  tabelaNutricional: { include: { itens: { orderBy: { ordem: "asc" } } } },
+  formatoImpressao: true,
+  subSetor: { include: { setor: true } },
+};
+
 describe("createSyncProcessor", () => {
   const device = {
     id: "device-1",
@@ -44,6 +50,7 @@ describe("createSyncProcessor", () => {
 
     expect(mockedPrisma.product.findMany).toHaveBeenCalledWith({
       where: { ativo: true, lojaId: "loja-a" },
+      include: expectedInclude,
     });
   });
 
@@ -55,6 +62,7 @@ describe("createSyncProcessor", () => {
 
     expect(mockedPrisma.product.findMany).toHaveBeenCalledWith({
       where: { id: { in: ["p1", "p2"] }, lojaId: "loja-a" },
+      include: expectedInclude,
     });
   });
 });

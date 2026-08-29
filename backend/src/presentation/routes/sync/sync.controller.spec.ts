@@ -2,13 +2,13 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { SyncController } from "./sync.controller";
 
 describe("SyncController", () => {
-  const makeReq = (clienteId: string) => ({ user: { clienteId, sub: "user-1" } }) as any;
+  const makeReq = (lojaId: string) => ({ user: { lojaId, sub: "user-1" } }) as any;
 
   function makeController(devices: Record<string, { id: string }>) {
     const queue = { add: jest.fn().mockResolvedValue({ id: "job-1" }) };
     const deviceRepo = {
-      findById: jest.fn((id: string, clienteId: string) =>
-        Promise.resolve(devices[`${clienteId}:${id}`] ?? null),
+      findById: jest.fn((id: string, lojaId: string) =>
+        Promise.resolve(devices[`${lojaId}:${id}`] ?? null),
       ),
     };
     const prisma = { syncJob: { findMany: jest.fn().mockResolvedValue([]) } };
@@ -18,21 +18,21 @@ describe("SyncController", () => {
   }
 
   it("rejeita sync para device que não pertence ao cliente autenticado", async () => {
-    const { controller } = makeController({ "cliente-a:device-1": { id: "device-1" } });
+    const { controller } = makeController({ "loja-a:device-1": { id: "device-1" } });
 
     await expect(
-      controller.create({ deviceIds: ["device-1"], tipo: "TOTAL" }, makeReq("cliente-b")),
+      controller.create({ deviceIds: ["device-1"], tipo: "TOTAL" }, makeReq("loja-b")),
     ).rejects.toThrow(BadRequestException);
   });
 
   it("enfileira e audita quando todos os devices pertencem ao cliente", async () => {
     const { controller, queue, auditLog } = makeController({
-      "cliente-a:device-1": { id: "device-1" },
+      "loja-a:device-1": { id: "device-1" },
     });
 
     const result = await controller.create(
       { deviceIds: ["device-1"], tipo: "INCREMENTAL", productIds: ["p1"] },
-      makeReq("cliente-a"),
+      makeReq("loja-a"),
     );
 
     expect(result.queued).toEqual(["job-1"]);
@@ -47,6 +47,6 @@ describe("SyncController", () => {
   it("status lança NotFound se o device não pertence ao cliente", async () => {
     const { controller } = makeController({});
 
-    await expect(controller.status("device-x", makeReq("cliente-a"))).rejects.toThrow(NotFoundException);
+    await expect(controller.status("device-x", makeReq("loja-a"))).rejects.toThrow(NotFoundException);
   });
 });
