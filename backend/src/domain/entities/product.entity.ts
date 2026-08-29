@@ -8,6 +8,7 @@ export class Product {
   codigoBarras!: string;
   nome!: string;
   preco!: number;
+  custo?: number | null;
   categoriaImposto?: string | null;
   taxType?: number | null;
   taxaImposto?: number | null;

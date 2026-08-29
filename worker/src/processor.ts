@@ -90,6 +90,7 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
         codigoBarras: p.codigoBarras,
         nome: p.nome,
         preco: Number(p.preco),
+        custo: p.custo != null ? Number(p.custo) : undefined,
         categoriaImposto: p.categoriaImposto ?? undefined,
         unidadeVenda: p.unidadeVenda,
         taxType: p.taxType ?? undefined,

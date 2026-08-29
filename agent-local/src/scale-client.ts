@@ -48,6 +48,9 @@ export interface ScaleSyncPayload {
   codigoBarras: string;
   nome: string;
   preco: number;
+  /** `Cost` no código-fonte decompilado — idx6 do PLU. Só armazenado/enviado
+   * pra balança, não usado em cálculo de venda no PesoHub. */
+  custo?: number;
   categoriaImposto?: string;
   /** `UnitID` no código-fonte decompilado — idx4 do PLU. Unidade de venda
    * (peso/unidade), não "bandeira de código de barras" como se suspeitava
@@ -130,6 +133,7 @@ const FIELD_EAN13 = 3;
 const FIELD_UNIT = 4;
 const UNIDADE_VENDA_WIRE: Record<"PESO" | "PECA", string> = { PESO: "1", PECA: "2" };
 const FIELD_PRICE = 5;
+const FIELD_COST = 6;
 const FIELD_TARA = 7;
 /** `LabelID1` no código-fonte decompilado do Ramuza.exe — vínculo com o
  * formato de etiqueta (mesmo namespace de "número" que FormatoImpressao usa
@@ -320,6 +324,7 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   fields[FIELD_EAN13] = sanitizeField(product.codigoBarras ?? "");
   if (product.unidadeVenda != null) fields[FIELD_UNIT] = UNIDADE_VENDA_WIRE[product.unidadeVenda];
   fields[FIELD_PRICE] = encodePrice(product.preco);
+  if (product.custo != null) fields[FIELD_COST] = encodePrice(product.custo);
   if (product.tara != null) fields[FIELD_TARA] = encodeTara(product.tara);
   if (product.desconto != null) fields[FIELD_DESCONTO] = encodePrice(product.desconto);
   if (product.textoExtra1 != null) fields[FIELD_TEXTO_EXTRA_1] = sanitizeField(product.textoExtra1);

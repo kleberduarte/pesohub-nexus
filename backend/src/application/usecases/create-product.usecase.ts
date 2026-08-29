@@ -22,6 +22,7 @@ export class CreateProductUseCase {
       codigoBarras: dto.codigoBarras,
       nome: dto.nome,
       preco: dto.preco,
+      custo: dto.custo ?? null,
       categoriaImposto: dto.categoriaImposto ?? null,
       taxType: dto.taxType ?? 0,
       taxaImposto: dto.taxaImposto ?? null,

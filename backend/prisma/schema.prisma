@@ -499,6 +499,9 @@ model Product {
   codigoBarras     String
   nome             String
   preco            Decimal       @db.Decimal(10, 2)
+  /// Custo do produto (idx6 do PLU, `Cost` no wire) — só armazenado/enviado
+  /// pra balança, não usado em cálculo de venda no PesoHub.
+  custo            Decimal?      @db.Decimal(10, 2)
   categoriaImposto String?
   /// Modo de cálculo do imposto na balança (TaxType do wire, idx57 do PLU):
   /// 0=sem imposto, 1=soma por fora do preço, 2=informativo (não altera o preço),

@@ -19,6 +19,10 @@ export class CreateProductDto {
   preco!: number;
 
   @IsOptional()
+  @IsNumber()
+  custo?: number;
+
+  @IsOptional()
   @IsString()
   categoriaImposto?: string;
 

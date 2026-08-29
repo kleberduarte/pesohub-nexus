@@ -306,6 +306,7 @@ export interface Product {
   codigoBarras: string;
   nome: string;
   preco: number;
+  custo?: number | null;
   categoriaImposto?: string | null;
   taxType?: number | null;
   taxaImposto?: number | null;
@@ -349,6 +350,7 @@ export interface CreateProductInput {
   codigoBarras: string;
   nome: string;
   preco: number;
+  custo?: number;
   categoriaImposto?: string;
   taxType?: number;
   taxaImposto?: number;

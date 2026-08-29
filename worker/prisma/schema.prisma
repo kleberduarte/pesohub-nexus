@@ -499,6 +499,7 @@ model Product {
   codigoBarras     String
   nome             String
   preco            Decimal       @db.Decimal(10, 2)
+  custo            Decimal?      @db.Decimal(10, 2)
   categoriaImposto String?
   taxType          Int?          @default(0)
   taxaImposto      Decimal?      @db.Decimal(5, 2)

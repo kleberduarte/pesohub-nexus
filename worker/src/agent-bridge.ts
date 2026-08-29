@@ -50,6 +50,7 @@ export interface SyncCommandPayload {
     codigoBarras: string;
     nome: string;
     preco: number;
+    custo?: number;
     categoriaImposto?: string;
     unidadeVenda?: "PESO" | "PECA";
     taxType?: number;
