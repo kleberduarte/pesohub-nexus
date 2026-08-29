@@ -328,11 +328,11 @@ model Alergico {
 }
 
 model TabelaNutricional {
-  id        String                  @id @default(cuid())
-  clienteId String
-  cliente   Cliente                 @relation(fields: [clienteId], references: [id])
-  lojaId    String
-  loja      Loja                    @relation(fields: [lojaId], references: [id])
+  id                  String                  @id @default(cuid())
+  clienteId           String
+  cliente             Cliente                 @relation(fields: [clienteId], references: [id])
+  lojaId              String
+  loja                Loja                    @relation(fields: [lojaId], references: [id])
   numero              Int
   nome                String
   porcao              String?
@@ -500,6 +500,8 @@ model Product {
   nome             String
   preco            Decimal       @db.Decimal(10, 2)
   categoriaImposto String?
+  taxType          Int?          @default(0)
+  taxaImposto      Decimal?      @db.Decimal(5, 2)
   ativo            Boolean       @default(true)
   versao           Int           @default(1)
   syncJobItems     SyncJobItem[]
@@ -606,19 +608,19 @@ model AuditLog {
 /// Cliente do PesoHub. Puxa produtos via polling (GET /products autenticado por
 /// login de serviço) e faz upsert na Loja de destino — Veltrix não expõe webhook.
 model IntegracaoVeltrix {
-  id                 String    @id @default(cuid())
-  clienteId          String    @unique
-  cliente            Cliente   @relation(fields: [clienteId], references: [id])
-  lojaId             String    @unique
-  loja               Loja      @relation(fields: [lojaId], references: [id])
-  baseUrl            String
-  email              String
-  senha              String
-  ativo              Boolean   @default(true)
-  intervaloMinutos   Int       @default(15)
+  id                  String    @id @default(cuid())
+  clienteId           String    @unique
+  cliente             Cliente   @relation(fields: [clienteId], references: [id])
+  lojaId              String    @unique
+  loja                Loja      @relation(fields: [lojaId], references: [id])
+  baseUrl             String
+  email               String
+  senha               String
+  ativo               Boolean   @default(true)
+  intervaloMinutos    Int       @default(15)
   ultimaSincronizacao DateTime?
-  ultimoStatus       String?
-  ultimoErro         String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  ultimoStatus        String?
+  ultimoErro          String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 }

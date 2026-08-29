@@ -307,6 +307,8 @@ export interface Product {
   nome: string;
   preco: number;
   categoriaImposto?: string | null;
+  taxType?: number | null;
+  taxaImposto?: number | null;
   ativo: boolean;
   versao: number;
 
@@ -348,6 +350,8 @@ export interface CreateProductInput {
   nome: string;
   preco: number;
   categoriaImposto?: string;
+  taxType?: number;
+  taxaImposto?: number;
   ativo?: boolean;
 
   lote?: string;

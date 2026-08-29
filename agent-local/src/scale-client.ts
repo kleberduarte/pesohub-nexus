@@ -44,6 +44,18 @@ export interface ScaleSyncPayload {
   nome: string;
   preco: number;
   categoriaImposto?: string;
+  /** `UnitID` no código-fonte decompilado — idx4 do PLU. Unidade de venda
+   * (peso/unidade), não "bandeira de código de barras" como se suspeitava
+   * antes. Mapeamento PESO/PECA→1/2 ainda sujeito a confirmação de hardware
+   * (só o valor "1" tinha sido visto em registros reais até agora). */
+  unidadeVenda?: "PESO" | "PECA";
+  /** Modo de cálculo do imposto na balança (TaxType do wire): 1=soma por fora
+   * do preço, 2=informativo (não altera o preço), 3=embutido no preço
+   * (extrai). Ausente/0 = sem imposto. */
+  taxType?: number;
+  /** Alíquota em %, ex.: 18 para 18%. Convertida para o inteiro do wire
+   * (percentual × 10000) em `buildPluRow`. */
+  taxaImposto?: number;
   tara?: number;
   desconto?: number;
   textoExtra1?: string;
@@ -110,6 +122,8 @@ const PLU_FIELD_TEMPLATE = [
 const FIELD_PLU_NUMBER = 1;
 const FIELD_PRODUCT_CODE = 2;
 const FIELD_EAN13 = 3;
+const FIELD_UNIT = 4;
+const UNIDADE_VENDA_WIRE: Record<"PESO" | "PECA", string> = { PESO: "1", PECA: "2" };
 const FIELD_PRICE = 5;
 const FIELD_TARA = 7;
 /** `LabelID1` no código-fonte decompilado do Ramuza.exe — vínculo com o
@@ -133,6 +147,15 @@ const FIELD_TEXTO_EXTRA_6 = 21;
 const FIELD_TEXTO_EXTRA_7 = 22;
 const FIELD_VALIDADE_DIAS = 32;
 const FIELD_DESCONTO = 56;
+/** TaxType/Tax no código-fonte decompilado — idx57/58 do PLU. Semântica achada
+ * em `RDS.cs` (lógica de venda, não uma tabela de códigos): TaxType 1=soma o
+ * imposto por fora do preço, 2=calcula só como informativo (não altera o
+ * preço cobrado), 3=imposto já embutido no preço (extrai a parte do
+ * imposto); qualquer outro valor = sem imposto. Tax é a alíquota como
+ * inteiro = percentual × 10000 (ex.: 18% → 1800). Ver
+ * [[project_ramuza_full_field_map_2026_08_28]]. */
+const FIELD_TAX_TYPE = 57;
+const FIELD_TAX = 58;
 const FIELD_VINCULO_TABELA_NUTRICIONAL = 59;
 
 /**
@@ -290,6 +313,7 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   fields[FIELD_PLU_NUMBER] = String(pluNumber);
   fields[FIELD_PRODUCT_CODE] = sanitizeField(resolveWireCodigo(product.codigo, pluNumber));
   fields[FIELD_EAN13] = sanitizeField(product.codigoBarras ?? "");
+  if (product.unidadeVenda != null) fields[FIELD_UNIT] = UNIDADE_VENDA_WIRE[product.unidadeVenda];
   fields[FIELD_PRICE] = encodePrice(product.preco);
   if (product.tara != null) fields[FIELD_TARA] = encodeTara(product.tara);
   if (product.desconto != null) fields[FIELD_DESCONTO] = encodePrice(product.desconto);
@@ -301,6 +325,10 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   if (product.textoExtra6 != null) fields[FIELD_TEXTO_EXTRA_6] = sanitizeField(product.textoExtra6);
   if (product.textoExtra7 != null) fields[FIELD_TEXTO_EXTRA_7] = sanitizeField(product.textoExtra7);
   if (product.validadeDias != null) fields[FIELD_VALIDADE_DIAS] = String(Math.round(product.validadeDias));
+  if (product.taxType != null && product.taxType >= 1 && product.taxType <= 3) {
+    fields[FIELD_TAX_TYPE] = String(product.taxType);
+    fields[FIELD_TAX] = String(Math.round((product.taxaImposto ?? 0) * 10000));
+  }
   if (product.formatoImpressao != null) {
     fields[FIELD_VINCULO_FORMATO_IMPRESSAO] = String(product.formatoImpressao.numero);
   }

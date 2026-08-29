@@ -23,6 +23,8 @@ export class CreateProductUseCase {
       nome: dto.nome,
       preco: dto.preco,
       categoriaImposto: dto.categoriaImposto ?? null,
+      taxType: dto.taxType ?? 0,
+      taxaImposto: dto.taxaImposto ?? null,
       ativo: dto.ativo ?? true,
       lote: dto.lote ?? null,
       unidadeVenda: dto.unidadeVenda ?? "PESO",

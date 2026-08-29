@@ -23,6 +23,14 @@ export class CreateProductDto {
   categoriaImposto?: string;
 
   @IsOptional()
+  @IsIn([0, 1, 2, 3])
+  taxType?: number;
+
+  @IsOptional()
+  @IsNumber()
+  taxaImposto?: number;
+
+  @IsOptional()
   @IsBoolean()
   ativo?: boolean;
 

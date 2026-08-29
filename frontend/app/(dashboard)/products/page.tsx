@@ -29,6 +29,8 @@ const emptyForm: CreateProductInput = {
   nome: "",
   preco: 0,
   categoriaImposto: "",
+  taxType: 0,
+  taxaImposto: undefined,
   ativo: true,
   lote: "",
   unidadeVenda: "PESO",
@@ -193,6 +195,8 @@ export default function ProductsPage() {
       nome: product.nome,
       preco: product.preco,
       categoriaImposto: product.categoriaImposto ?? "",
+      taxType: product.taxType ?? 0,
+      taxaImposto: product.taxaImposto ?? undefined,
       ativo: product.ativo,
       lote: product.lote ?? "",
       unidadeVenda: product.unidadeVenda,
@@ -574,6 +578,34 @@ export default function ProductsPage() {
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.categoriaImposto}
                           onChange={(e) => setForm({ ...form, categoriaImposto: e.target.value })}
+                        />
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Modo de Imposto</label>
+                        <select
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+                          value={form.taxType ?? 0}
+                          onChange={(e) => setForm({ ...form, taxType: Number(e.target.value) })}
+                        >
+                          <option value={0}>Sem imposto</option>
+                          <option value={1}>Soma por fora do preço</option>
+                          <option value={2}>Informativo (não altera o preço)</option>
+                          <option value={3}>Embutido no preço</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-1">
+                        <label className="block text-xs font-medium text-slate-700 mb-1">Alíquota (%)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min={0}
+                          max={100}
+                          disabled={!form.taxType}
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-400"
+                          value={form.taxaImposto ?? ""}
+                          onChange={(e) =>
+                            setForm({ ...form, taxaImposto: e.target.value === "" ? undefined : Number(e.target.value) })
+                          }
                         />
                       </div>
                       <div className="md:col-span-3">

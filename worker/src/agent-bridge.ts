@@ -48,6 +48,9 @@ export interface SyncCommandPayload {
     nome: string;
     preco: number;
     categoriaImposto?: string;
+    unidadeVenda?: "PESO" | "PECA";
+    taxType?: number;
+    taxaImposto?: number;
     tara?: number;
     desconto?: number;
     textoExtra1?: string;

@@ -28,7 +28,7 @@ function sanitizeRelationIds<T extends Record<string, unknown>>(data: T): T {
   return sanitized;
 }
 
-const DECIMAL_FIELDS = ["preco", "tara", "desconto"] as const;
+const DECIMAL_FIELDS = ["preco", "tara", "desconto", "taxaImposto"] as const;
 
 /**
  * Campos Decimal do Prisma serializam para JSON como string; sem essa

@@ -9,6 +9,8 @@ export class Product {
   nome!: string;
   preco!: number;
   categoriaImposto?: string | null;
+  taxType?: number | null;
+  taxaImposto?: number | null;
   ativo!: boolean;
   versao!: number;
 
