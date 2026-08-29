@@ -1,8 +1,12 @@
-import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString } from "class-validator";
+import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class UpdateFormatoImpressaoDto {
+  /** Ver comentário no CreateFormatoImpressaoDto — faixa 1-99 confirmada
+   * empiricamente no hardware físico. */
   @IsOptional()
   @IsInt()
+  @Min(1)
+  @Max(99)
   numero?: number;
 
   @IsOptional()

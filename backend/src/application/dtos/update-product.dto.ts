@@ -23,8 +23,20 @@ export class UpdateProductDto {
   preco?: number;
 
   @IsOptional()
+  @IsNumber()
+  custo?: number;
+
+  @IsOptional()
   @IsString()
   categoriaImposto?: string;
+
+  @IsOptional()
+  @IsIn([0, 1, 2, 3])
+  taxType?: number;
+
+  @IsOptional()
+  @IsNumber()
+  taxaImposto?: number;
 
   @IsOptional()
   @IsBoolean()

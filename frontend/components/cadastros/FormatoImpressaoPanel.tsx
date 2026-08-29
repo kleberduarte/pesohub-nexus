@@ -26,7 +26,22 @@ interface LayoutElemento {
   largura: number; // mm
   altura: number; // mm
   texto?: string;
+  /** Rotação do elemento na impressão: 0/90/180/270 graus. Mapeado pro `Angle`
+   * do wire (`LabelItem` da balança) como índice de giro de 90° (0/1/2/3) —
+   * convenção assumida, ainda sem confirmação visual na etiqueta impressa
+   * (só write→readback confirmado). */
+  angulo?: 0 | 90 | 180 | 270;
+  /** Alinhamento do texto dentro do elemento. Mapeado pro `Align` do wire
+   * como 0=esquerda/1=centro/2=direita — mesma ressalva do ângulo. */
+  alinhamento?: 0 | 1 | 2;
+  /** Tamanho/índice de fonte. Mapeado pro `Font` do wire — sem tabela de
+   * valores confirmada ainda, aceita qualquer inteiro >= 0 (0 = padrão da
+   * balança). */
+  fonte?: number;
 }
+
+const ALINHAMENTO_LABEL: Record<0 | 1 | 2, string> = { 0: "Esquerda", 1: "Centro", 2: "Direita" };
+const ALINHAMENTO_CSS: Record<0 | 1 | 2, string> = { 0: "flex-start", 1: "center", 2: "flex-end" };
 
 const TIPO_LABEL: Record<ElementoTipo, string> = {
   nome: "Nome do Produto",
@@ -449,7 +464,7 @@ export function FormatoImpressaoPanel() {
                   <div
                     key={el.id}
                     onPointerDown={(e) => handlePointerDown(e, el)}
-                    className={`absolute flex items-center justify-center text-center text-[9px] leading-tight cursor-move select-none border ${
+                    className={`absolute flex items-center text-center text-[9px] leading-tight cursor-move select-none border ${
                       selectedId === el.id
                         ? "border-brand-500 bg-brand-50 text-brand-800 ring-2 ring-brand-300"
                         : "border-slate-300 bg-slate-50 text-slate-500"
@@ -459,6 +474,8 @@ export function FormatoImpressaoPanel() {
                       top: el.y * PX_PER_MM,
                       width: el.largura * PX_PER_MM,
                       height: el.altura * PX_PER_MM,
+                      justifyContent: ALINHAMENTO_CSS[el.alinhamento ?? 0],
+                      transform: el.angulo ? `rotate(${el.angulo}deg)` : undefined,
                     }}
                   >
                     {el.tipo === "texto" ? el.texto : TIPO_LABEL[el.tipo]}
@@ -515,6 +532,47 @@ export function FormatoImpressaoPanel() {
                           type="number"
                           value={Math.round(selected.altura)}
                           onChange={(e) => updateElemento(selected.id, { altura: Number(e.target.value) })}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Rotação</label>
+                        <select
+                          value={selected.angulo ?? 0}
+                          onChange={(e) =>
+                            updateElemento(selected.id, { angulo: Number(e.target.value) as 0 | 90 | 180 | 270 })
+                          }
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        >
+                          <option value={0}>0°</option>
+                          <option value={90}>90°</option>
+                          <option value={180}>180°</option>
+                          <option value={270}>270°</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Alinhamento</label>
+                        <select
+                          value={selected.alinhamento ?? 0}
+                          onChange={(e) => updateElemento(selected.id, { alinhamento: Number(e.target.value) as 0 | 1 | 2 })}
+                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                        >
+                          {([0, 1, 2] as const).map((a) => (
+                            <option key={a} value={a}>
+                              {ALINHAMENTO_LABEL[a]}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Fonte (tamanho)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={selected.fonte ?? 0}
+                          onChange={(e) => updateElemento(selected.id, { fonte: Number(e.target.value) })}
                           className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
                         />
                       </div>

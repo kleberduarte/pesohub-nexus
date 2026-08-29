@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateDeviceUseCase } from "../../../application/usecases/create-device.usecase";
@@ -38,30 +52,36 @@ export class DevicesController {
       DevicesController.MAX_PAGE_SIZE,
       Math.max(1, parseInt(pageSizeQuery ?? "", 10) || DevicesController.DEFAULT_PAGE_SIZE),
     );
-    return this.devices.findAllPaginated(this.lojaId(req), page, pageSize);
+    const lojaId = this.lojaId(req);
+    if (!lojaId) return { data: [], total: 0, page, pageSize };
+    return this.devices.findAllPaginated(lojaId, page, pageSize);
   }
 
   @Get("stats")
   stats(@Req() req: Request) {
-    return this.devices.countStats(this.lojaId(req));
+    const lojaId = this.lojaId(req);
+    if (!lojaId) return { total: 0, online: 0 };
+    return this.devices.countStats(lojaId);
   }
 
   @Get("discovered")
   async findDiscovered(@Req() req: Request) {
+    const lojaId = this.lojaId(req);
+    if (!lojaId) return [];
     const discovered = this.agentGateway.getDiscoveredDevices(this.clienteId(req));
-    const registered = await this.devices.findAll(this.lojaId(req));
+    const registered = await this.devices.findAll(lojaId);
     const registeredIps = new Set(registered.map((d) => d.ip));
     return discovered.filter((d) => !registeredIps.has(d.ip));
   }
 
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
-    return this.devices.findById(id, this.lojaId(req));
+    return this.devices.findById(id, this.requireLojaId(req));
   }
 
   @Post()
   create(@Body() dto: CreateDeviceDto, @Req() req: Request) {
-    return this.createDevice.execute(this.clienteId(req), this.lojaId(req), dto);
+    return this.createDevice.execute(this.clienteId(req), this.requireLojaId(req), dto);
   }
 
   @Post("import")
@@ -78,25 +98,33 @@ export class DevicesController {
 
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateDeviceDto, @Req() req: Request) {
-    return this.devices.update(id, this.lojaId(req), dto);
+    return this.devices.update(id, this.requireLojaId(req), dto);
   }
 
   @Delete(":id")
   @HttpCode(204)
   remove(@Param("id") id: string, @Req() req: Request) {
-    return this.devices.delete(id, this.lojaId(req));
+    return this.devices.delete(id, this.requireLojaId(req));
   }
 
   @Post(":id/link-agent")
   linkAgent(@Param("id") id: string, @Body() dto: LinkAgentDto, @Req() req: Request) {
-    return this.linkDeviceAgent.execute(id, this.lojaId(req), dto.agentToken);
+    return this.linkDeviceAgent.execute(id, this.requireLojaId(req), dto.agentToken);
   }
 
   private clienteId(req: Request): string {
     return (req as unknown as { user: { clienteId: string } }).user.clienteId;
   }
 
-  private lojaId(req: Request): string {
-    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
+  private lojaId(req: Request): string | null {
+    return (req as unknown as { user: { lojaId: string | null } }).user.lojaId;
+  }
+
+  /** Ver mesma ressalva em `products.controller.ts` — Cliente sem Loja
+   * cadastrada ainda tem `lojaId` null na sessão. */
+  private requireLojaId(req: Request): string {
+    const lojaId = this.lojaId(req);
+    if (!lojaId) throw new BadRequestException("Nenhuma loja associada à sua sessão. Crie uma loja primeiro.");
+    return lojaId;
   }
 }

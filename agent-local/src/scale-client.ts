@@ -21,17 +21,73 @@ export interface TabelaNutricionalPayload {
   itens: TabelaNutricionalItemPayload[];
 }
 
+export interface FormatoImpressaoElementoPayload {
+  x: number;
+  y: number;
+  largura: number;
+  altura: number;
+  /** Angle/Align/Font do wire (`LabelItem`) — ver ressalva de mapeamento
+   * ainda não confirmado visualmente em `scale-client.ts` (buildLabelBlock). */
+  angulo?: number;
+  alinhamento?: number;
+  fonte?: number;
+}
+
+export interface ClassePayload {
+  /** Mesmo esquema de "número" que TabelaNutricional/FormatoImpressao usam —
+   * vira o `ClassID` do wire (comando `DWL/CLS`), referenciado pelo idx14
+   * do PLU. */
+  numero: number;
+  nome: string;
+}
+
+export interface FormatoImpressaoPayload {
+  /** Mesmo esquema de "número" que TabelaNutricional usa — vira o `LabelID`
+   * do wire (comando `DWL/LAB`), referenciado pelo vínculo idx8 do PLU. */
+  numero: number;
+  nome: string;
+  larguraMm: number;
+  alturaMm: number;
+  elementos: FormatoImpressaoElementoPayload[];
+}
+
 export interface ScaleSyncPayload {
   codigo: string;
   codigoBarras: string;
   nome: string;
   preco: number;
+  /** `Cost` no código-fonte decompilado — idx6 do PLU. Só armazenado/enviado
+   * pra balança, não usado em cálculo de venda no PesoHub. */
+  custo?: number;
   categoriaImposto?: string;
+  /** `UnitID` no código-fonte decompilado — idx4 do PLU. Unidade de venda
+   * (peso/unidade), não "bandeira de código de barras" como se suspeitava
+   * antes. Mapeamento PESO/PECA→1/2 ainda sujeito a confirmação de hardware
+   * (só o valor "1" tinha sido visto em registros reais até agora). */
+  unidadeVenda?: "PESO" | "PECA";
+  /** Modo de cálculo do imposto na balança (TaxType do wire): 1=soma por fora
+   * do preço, 2=informativo (não altera o preço), 3=embutido no preço
+   * (extrai). Ausente/0 = sem imposto. */
+  taxType?: number;
+  /** Alíquota em %, ex.: 18 para 18%. Convertida para o inteiro do wire
+   * (percentual × 10000) em `buildPluRow`. */
+  taxaImposto?: number;
   tara?: number;
   desconto?: number;
   textoExtra1?: string;
+  textoExtra2?: string;
+  textoExtra3?: string;
+  textoExtra4?: string;
+  textoExtra5?: string;
+  textoExtra6?: string;
+  textoExtra7?: string;
   validadeDias?: number;
+  formatoImpressao?: FormatoImpressaoPayload;
   tabelaNutricional?: TabelaNutricionalPayload;
+  /** Setor/departamento do produto — vira `ClassID` (idx14 do PLU). Ausente
+   * mantém o "9" neutro do template (mesmo fallback que o software oficial
+   * usa quando o PLU não referencia nenhuma Class válida, ver `RDS.cs`). */
+  setor?: ClassePayload;
 }
 
 export interface ScaleSyncOutcome {
@@ -86,12 +142,53 @@ const PLU_FIELD_TEMPLATE = [
 const FIELD_PLU_NUMBER = 1;
 const FIELD_PRODUCT_CODE = 2;
 const FIELD_EAN13 = 3;
+const FIELD_UNIT = 4;
+const UNIDADE_VENDA_WIRE: Record<"PESO" | "PECA", string> = { PESO: "1", PECA: "2" };
 const FIELD_PRICE = 5;
+const FIELD_COST = 6;
 const FIELD_TARA = 7;
+/** `ClassID` no código-fonte decompilado — idx14 do PLU. Referencia um
+ * cadastro próprio da balança (`Class`, comando `DWL/CLS`), não é um número
+ * solto — template mantém "9" (mesmo fallback do software oficial quando o
+ * PLU não tem Class válida, ver `RDS.cs` `logItemRow.Class = ... ?? 9`). */
+const FIELD_SETOR = 14;
+/** 1-9 são ClassIDs reservados pela balança (Diversos-Peso, Taxa de serviço,
+ * Padrão etc. — confirmado via `UPL/CLS` no hardware físico em 2026-08-29).
+ * O backend já bloqueia `Setor.numero` nessa faixa pra cadastros novos, mas
+ * um Setor criado ANTES dessa validação existir ainda pode ter um número
+ * baixo — nunca escrever/referenciar uma Class nessa faixa a partir daqui,
+ * pra não sobrescrever as classes do sistema. */
+const CLASS_ID_MIN_SAFE = 10;
+/** `LabelID1` no código-fonte decompilado do Ramuza.exe — vínculo com o
+ * formato de etiqueta (mesmo namespace de "número" que FormatoImpressao usa
+ * no PesoHub). Não confirmado ainda em hardware físico — ver
+ * [[project_ramuza_full_field_map_2026_08_28]] antes de assumir certo. */
+const FIELD_VINCULO_FORMATO_IMPRESSAO = 8;
 const FIELD_NAME = 15;
+/** Text1-7 no código-fonte decompilado — idx16-22 do PLU. Confirmado por
+ * `RDS.DataSet_GetPLUString`/`DataSet_GetPLURowFromTMS`, ver
+ * [[project_ramuza_full_field_map_2026_08_28]]. Só idx16 (Text1) tinha sido
+ * confirmado empiricamente antes; idx17-22 (Text2-7) nunca tinham sido
+ * wired — não confundir com os "candidatos incertos" de captura antiga
+ * mencionados acima, esse mapeamento vem direto do código-fonte. */
 const FIELD_TEXTO_EXTRA_1 = 16;
+const FIELD_TEXTO_EXTRA_2 = 17;
+const FIELD_TEXTO_EXTRA_3 = 18;
+const FIELD_TEXTO_EXTRA_4 = 19;
+const FIELD_TEXTO_EXTRA_5 = 20;
+const FIELD_TEXTO_EXTRA_6 = 21;
+const FIELD_TEXTO_EXTRA_7 = 22;
 const FIELD_VALIDADE_DIAS = 32;
 const FIELD_DESCONTO = 56;
+/** TaxType/Tax no código-fonte decompilado — idx57/58 do PLU. Semântica achada
+ * em `RDS.cs` (lógica de venda, não uma tabela de códigos): TaxType 1=soma o
+ * imposto por fora do preço, 2=calcula só como informativo (não altera o
+ * preço cobrado), 3=imposto já embutido no preço (extrai a parte do
+ * imposto); qualquer outro valor = sem imposto. Tax é a alíquota como
+ * inteiro = percentual × 10000 (ex.: 18% → 1800). Ver
+ * [[project_ramuza_full_field_map_2026_08_28]]. */
+const FIELD_TAX_TYPE = 57;
+const FIELD_TAX = 58;
 const FIELD_VINCULO_TABELA_NUTRICIONAL = 59;
 
 /**
@@ -249,16 +346,112 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   fields[FIELD_PLU_NUMBER] = String(pluNumber);
   fields[FIELD_PRODUCT_CODE] = sanitizeField(resolveWireCodigo(product.codigo, pluNumber));
   fields[FIELD_EAN13] = sanitizeField(product.codigoBarras ?? "");
+  if (product.unidadeVenda != null) fields[FIELD_UNIT] = UNIDADE_VENDA_WIRE[product.unidadeVenda];
   fields[FIELD_PRICE] = encodePrice(product.preco);
+  if (product.custo != null) fields[FIELD_COST] = encodePrice(product.custo);
   if (product.tara != null) fields[FIELD_TARA] = encodeTara(product.tara);
+  if (product.setor != null && product.setor.numero >= CLASS_ID_MIN_SAFE) {
+    fields[FIELD_SETOR] = String(product.setor.numero);
+  }
   if (product.desconto != null) fields[FIELD_DESCONTO] = encodePrice(product.desconto);
   if (product.textoExtra1 != null) fields[FIELD_TEXTO_EXTRA_1] = sanitizeField(product.textoExtra1);
+  if (product.textoExtra2 != null) fields[FIELD_TEXTO_EXTRA_2] = sanitizeField(product.textoExtra2);
+  if (product.textoExtra3 != null) fields[FIELD_TEXTO_EXTRA_3] = sanitizeField(product.textoExtra3);
+  if (product.textoExtra4 != null) fields[FIELD_TEXTO_EXTRA_4] = sanitizeField(product.textoExtra4);
+  if (product.textoExtra5 != null) fields[FIELD_TEXTO_EXTRA_5] = sanitizeField(product.textoExtra5);
+  if (product.textoExtra6 != null) fields[FIELD_TEXTO_EXTRA_6] = sanitizeField(product.textoExtra6);
+  if (product.textoExtra7 != null) fields[FIELD_TEXTO_EXTRA_7] = sanitizeField(product.textoExtra7);
   if (product.validadeDias != null) fields[FIELD_VALIDADE_DIAS] = String(Math.round(product.validadeDias));
+  if (product.taxType != null && product.taxType >= 1 && product.taxType <= 3) {
+    fields[FIELD_TAX_TYPE] = String(product.taxType);
+    fields[FIELD_TAX] = String(Math.round((product.taxaImposto ?? 0) * 10000));
+  }
+  if (product.formatoImpressao != null) {
+    fields[FIELD_VINCULO_FORMATO_IMPRESSAO] = String(product.formatoImpressao.numero);
+  }
   if (product.tabelaNutricional != null) {
     fields[FIELD_VINCULO_TABELA_NUTRICIONAL] = String(product.tabelaNutricional.numero);
   }
   fields[FIELD_NAME] = sanitizeField(product.nome);
   return fields.join("\t") + "\r\n";
+}
+
+/**
+ * Monta o bloco `LAB\t...` (cabeçalho do formato de etiqueta) + um `LAS\t...`
+ * por elemento posicionado + `LAE\t` de fechamento, achado em
+ * `NetForm.cs`/`UploadECS()` (bloco `checkPara.blabel`, ramo `iScaleType_TM`
+ * — que é exatamente o tipo do nosso hardware, Ramuza Atena II TM-xA) do
+ * código-fonte decompilado. Ver [[project_ramuza_full_field_map_2026_08_28]].
+ *
+ * NÃO CONFIRMADO EM HARDWARE FÍSICO ainda — os 32 campos de texto fixo
+ * (Text1-32) do cabeçalho LAB não têm equivalente no PesoHub hoje (ficam
+ * vazios), e os campos Flag1-3 de cada elemento (LAS) continuam com valor
+ * neutro (0) até descobrir o que fazem. `Print=1` (assume "sempre imprime").
+ * O fator de conversão de mm pra unidade do wire também é uma suposição
+ * (1:1) — testar contra a balança antes de confiar cegamente na
+ * posição/tamanho impresso.
+ *
+ * Angle/Align/Font (2026-08-29): write→readback confirmado no protocolo
+ * (`probe-lab-angle-align-font.ts`), mas o MAPEAMENTO em si (que valor de
+ * Angle corresponde a qual rotação visual, etc.) é uma suposição —
+ * `angulo` em graus (0/90/180/270) vira índice de giro de 90° (0-3),
+ * `alinhamento`/`fonte` são passados como inteiro cru. Nunca foi impresso
+ * fisicamente numa etiqueta pra confirmar o efeito visual real.
+ */
+function buildLabelBlock(formato: FormatoImpressaoPayload): string {
+  const emptyTexts = new Array(32).fill("");
+  const header =
+    [
+      "LAB",
+      String(formato.numero),
+      sanitizeField(formato.nome),
+      "0", // Sort
+      String(Math.round(formato.larguraMm)),
+      String(Math.round(formato.alturaMm)),
+      ...emptyTexts.slice(0, 16), // Text1-16
+      "0", // Version
+      ...emptyTexts.slice(16, 32), // Text17-32
+    ].join("\t") + "\t\r\n";
+
+  const elementos = formato.elementos
+    .map((el, i) =>
+      [
+        "LAS",
+        String(i + 1), // SubID
+        "0", // Flag1
+        "0", // Flag2
+        "0", // Flag3
+        "1", // Print
+        String(Math.round(((el.angulo ?? 0) / 90) % 4)), // Angle (índice de giro de 90°)
+        String(el.alinhamento ?? 0), // Align
+        String(el.fonte ?? 0), // Font
+        String(Math.round(el.x)),
+        String(Math.round(el.y)),
+        String(Math.round(el.largura)),
+        String(Math.round(el.altura)),
+      ].join("\t") + "\t\r\n",
+    )
+    .join("");
+
+  return header + elementos + "LAE\t\r\n";
+}
+
+/**
+ * Monta o bloco `DWL/CLS` (cadastro de Setor como "Class" na balança) —
+ * achado em `RDS.cs`/`NetForm.cs` (`checkPara.bclass`), enviado ANTES do
+ * bloco PLU na sequência real do software oficial (`ClassID` é referenciado
+ * pelo PLU, então precisa existir primeiro). Formato por linha: ClassID,
+ * Name, DeptID, LabelID1, BarT1, BarF1, LabelID2, BarT2, BarF2 — só
+ * ClassID/Name vêm do PesoHub, o resto fica neutro (0, mesmo padrão do
+ * `buildLabelBlock`) até termos demanda de usar Department/etiqueta por
+ * setor. NÃO CONFIRMADO EM HARDWARE FÍSICO ainda a faixa válida de
+ * `ClassID` (mesma classe de limite do `minUserLabelID`/`minUserPLUID`
+ * já vistos — testar antes de confiar cegamente).
+ */
+function buildClassRow(classe: ClassePayload): string {
+  return (
+    ["CLS", String(classe.numero), sanitizeField(classe.nome), "0", "0", "0", "0", "0", "0"].join("\t") + "\t\r\n"
+  );
 }
 
 /**
@@ -269,6 +462,15 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
  */
 export function buildSyncBody(products: ScaleSyncPayload[]): string {
   const pluNumbers = products.map((p, i) => resolvePluNumber(p.codigo, i));
+
+  // Mesmo dedupe do NU3/LAB: vários produtos podem compartilhar o mesmo Setor.
+  const classes = new Map<number, ClassePayload>();
+  for (const p of products) {
+    if (p.setor != null && p.setor.numero >= CLASS_ID_MIN_SAFE) classes.set(p.setor.numero, p.setor);
+  }
+
+  const clsBlock =
+    classes.size > 0 ? `DWL\tCLS\t\r\n` + [...classes.values()].map(buildClassRow).join("") + `END\tCLS\t\r\n` : "";
 
   // Dedupe por número da tabela: vários produtos podem apontar pra mesma
   // tabela nutricional, e a balança só precisa receber cada NU3 uma vez
@@ -286,11 +488,27 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
       ? `DWL\tNU3\t\r\n` + [...tabelasNutricionais.values()].map(buildNu3Row).join("") + `END\tNU3\t\r\n`
       : "";
 
+  // Mesmo dedupe do NU3: vários produtos podem compartilhar o mesmo formato
+  // de etiqueta.
+  const formatosImpressao = new Map<number, FormatoImpressaoPayload>();
+  for (const p of products) {
+    if (p.formatoImpressao != null) {
+      formatosImpressao.set(p.formatoImpressao.numero, p.formatoImpressao);
+    }
+  }
+
+  const labBlock =
+    formatosImpressao.size > 0
+      ? `DWL\tLAB\t\r\n` + [...formatosImpressao.values()].map(buildLabelBlock).join("") + `END\tLAB\t\r\n`
+      : "";
+
   return (
+    clsBlock +
     `DWL\tPLU\t\r\n` +
     products.map((p, i) => buildPluRow(p, pluNumbers[i])).join("") +
     `END\tPLU\t\r\n` +
     nu3Block +
+    labBlock +
     `UPL\tTIM\t\r\n`
   );
 }

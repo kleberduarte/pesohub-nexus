@@ -1,6 +1,35 @@
 import { prisma } from "./prisma";
 import { AgentBridge, SyncCommandPayload } from "./agent-bridge";
 
+/** Mesmo formato salvo pelo editor visual do frontend (`FormatoImpressaoPanel.tsx`):
+ * `layout: { elementos: [{ id, tipo, x, y, largura, altura, texto? }, ...] }`. */
+function getLayoutElementos(
+  layout: unknown,
+): { x: number; y: number; largura: number; altura: number; angulo?: number; alinhamento?: number; fonte?: number }[] {
+  const elementos = (layout as { elementos?: unknown[] } | null)?.elementos;
+  if (!Array.isArray(elementos)) return [];
+  return elementos.map((el) => {
+    const e = el as {
+      x?: number;
+      y?: number;
+      largura?: number;
+      altura?: number;
+      angulo?: number;
+      alinhamento?: number;
+      fonte?: number;
+    };
+    return {
+      x: e.x ?? 0,
+      y: e.y ?? 0,
+      largura: e.largura ?? 0,
+      altura: e.altura ?? 0,
+      angulo: e.angulo,
+      alinhamento: e.alinhamento,
+      fonte: e.fonte,
+    };
+  });
+}
+
 export interface SyncJobData {
   deviceId: string;
   tipo: "TOTAL" | "INCREMENTAL";
@@ -19,19 +48,21 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
       );
     }
 
-    const tabelaNutricionalInclude = {
+    const productInclude = {
       tabelaNutricional: { include: { itens: { orderBy: { ordem: "asc" as const } } } },
+      formatoImpressao: true,
+      subSetor: { include: { setor: true } },
     };
 
     const products =
       tipo === "TOTAL"
         ? await prisma.product.findMany({
             where: { ativo: true, lojaId: device.lojaId },
-            include: tabelaNutricionalInclude,
+            include: productInclude,
           })
         : await prisma.product.findMany({
             where: { id: { in: productIds ?? [] }, lojaId: device.lojaId },
-            include: tabelaNutricionalInclude,
+            include: productInclude,
           });
 
     const syncJob = await prisma.syncJob.create({
@@ -60,11 +91,39 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
         codigoBarras: p.codigoBarras,
         nome: p.nome,
         preco: Number(p.preco),
+        custo: p.custo != null ? Number(p.custo) : undefined,
         categoriaImposto: p.categoriaImposto ?? undefined,
+        unidadeVenda: p.unidadeVenda,
+        taxType: p.taxType ?? undefined,
+        taxaImposto: p.taxaImposto != null ? Number(p.taxaImposto) : undefined,
         tara: p.tara != null ? Number(p.tara) : undefined,
         desconto: p.desconto != null ? Number(p.desconto) : undefined,
         textoExtra1: p.textoExtra1 ?? undefined,
+        textoExtra2: p.textoExtra2 ?? undefined,
+        textoExtra3: p.textoExtra3 ?? undefined,
+        textoExtra4: p.textoExtra4 ?? undefined,
+        textoExtra5: p.textoExtra5 ?? undefined,
+        textoExtra6: p.textoExtra6 ?? undefined,
+        textoExtra7: p.textoExtra7 ?? undefined,
         validadeDias: p.validadeDias ?? undefined,
+        setor: p.subSetor?.setor ? { numero: p.subSetor.setor.numero, nome: p.subSetor.setor.nome } : undefined,
+        formatoImpressao: p.formatoImpressao
+          ? {
+              numero: p.formatoImpressao.numero,
+              nome: p.formatoImpressao.nome,
+              larguraMm: p.formatoImpressao.larguraMm,
+              alturaMm: p.formatoImpressao.alturaMm,
+              elementos: getLayoutElementos(p.formatoImpressao.layout).map((el) => ({
+                x: el.x,
+                y: el.y,
+                largura: el.largura,
+                altura: el.altura,
+                angulo: el.angulo,
+                alinhamento: el.alinhamento,
+                fonte: el.fonte,
+              })),
+            }
+          : undefined,
         tabelaNutricional: p.tabelaNutricional
           ? {
               numero: p.tabelaNutricional.numero,

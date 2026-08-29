@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import JsBarcode from "jsbarcode";
 import { X, Search } from "lucide-react";
 import type { Product, FormatoImpressao, Imagem, TabelaNutricional } from "../../lib/api";
+import { NUTRIENTES_PADRAO } from "../../lib/nutrientes-padrao";
 
 type ElementoTipo = "nome" | "preco" | "codigoBarras" | "texto" | "imagem" | "tabelaNutricional" | "selos" | "ingredientes";
 
@@ -34,6 +35,10 @@ const UNIDADE_LABEL: Record<string, string> = {
   MG: "mg",
   MCG: "mcg",
 };
+
+// A tabela fixa dos 10 nutrientes padrão vive em ../../lib/nutrientes-padrao
+// (compartilhada com o formulário de cadastro) — ver o comentário lá pra por
+// que a posição (`ordem`) e não o nome é o que importa pro wire da balança.
 
 const PX_PER_MM = 5;
 
@@ -219,7 +224,7 @@ export function EtiquetaPreview({
                           <span className="text-[9px] text-slate-400">{TIPO_LABEL.imagem}</span>
                         ))}
                       {el.tipo === "tabelaNutricional" &&
-                        (tabelaNutricional && tabelaNutricional.itens.length > 0 ? (
+                        (tabelaNutricional ? (
                           <div className="w-full h-full overflow-auto text-left px-0.5">
                             <p className="text-[7px] font-bold text-slate-900 leading-tight">INFORMAÇÃO NUTRICIONAL</p>
                             {tabelaNutricional.porcao && (
@@ -245,20 +250,40 @@ export function EtiquetaPreview({
                                 </tr>
                               </thead>
                               <tbody>
-                                {tabelaNutricional.itens.map((item) => (
-                                  <tr key={item.ordem}>
-                                    <td className="border border-slate-400 py-0.5 pr-1 pl-1 text-slate-700">
-                                      {item.ingrediente}
-                                    </td>
-                                    <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-700 whitespace-nowrap">
-                                      {item.valor}
-                                      {UNIDADE_LABEL[item.unidade] ?? ""}
-                                    </td>
-                                    <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-500 whitespace-nowrap">
-                                      {item.porcentagem}%
-                                    </td>
-                                  </tr>
-                                ))}
+                                {NUTRIENTES_PADRAO.map((padrao, i) => {
+                                  const ordem = i + 1;
+                                  const item = tabelaNutricional.itens.find((it) => it.ordem === ordem);
+                                  return (
+                                    <tr key={ordem}>
+                                      <td className="border border-slate-400 py-0.5 pr-1 pl-1 text-slate-700">
+                                        {padrao.nome}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-700 whitespace-nowrap">
+                                        {item?.valor ?? 0}
+                                        {UNIDADE_LABEL[padrao.unidade]}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-500 whitespace-nowrap">
+                                        {item?.porcentagem ?? 0}%
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                {tabelaNutricional.itens
+                                  .filter((item) => item.ordem > 10)
+                                  .map((item) => (
+                                    <tr key={item.ordem}>
+                                      <td className="border border-slate-400 py-0.5 pr-1 pl-1 text-slate-700">
+                                        {item.ingrediente}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-700 whitespace-nowrap">
+                                        {item.valor}
+                                        {UNIDADE_LABEL[item.unidade] ?? ""}
+                                      </td>
+                                      <td className="border border-slate-400 py-0.5 px-1 text-right text-slate-500 whitespace-nowrap">
+                                        {item.porcentagem}%
+                                      </td>
+                                    </tr>
+                                  ))}
                               </tbody>
                             </table>
                             <p className="text-[5px] text-slate-400 leading-tight mt-0.5">

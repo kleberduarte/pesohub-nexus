@@ -22,6 +22,29 @@ export interface TabelaNutricionalPayload {
   itens: TabelaNutricionalItemPayload[];
 }
 
+export interface ClassePayload {
+  numero: number;
+  nome: string;
+}
+
+export interface FormatoImpressaoElementoPayload {
+  x: number;
+  y: number;
+  largura: number;
+  altura: number;
+  angulo?: number;
+  alinhamento?: number;
+  fonte?: number;
+}
+
+export interface FormatoImpressaoPayload {
+  numero: number;
+  nome: string;
+  larguraMm: number;
+  alturaMm: number;
+  elementos: FormatoImpressaoElementoPayload[];
+}
+
 export interface SyncCommandPayload {
   deviceId: string;
   deviceIp: string;
@@ -32,12 +55,24 @@ export interface SyncCommandPayload {
     codigoBarras: string;
     nome: string;
     preco: number;
+    custo?: number;
     categoriaImposto?: string;
+    unidadeVenda?: "PESO" | "PECA";
+    taxType?: number;
+    taxaImposto?: number;
     tara?: number;
     desconto?: number;
     textoExtra1?: string;
+    textoExtra2?: string;
+    textoExtra3?: string;
+    textoExtra4?: string;
+    textoExtra5?: string;
+    textoExtra6?: string;
+    textoExtra7?: string;
     validadeDias?: number;
+    formatoImpressao?: FormatoImpressaoPayload;
     tabelaNutricional?: TabelaNutricionalPayload;
+    setor?: ClassePayload;
   }>;
 }
 
