@@ -6,6 +6,7 @@ import { AgentBridge, SyncCommandPayload } from "./agent-bridge";
 function getLayoutElementos(layout: unknown): {
   tipo?: string;
   texto?: string;
+  imagemNumero?: number;
   x: number;
   y: number;
   largura: number;
@@ -20,6 +21,7 @@ function getLayoutElementos(layout: unknown): {
     const e = el as {
       tipo?: string;
       texto?: string;
+      imagemNumero?: number;
       x?: number;
       y?: number;
       largura?: number;
@@ -31,6 +33,7 @@ function getLayoutElementos(layout: unknown): {
     return {
       tipo: e.tipo,
       texto: e.texto,
+      imagemNumero: e.imagemNumero,
       x: e.x ?? 0,
       y: e.y ?? 0,
       largura: e.largura ?? 0,
@@ -128,6 +131,7 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
               elementos: getLayoutElementos(p.formatoImpressao.layout).map((el) => ({
                 tipo: el.tipo,
                 texto: el.texto,
+                imagemNumero: el.imagemNumero,
                 x: el.x,
                 y: el.y,
                 largura: el.largura,

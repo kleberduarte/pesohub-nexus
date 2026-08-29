@@ -32,6 +32,7 @@ export interface ClassePayload {
 export interface FormatoImpressaoElementoPayload {
   tipo?: string;
   texto?: string;
+  imagemNumero?: number;
   x: number;
   y: number;
   largura: number;

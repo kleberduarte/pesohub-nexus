@@ -1,4 +1,6 @@
 import { Socket } from "net";
+import { buildBmpBlock, type BitmapMonocromatico } from "./bitmap-wire";
+import { desenharFaixaSelos, atribuirIdsDeSelo } from "./selos-bitmap";
 
 export interface TabelaNutricionalItemPayload {
   /** Posição do nutriente no formulário (1-based). 1-10 mapeiam pros 10 slots
@@ -36,6 +38,9 @@ export interface FormatoImpressaoElementoPayload {
   /** Conteúdo dos elementos `tipo: "texto"` — vira um dos 32 textos
    * constantes do cabeçalho LAB (ver `buildLabelBlock`). */
   texto?: string;
+  /** Qual bitmap mostrar nos elementos `tipo: "imagem"` — vai no Flag2 do
+   * wire. As imagens são enviadas à parte, no bloco `DWL/BMP`. */
+  imagemNumero?: number;
   x: number;
   y: number;
   largura: number;
@@ -563,7 +568,7 @@ const FONTE_PADRAO_POR_TIPO: Record<string, number> = {
 /** Quantos slots de texto constante o cabeçalho `LAB` carrega (Text1-32). */
 const MAX_TEXTOS_CONSTANTES = 32;
 
-function buildLabelBlock(formato: FormatoImpressaoPayload): string {
+function buildLabelBlock(formato: FormatoImpressaoPayload, bmpSelosId?: number): string {
   const toWire = (mm: number) => String(Math.round(mm * WIRE_UNITS_PER_MM));
 
   // Elementos de texto livre viram "Textos constantes" (Flag1=3): o texto em
@@ -599,9 +604,15 @@ function buildLabelBlock(formato: FormatoImpressaoPayload): string {
       const flag =
         slot !== undefined
           ? { flag1: 3, flag2: slot, flag3: 0 } // Textos constantes → Text(slot+1)
-          : el.tipo != null
-            ? FLAG_POR_TIPO[el.tipo]
-            : undefined;
+          : el.tipo === "imagem"
+            ? { flag1: 6, flag2: el.imagemNumero ?? 0, flag3: 0 } // Imagem → Flag2 = id do bitmap
+            : // Selos viram imagem quando há um bitmap gerado pra este produto;
+              // sem bitmap, caem no campo de Alérgico (texto corrido).
+              el.tipo === "selos" && bmpSelosId != null
+              ? { flag1: 6, flag2: bmpSelosId, flag3: 0 }
+              : el.tipo != null
+                ? FLAG_POR_TIPO[el.tipo]
+                : undefined;
       return [
         "LAS",
         String(i + 1), // SubID
@@ -715,19 +726,52 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
 
   // Mesmo dedupe do NU3: vários produtos podem compartilhar o mesmo formato
   // de etiqueta.
-  const formatosImpressao = new Map<number, FormatoImpressaoPayload>();
+  // Ids de bitmap pros selos: o elemento de imagem só referencia Flag2 1..15,
+  // então distribuímos os slots entre as tabelas que têm selos.
+  const idsDeSelo = atribuirIdsDeSelo(
+    products.filter((p) => (p.tabelaNutricional?.selos?.length ?? 0) > 0).map((p) => p.tabelaNutricional!.numero),
+  );
+
+  // Guarda junto qual bitmap de selo cada formato deve referenciar — vem do
+  // produto que usa aquele formato (ver bloco BMP abaixo).
+  const formatosImpressao = new Map<number, { formato: FormatoImpressaoPayload; bmpSelosId?: number }>();
   for (const p of products) {
-    if (p.formatoImpressao != null) {
-      formatosImpressao.set(p.formatoImpressao.numero, p.formatoImpressao);
+    if (p.formatoImpressao == null) continue;
+    const entrada = formatosImpressao.get(p.formatoImpressao.numero);
+    const bmpSelosId =
+      p.tabelaNutricional != null ? idsDeSelo.get(p.tabelaNutricional.numero) : undefined;
+    if (entrada == null) {
+      formatosImpressao.set(p.formatoImpressao.numero, { formato: p.formatoImpressao, bmpSelosId });
+    } else if (entrada.bmpSelosId == null && bmpSelosId != null) {
+      entrada.bmpSelosId = bmpSelosId;
     }
   }
 
   const labBlock =
     formatosImpressao.size > 0
-      ? `DWL\tLAB\t\r\n` + [...formatosImpressao.values()].map(buildLabelBlock).join("") + `END\tLAB\t\r\n`
+      ? `DWL\tLAB\t\r\n` +
+        [...formatosImpressao.values()].map(({ formato, bmpSelosId }) => buildLabelBlock(formato, bmpSelosId)).join("") +
+        `END\tLAB\t\r\n`
       : "";
 
+  // A faixa gráfica "ALTO EM ..." é uma imagem: a balança não sabe desenhar
+  // selos, só referenciar um bitmap por id (`Flag1=6`). Geramos um bitmap por
+  // tabela nutricional que tenha selos, no tamanho do elemento `selos` do
+  // layout que a usa (se houver), e mandamos no bloco `DWL/BMP`.
+  const bitmaps = new Map<number, BitmapMonocromatico>();
+  for (const p of products) {
+    const selos = p.tabelaNutricional?.selos;
+    if (!selos || selos.length === 0) continue;
+    const id = idsDeSelo.get(p.tabelaNutricional!.numero);
+    if (id == null || bitmaps.has(id)) continue;
+    const caixa = p.formatoImpressao?.elementos.find((el) => el.tipo === "selos");
+    bitmaps.set(id, desenharFaixaSelos(selos, caixa?.largura ?? 56, caixa?.altura ?? 8));
+  }
+
+  const bmpBlock = buildBmpBlock(bitmaps);
+
   return (
+    bmpBlock +
     clsBlock +
     `DWL\tPLU\t\r\n` +
     products.map((p, i) => buildPluRow(p, pluNumbers[i])).join("") +
