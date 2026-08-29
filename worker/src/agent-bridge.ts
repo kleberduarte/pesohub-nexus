@@ -19,6 +19,8 @@ export interface TabelaNutricionalPayload {
   nome: string;
   porcao?: string;
   porcoesPorEmbalagem?: number;
+  ingredientes?: string;
+  selos: string[];
   itens: TabelaNutricionalItemPayload[];
 }
 
@@ -28,6 +30,9 @@ export interface ClassePayload {
 }
 
 export interface FormatoImpressaoElementoPayload {
+  tipo?: string;
+  texto?: string;
+  imagemNumero?: number;
   x: number;
   y: number;
   largura: number;

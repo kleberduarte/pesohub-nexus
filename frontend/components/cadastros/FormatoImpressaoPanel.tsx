@@ -16,7 +16,24 @@ import {
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EtiquetaPreview } from "../products/EtiquetaPreview";
 
-type ElementoTipo = "nome" | "preco" | "codigoBarras" | "texto" | "imagem" | "tabelaNutricional" | "selos" | "ingredientes";
+type ElementoTipo =
+  | "nome"
+  | "preco"
+  | "precoUnitario"
+  | "peso"
+  | "tara"
+  | "validade"
+  | "dataEmbalagem"
+  | "pesoBrutoLiquido"
+  | "lote"
+  | "textoExtra5"
+  | "textoExtra7"
+  | "codigoBarras"
+  | "texto"
+  | "imagem"
+  | "tabelaNutricional"
+  | "selos"
+  | "ingredientes";
 
 interface LayoutElemento {
   id: string;
@@ -45,7 +62,16 @@ const ALINHAMENTO_CSS: Record<0 | 1 | 2, string> = { 0: "flex-start", 1: "center
 
 const TIPO_LABEL: Record<ElementoTipo, string> = {
   nome: "Nome do Produto",
-  preco: "Preço",
+  preco: "Preço Total",
+  precoUnitario: "Preço por kg/un",
+  peso: "Peso",
+  tara: "Tara",
+  validade: "Validade",
+  dataEmbalagem: "Data de Embalagem",
+  pesoBrutoLiquido: "Indicador B/L (bruto/líquido)",
+  lote: "Lote",
+  textoExtra5: "Texto Extra 5",
+  textoExtra7: "Texto Extra 7",
   codigoBarras: "Código de Barras",
   texto: "Texto Livre",
   imagem: "Imagem/Logo",
@@ -57,6 +83,15 @@ const TIPO_LABEL: Record<ElementoTipo, string> = {
 const TIPO_DEFAULT_SIZE: Record<ElementoTipo, { largura: number; altura: number }> = {
   nome: { largura: 40, altura: 8 },
   preco: { largura: 30, altura: 12 },
+  precoUnitario: { largura: 25, altura: 6 },
+  peso: { largura: 20, altura: 6 },
+  tara: { largura: 20, altura: 6 },
+  validade: { largura: 25, altura: 6 },
+  dataEmbalagem: { largura: 25, altura: 6 },
+  pesoBrutoLiquido: { largura: 6, altura: 5 },
+  lote: { largura: 25, altura: 5 },
+  textoExtra5: { largura: 40, altura: 5 },
+  textoExtra7: { largura: 40, altura: 5 },
   codigoBarras: { largura: 45, altura: 15 },
   texto: { largura: 30, altura: 6 },
   imagem: { largura: 20, altura: 20 },

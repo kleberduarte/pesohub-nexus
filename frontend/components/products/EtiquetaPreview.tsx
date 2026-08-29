@@ -6,7 +6,24 @@ import { X, Search } from "lucide-react";
 import type { Product, FormatoImpressao, Imagem, TabelaNutricional } from "../../lib/api";
 import { NUTRIENTES_PADRAO } from "../../lib/nutrientes-padrao";
 
-type ElementoTipo = "nome" | "preco" | "codigoBarras" | "texto" | "imagem" | "tabelaNutricional" | "selos" | "ingredientes";
+type ElementoTipo =
+  | "nome"
+  | "preco"
+  | "precoUnitario"
+  | "peso"
+  | "tara"
+  | "validade"
+  | "dataEmbalagem"
+  | "pesoBrutoLiquido"
+  | "lote"
+  | "textoExtra5"
+  | "textoExtra7"
+  | "codigoBarras"
+  | "texto"
+  | "imagem"
+  | "tabelaNutricional"
+  | "selos"
+  | "ingredientes";
 
 interface LayoutElemento {
   id: string;
@@ -20,7 +37,16 @@ interface LayoutElemento {
 
 const TIPO_LABEL: Record<ElementoTipo, string> = {
   nome: "Nome do Produto",
-  preco: "Preço",
+  preco: "Preço Total",
+  precoUnitario: "Preço por kg/un",
+  peso: "Peso",
+  tara: "Tara",
+  validade: "Validade",
+  dataEmbalagem: "Data de Embalagem",
+  pesoBrutoLiquido: "Indicador B/L (bruto/líquido)",
+  lote: "Lote",
+  textoExtra5: "Texto Extra 5",
+  textoExtra7: "Texto Extra 7",
   codigoBarras: "Código de Barras",
   texto: "Texto Livre",
   imagem: "Imagem/Logo",
@@ -28,6 +54,11 @@ const TIPO_LABEL: Record<ElementoTipo, string> = {
   selos: "Selos (Alto em...)",
   ingredientes: "Ingredientes",
 };
+
+/** Peso/tara não existem no cadastro (vêm da pesagem na balança) — o preview
+ * mostra um valor ilustrativo só pra dar noção de espaço ocupado. */
+const PESO_EXEMPLO = "0,190 kg";
+const TARA_EXEMPLO = "0,000 kg";
 
 const UNIDADE_LABEL: Record<string, string> = {
   KCAL_KJ: "kcal",
@@ -47,12 +78,19 @@ function getElementos(layout: Record<string, unknown> | null | undefined): Layou
   return el ?? [];
 }
 
-function formatPreco(preco: number): string {
-  return preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
 function formatPrecoValor(preco: number): string {
   return preco.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** A balança calcula a validade na hora da pesagem (hoje + `validadeDias`);
+ * aqui é só a projeção pro preview, no mesmo formato dd-mm-aa que ela imprime. */
+function formatDataMaisDias(dias: number | null | undefined): string {
+  const d = new Date();
+  d.setDate(d.getDate() + (dias ?? 0));
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const aa = String(d.getFullYear()).slice(-2);
+  return `${dd}-${mm}-${aa}`;
 }
 
 interface EtiquetaPreviewProps {
@@ -214,6 +252,47 @@ export function EtiquetaPreview({
                             {formatPrecoValor(product.preco)}
                           </div>
                         </div>
+                      )}
+                      {el.tipo === "precoUnitario" && (
+                        <span className="w-full text-[9px] text-slate-900 text-left px-0.5 whitespace-nowrap">
+                          Preço/{product.unidadeVenda === "PECA" ? "pç" : "kg"}: R$ {formatPrecoValor(product.preco)}
+                        </span>
+                      )}
+                      {el.tipo === "pesoBrutoLiquido" && (
+                        <span className="w-full text-[9px] text-slate-900 text-center">B</span>
+                      )}
+                      {el.tipo === "peso" && (
+                        <span className="w-full text-[9px] text-slate-900 text-left px-0.5 whitespace-nowrap">
+                          Peso: {PESO_EXEMPLO}
+                        </span>
+                      )}
+                      {el.tipo === "tara" && (
+                        <span className="w-full text-[9px] text-slate-900 text-left px-0.5 whitespace-nowrap">
+                          Tara: {TARA_EXEMPLO}
+                        </span>
+                      )}
+                      {el.tipo === "validade" && (
+                        <span className="w-full text-[9px] text-slate-900 text-left px-0.5 whitespace-nowrap">
+                          Validade: {formatDataMaisDias(product.validadeDias)}
+                        </span>
+                      )}
+                      {el.tipo === "dataEmbalagem" && (
+                        <span className="w-full text-[9px] text-slate-900 text-left px-0.5 whitespace-nowrap">
+                          Data: {formatDataMaisDias(0)}
+                        </span>
+                      )}
+                      {el.tipo === "lote" && (
+                        <span className="w-full text-[9px] text-slate-900 text-left px-0.5">Lote: —</span>
+                      )}
+                      {el.tipo === "textoExtra5" && (
+                        <span className="w-full text-[9px] text-slate-700 text-left px-0.5">
+                          {product.textoExtra5 ?? TIPO_LABEL.textoExtra5}
+                        </span>
+                      )}
+                      {el.tipo === "textoExtra7" && (
+                        <span className="w-full text-[9px] text-slate-700 text-left px-0.5">
+                          {product.textoExtra7 ?? TIPO_LABEL.textoExtra7}
+                        </span>
                       )}
                       {el.tipo === "texto" && <span className="text-[10px] text-slate-700">{el.texto}</span>}
                       {el.tipo === "imagem" &&
