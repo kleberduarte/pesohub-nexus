@@ -1,6 +1,19 @@
 import { prisma } from "./prisma";
 import { AgentBridge, SyncCommandPayload } from "./agent-bridge";
 
+/** Mesmo formato salvo pelo editor visual do frontend (`FormatoImpressaoPanel.tsx`):
+ * `layout: { elementos: [{ id, tipo, x, y, largura, altura, texto? }, ...] }`. */
+function getLayoutElementos(
+  layout: unknown,
+): { x: number; y: number; largura: number; altura: number }[] {
+  const elementos = (layout as { elementos?: unknown[] } | null)?.elementos;
+  if (!Array.isArray(elementos)) return [];
+  return elementos.map((el) => {
+    const e = el as { x?: number; y?: number; largura?: number; altura?: number };
+    return { x: e.x ?? 0, y: e.y ?? 0, largura: e.largura ?? 0, altura: e.altura ?? 0 };
+  });
+}
+
 export interface SyncJobData {
   deviceId: string;
   tipo: "TOTAL" | "INCREMENTAL";
@@ -19,19 +32,20 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
       );
     }
 
-    const tabelaNutricionalInclude = {
+    const productInclude = {
       tabelaNutricional: { include: { itens: { orderBy: { ordem: "asc" as const } } } },
+      formatoImpressao: true,
     };
 
     const products =
       tipo === "TOTAL"
         ? await prisma.product.findMany({
             where: { ativo: true, lojaId: device.lojaId },
-            include: tabelaNutricionalInclude,
+            include: productInclude,
           })
         : await prisma.product.findMany({
             where: { id: { in: productIds ?? [] }, lojaId: device.lojaId },
-            include: tabelaNutricionalInclude,
+            include: productInclude,
           });
 
     const syncJob = await prisma.syncJob.create({
@@ -65,6 +79,20 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
         desconto: p.desconto != null ? Number(p.desconto) : undefined,
         textoExtra1: p.textoExtra1 ?? undefined,
         validadeDias: p.validadeDias ?? undefined,
+        formatoImpressao: p.formatoImpressao
+          ? {
+              numero: p.formatoImpressao.numero,
+              nome: p.formatoImpressao.nome,
+              larguraMm: p.formatoImpressao.larguraMm,
+              alturaMm: p.formatoImpressao.alturaMm,
+              elementos: getLayoutElementos(p.formatoImpressao.layout).map((el) => ({
+                x: el.x,
+                y: el.y,
+                largura: el.largura,
+                altura: el.altura,
+              })),
+            }
+          : undefined,
         tabelaNutricional: p.tabelaNutricional
           ? {
               numero: p.tabelaNutricional.numero,

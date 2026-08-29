@@ -21,6 +21,23 @@ export interface TabelaNutricionalPayload {
   itens: TabelaNutricionalItemPayload[];
 }
 
+export interface FormatoImpressaoElementoPayload {
+  x: number;
+  y: number;
+  largura: number;
+  altura: number;
+}
+
+export interface FormatoImpressaoPayload {
+  /** Mesmo esquema de "número" que TabelaNutricional usa — vira o `LabelID`
+   * do wire (comando `DWL/LAB`), referenciado pelo vínculo idx8 do PLU. */
+  numero: number;
+  nome: string;
+  larguraMm: number;
+  alturaMm: number;
+  elementos: FormatoImpressaoElementoPayload[];
+}
+
 export interface ScaleSyncPayload {
   codigo: string;
   codigoBarras: string;
@@ -31,6 +48,7 @@ export interface ScaleSyncPayload {
   desconto?: number;
   textoExtra1?: string;
   validadeDias?: number;
+  formatoImpressao?: FormatoImpressaoPayload;
   tabelaNutricional?: TabelaNutricionalPayload;
 }
 
@@ -88,6 +106,11 @@ const FIELD_PRODUCT_CODE = 2;
 const FIELD_EAN13 = 3;
 const FIELD_PRICE = 5;
 const FIELD_TARA = 7;
+/** `LabelID1` no código-fonte decompilado do Ramuza.exe — vínculo com o
+ * formato de etiqueta (mesmo namespace de "número" que FormatoImpressao usa
+ * no PesoHub). Não confirmado ainda em hardware físico — ver
+ * [[project_ramuza_full_field_map_2026_08_28]] antes de assumir certo. */
+const FIELD_VINCULO_FORMATO_IMPRESSAO = 8;
 const FIELD_NAME = 15;
 const FIELD_TEXTO_EXTRA_1 = 16;
 const FIELD_VALIDADE_DIAS = 32;
@@ -254,11 +277,68 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   if (product.desconto != null) fields[FIELD_DESCONTO] = encodePrice(product.desconto);
   if (product.textoExtra1 != null) fields[FIELD_TEXTO_EXTRA_1] = sanitizeField(product.textoExtra1);
   if (product.validadeDias != null) fields[FIELD_VALIDADE_DIAS] = String(Math.round(product.validadeDias));
+  if (product.formatoImpressao != null) {
+    fields[FIELD_VINCULO_FORMATO_IMPRESSAO] = String(product.formatoImpressao.numero);
+  }
   if (product.tabelaNutricional != null) {
     fields[FIELD_VINCULO_TABELA_NUTRICIONAL] = String(product.tabelaNutricional.numero);
   }
   fields[FIELD_NAME] = sanitizeField(product.nome);
   return fields.join("\t") + "\r\n";
+}
+
+/**
+ * Monta o bloco `LAB\t...` (cabeçalho do formato de etiqueta) + um `LAS\t...`
+ * por elemento posicionado + `LAE\t` de fechamento, achado em
+ * `NetForm.cs`/`UploadECS()` (bloco `checkPara.blabel`, ramo `iScaleType_TM`
+ * — que é exatamente o tipo do nosso hardware, Ramuza Atena II TM-xA) do
+ * código-fonte decompilado. Ver [[project_ramuza_full_field_map_2026_08_28]].
+ *
+ * NÃO CONFIRMADO EM HARDWARE FÍSICO ainda — os 32 campos de texto fixo
+ * (Text1-32) do cabeçalho LAB não têm equivalente no PesoHub hoje (ficam
+ * vazios), e os campos Flag1-3/Angle/Align/Font de cada elemento (LAS) não
+ * existem no editor visual do PesoHub ainda (ver task de Angle/Align/Font
+ * pendente) — usados aqui com valores neutros (0) até confirmar o que cada
+ * um faz. `Print=1` (assume "sempre imprime"). O fator de conversão de
+ * mm pra unidade do wire também é uma suposição (1:1) — testar contra a
+ * balança antes de confiar cegamente na posição/tamanho impresso.
+ */
+function buildLabelBlock(formato: FormatoImpressaoPayload): string {
+  const emptyTexts = new Array(32).fill("");
+  const header =
+    [
+      "LAB",
+      String(formato.numero),
+      sanitizeField(formato.nome),
+      "0", // Sort
+      String(Math.round(formato.larguraMm)),
+      String(Math.round(formato.alturaMm)),
+      ...emptyTexts.slice(0, 16), // Text1-16
+      "0", // Version
+      ...emptyTexts.slice(16, 32), // Text17-32
+    ].join("\t") + "\t\r\n";
+
+  const elementos = formato.elementos
+    .map((el, i) =>
+      [
+        "LAS",
+        String(i + 1), // SubID
+        "0", // Flag1
+        "0", // Flag2
+        "0", // Flag3
+        "1", // Print
+        "0", // Angle
+        "0", // Align
+        "0", // Font
+        String(Math.round(el.x)),
+        String(Math.round(el.y)),
+        String(Math.round(el.largura)),
+        String(Math.round(el.altura)),
+      ].join("\t") + "\t\r\n",
+    )
+    .join("");
+
+  return header + elementos + "LAE\t\r\n";
 }
 
 /**
@@ -286,11 +366,26 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
       ? `DWL\tNU3\t\r\n` + [...tabelasNutricionais.values()].map(buildNu3Row).join("") + `END\tNU3\t\r\n`
       : "";
 
+  // Mesmo dedupe do NU3: vários produtos podem compartilhar o mesmo formato
+  // de etiqueta.
+  const formatosImpressao = new Map<number, FormatoImpressaoPayload>();
+  for (const p of products) {
+    if (p.formatoImpressao != null) {
+      formatosImpressao.set(p.formatoImpressao.numero, p.formatoImpressao);
+    }
+  }
+
+  const labBlock =
+    formatosImpressao.size > 0
+      ? `DWL\tLAB\t\r\n` + [...formatosImpressao.values()].map(buildLabelBlock).join("") + `END\tLAB\t\r\n`
+      : "";
+
   return (
     `DWL\tPLU\t\r\n` +
     products.map((p, i) => buildPluRow(p, pluNumbers[i])).join("") +
     `END\tPLU\t\r\n` +
     nu3Block +
+    labBlock +
     `UPL\tTIM\t\r\n`
   );
 }
