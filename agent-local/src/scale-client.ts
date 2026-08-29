@@ -47,6 +47,12 @@ export interface ScaleSyncPayload {
   tara?: number;
   desconto?: number;
   textoExtra1?: string;
+  textoExtra2?: string;
+  textoExtra3?: string;
+  textoExtra4?: string;
+  textoExtra5?: string;
+  textoExtra6?: string;
+  textoExtra7?: string;
   validadeDias?: number;
   formatoImpressao?: FormatoImpressaoPayload;
   tabelaNutricional?: TabelaNutricionalPayload;
@@ -112,7 +118,19 @@ const FIELD_TARA = 7;
  * [[project_ramuza_full_field_map_2026_08_28]] antes de assumir certo. */
 const FIELD_VINCULO_FORMATO_IMPRESSAO = 8;
 const FIELD_NAME = 15;
+/** Text1-7 no código-fonte decompilado — idx16-22 do PLU. Confirmado por
+ * `RDS.DataSet_GetPLUString`/`DataSet_GetPLURowFromTMS`, ver
+ * [[project_ramuza_full_field_map_2026_08_28]]. Só idx16 (Text1) tinha sido
+ * confirmado empiricamente antes; idx17-22 (Text2-7) nunca tinham sido
+ * wired — não confundir com os "candidatos incertos" de captura antiga
+ * mencionados acima, esse mapeamento vem direto do código-fonte. */
 const FIELD_TEXTO_EXTRA_1 = 16;
+const FIELD_TEXTO_EXTRA_2 = 17;
+const FIELD_TEXTO_EXTRA_3 = 18;
+const FIELD_TEXTO_EXTRA_4 = 19;
+const FIELD_TEXTO_EXTRA_5 = 20;
+const FIELD_TEXTO_EXTRA_6 = 21;
+const FIELD_TEXTO_EXTRA_7 = 22;
 const FIELD_VALIDADE_DIAS = 32;
 const FIELD_DESCONTO = 56;
 const FIELD_VINCULO_TABELA_NUTRICIONAL = 59;
@@ -276,6 +294,12 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   if (product.tara != null) fields[FIELD_TARA] = encodeTara(product.tara);
   if (product.desconto != null) fields[FIELD_DESCONTO] = encodePrice(product.desconto);
   if (product.textoExtra1 != null) fields[FIELD_TEXTO_EXTRA_1] = sanitizeField(product.textoExtra1);
+  if (product.textoExtra2 != null) fields[FIELD_TEXTO_EXTRA_2] = sanitizeField(product.textoExtra2);
+  if (product.textoExtra3 != null) fields[FIELD_TEXTO_EXTRA_3] = sanitizeField(product.textoExtra3);
+  if (product.textoExtra4 != null) fields[FIELD_TEXTO_EXTRA_4] = sanitizeField(product.textoExtra4);
+  if (product.textoExtra5 != null) fields[FIELD_TEXTO_EXTRA_5] = sanitizeField(product.textoExtra5);
+  if (product.textoExtra6 != null) fields[FIELD_TEXTO_EXTRA_6] = sanitizeField(product.textoExtra6);
+  if (product.textoExtra7 != null) fields[FIELD_TEXTO_EXTRA_7] = sanitizeField(product.textoExtra7);
   if (product.validadeDias != null) fields[FIELD_VALIDADE_DIAS] = String(Math.round(product.validadeDias));
   if (product.formatoImpressao != null) {
     fields[FIELD_VINCULO_FORMATO_IMPRESSAO] = String(product.formatoImpressao.numero);

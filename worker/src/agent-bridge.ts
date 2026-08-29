@@ -51,6 +51,12 @@ export interface SyncCommandPayload {
     tara?: number;
     desconto?: number;
     textoExtra1?: string;
+    textoExtra2?: string;
+    textoExtra3?: string;
+    textoExtra4?: string;
+    textoExtra5?: string;
+    textoExtra6?: string;
+    textoExtra7?: string;
     validadeDias?: number;
     formatoImpressao?: FormatoImpressaoPayload;
     tabelaNutricional?: TabelaNutricionalPayload;

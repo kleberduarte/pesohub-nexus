@@ -78,6 +78,12 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
         tara: p.tara != null ? Number(p.tara) : undefined,
         desconto: p.desconto != null ? Number(p.desconto) : undefined,
         textoExtra1: p.textoExtra1 ?? undefined,
+        textoExtra2: p.textoExtra2 ?? undefined,
+        textoExtra3: p.textoExtra3 ?? undefined,
+        textoExtra4: p.textoExtra4 ?? undefined,
+        textoExtra5: p.textoExtra5 ?? undefined,
+        textoExtra6: p.textoExtra6 ?? undefined,
+        textoExtra7: p.textoExtra7 ?? undefined,
         validadeDias: p.validadeDias ?? undefined,
         formatoImpressao: p.formatoImpressao
           ? {
