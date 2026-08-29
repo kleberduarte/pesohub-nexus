@@ -80,3 +80,29 @@ describe("ProductsController.removeAll", () => {
     expect(auditLog.record).toHaveBeenCalledWith(req, "products.delete_all", { count: 3 });
   });
 });
+
+/**
+ * Cliente sem nenhuma Loja cadastrada ainda tem `lojaId` null na sessão
+ * (ver AuthService.resolveEffectiveLoja). Antes disso, `findAll(null)` batia
+ * direto no Prisma e estourava "Argument lojaId must not be null" (500 cru)
+ * em vez de responder vazio / uma mensagem clara.
+ */
+describe("ProductsController com sessão sem Loja (lojaId null)", () => {
+  it("findAll responde lista vazia em vez de chamar o repositório com null", async () => {
+    const products = { findAll: jest.fn() };
+    const controller = new ProductsController({} as any, {} as any, products as any, {} as any);
+    const req = { user: { clienteId: "cliente-a", lojaId: null, sub: "user-1" } } as any;
+
+    const result = await controller.findAll(req);
+
+    expect(result).toEqual([]);
+    expect(products.findAll).not.toHaveBeenCalled();
+  });
+
+  it("create lança BadRequestException em vez de deixar o Prisma quebrar", () => {
+    const controller = new ProductsController({} as any, {} as any, {} as any, {} as any);
+    const req = { user: { clienteId: "cliente-a", lojaId: null, sub: "user-1" } } as any;
+
+    expect(() => controller.create({} as any, req)).toThrow("Nenhuma loja associada à sua sessão");
+  });
+});

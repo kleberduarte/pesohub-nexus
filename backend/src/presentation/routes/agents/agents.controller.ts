@@ -21,8 +21,10 @@ export class AgentsController {
 
   @Get()
   findAll(@Req() req: Request) {
+    const lojaId = this.lojaId(req);
+    if (!lojaId) return [];
     return this.prisma.agent.findMany({
-      where: { lojaId: this.lojaId(req) },
+      where: { lojaId },
       select: {
         id: true,
         lojaId: true,
@@ -47,7 +49,7 @@ export class AgentsController {
     return (req as unknown as { user: { clienteId: string } }).user.clienteId;
   }
 
-  private lojaId(req: Request): string {
-    return (req as unknown as { user: { lojaId: string } }).user.lojaId;
+  private lojaId(req: Request): string | null {
+    return (req as unknown as { user: { lojaId: string | null } }).user.lojaId;
   }
 }
