@@ -27,6 +27,9 @@ export interface FormatoImpressaoElementoPayload {
   y: number;
   largura: number;
   altura: number;
+  angulo?: number;
+  alinhamento?: number;
+  fonte?: number;
 }
 
 export interface FormatoImpressaoPayload {

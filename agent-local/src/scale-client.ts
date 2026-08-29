@@ -26,6 +26,11 @@ export interface FormatoImpressaoElementoPayload {
   y: number;
   largura: number;
   altura: number;
+  /** Angle/Align/Font do wire (`LabelItem`) — ver ressalva de mapeamento
+   * ainda não confirmado visualmente em `scale-client.ts` (buildLabelBlock). */
+  angulo?: number;
+  alinhamento?: number;
+  fonte?: number;
 }
 
 export interface FormatoImpressaoPayload {
@@ -348,12 +353,18 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
  *
  * NÃO CONFIRMADO EM HARDWARE FÍSICO ainda — os 32 campos de texto fixo
  * (Text1-32) do cabeçalho LAB não têm equivalente no PesoHub hoje (ficam
- * vazios), e os campos Flag1-3/Angle/Align/Font de cada elemento (LAS) não
- * existem no editor visual do PesoHub ainda (ver task de Angle/Align/Font
- * pendente) — usados aqui com valores neutros (0) até confirmar o que cada
- * um faz. `Print=1` (assume "sempre imprime"). O fator de conversão de
- * mm pra unidade do wire também é uma suposição (1:1) — testar contra a
- * balança antes de confiar cegamente na posição/tamanho impresso.
+ * vazios), e os campos Flag1-3 de cada elemento (LAS) continuam com valor
+ * neutro (0) até descobrir o que fazem. `Print=1` (assume "sempre imprime").
+ * O fator de conversão de mm pra unidade do wire também é uma suposição
+ * (1:1) — testar contra a balança antes de confiar cegamente na
+ * posição/tamanho impresso.
+ *
+ * Angle/Align/Font (2026-08-29): write→readback confirmado no protocolo
+ * (`probe-lab-angle-align-font.ts`), mas o MAPEAMENTO em si (que valor de
+ * Angle corresponde a qual rotação visual, etc.) é uma suposição —
+ * `angulo` em graus (0/90/180/270) vira índice de giro de 90° (0-3),
+ * `alinhamento`/`fonte` são passados como inteiro cru. Nunca foi impresso
+ * fisicamente numa etiqueta pra confirmar o efeito visual real.
  */
 function buildLabelBlock(formato: FormatoImpressaoPayload): string {
   const emptyTexts = new Array(32).fill("");
@@ -379,9 +390,9 @@ function buildLabelBlock(formato: FormatoImpressaoPayload): string {
         "0", // Flag2
         "0", // Flag3
         "1", // Print
-        "0", // Angle
-        "0", // Align
-        "0", // Font
+        String(Math.round(((el.angulo ?? 0) / 90) % 4)), // Angle (índice de giro de 90°)
+        String(el.alinhamento ?? 0), // Align
+        String(el.fonte ?? 0), // Font
         String(Math.round(el.x)),
         String(Math.round(el.y)),
         String(Math.round(el.largura)),

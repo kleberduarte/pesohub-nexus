@@ -5,12 +5,28 @@ import { AgentBridge, SyncCommandPayload } from "./agent-bridge";
  * `layout: { elementos: [{ id, tipo, x, y, largura, altura, texto? }, ...] }`. */
 function getLayoutElementos(
   layout: unknown,
-): { x: number; y: number; largura: number; altura: number }[] {
+): { x: number; y: number; largura: number; altura: number; angulo?: number; alinhamento?: number; fonte?: number }[] {
   const elementos = (layout as { elementos?: unknown[] } | null)?.elementos;
   if (!Array.isArray(elementos)) return [];
   return elementos.map((el) => {
-    const e = el as { x?: number; y?: number; largura?: number; altura?: number };
-    return { x: e.x ?? 0, y: e.y ?? 0, largura: e.largura ?? 0, altura: e.altura ?? 0 };
+    const e = el as {
+      x?: number;
+      y?: number;
+      largura?: number;
+      altura?: number;
+      angulo?: number;
+      alinhamento?: number;
+      fonte?: number;
+    };
+    return {
+      x: e.x ?? 0,
+      y: e.y ?? 0,
+      largura: e.largura ?? 0,
+      altura: e.altura ?? 0,
+      angulo: e.angulo,
+      alinhamento: e.alinhamento,
+      fonte: e.fonte,
+    };
   });
 }
 
@@ -99,6 +115,9 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
                 y: el.y,
                 largura: el.largura,
                 altura: el.altura,
+                angulo: el.angulo,
+                alinhamento: el.alinhamento,
+                fonte: el.fonte,
               })),
             }
           : undefined,
