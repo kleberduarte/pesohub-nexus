@@ -3,13 +3,23 @@ import { AgentBridge, SyncCommandPayload } from "./agent-bridge";
 
 /** Mesmo formato salvo pelo editor visual do frontend (`FormatoImpressaoPanel.tsx`):
  * `layout: { elementos: [{ id, tipo, x, y, largura, altura, texto? }, ...] }`. */
-function getLayoutElementos(
-  layout: unknown,
-): { x: number; y: number; largura: number; altura: number; angulo?: number; alinhamento?: number; fonte?: number }[] {
+function getLayoutElementos(layout: unknown): {
+  tipo?: string;
+  texto?: string;
+  x: number;
+  y: number;
+  largura: number;
+  altura: number;
+  angulo?: number;
+  alinhamento?: number;
+  fonte?: number;
+}[] {
   const elementos = (layout as { elementos?: unknown[] } | null)?.elementos;
   if (!Array.isArray(elementos)) return [];
   return elementos.map((el) => {
     const e = el as {
+      tipo?: string;
+      texto?: string;
       x?: number;
       y?: number;
       largura?: number;
@@ -19,6 +29,8 @@ function getLayoutElementos(
       fonte?: number;
     };
     return {
+      tipo: e.tipo,
+      texto: e.texto,
       x: e.x ?? 0,
       y: e.y ?? 0,
       largura: e.largura ?? 0,
@@ -114,6 +126,8 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
               larguraMm: p.formatoImpressao.larguraMm,
               alturaMm: p.formatoImpressao.alturaMm,
               elementos: getLayoutElementos(p.formatoImpressao.layout).map((el) => ({
+                tipo: el.tipo,
+                texto: el.texto,
                 x: el.x,
                 y: el.y,
                 largura: el.largura,
@@ -130,6 +144,8 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
               nome: p.tabelaNutricional.nome,
               porcao: p.tabelaNutricional.porcao ?? undefined,
               porcoesPorEmbalagem: p.tabelaNutricional.porcoesPorEmbalagem ?? undefined,
+              ingredientes: p.tabelaNutricional.ingredientes ?? undefined,
+              selos: p.tabelaNutricional.selos,
               itens: p.tabelaNutricional.itens.map((it) => ({
                 ordem: it.ordem,
                 valor: Number(it.valor),

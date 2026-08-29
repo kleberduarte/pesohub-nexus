@@ -18,10 +18,24 @@ export interface TabelaNutricionalPayload {
   nome: string;
   porcao?: string;
   porcoesPorEmbalagem?: number;
+  /** Vai no campo de texto livre do próprio NU3 (ver `NU3_FIELD_INGREDIENTES`). */
+  ingredientes?: string;
+  /** Selos de advertência ("ALTO EM açúcar", ...). Na balança não existe um
+   * cadastro de "selo": o equivalente nativo é o bloco `IR2` ("Alérgicos"),
+   * que é um registro de advertência com Nome + Informação, referenciado
+   * pelo idx61 do PLU. Ver `buildAlergicoRow`. */
+  selos?: string[];
   itens: TabelaNutricionalItemPayload[];
 }
 
 export interface FormatoImpressaoElementoPayload {
+  /** Tipo do elemento no editor visual (`nome`/`preco`/`codigoBarras`/etc,
+   * ver `ElementoTipo` em `EtiquetaPreview.tsx`) — decide a tripla
+   * Flag1/Flag2/Flag3 do wire, ver `FLAG_POR_TIPO`. */
+  tipo?: string;
+  /** Conteúdo dos elementos `tipo: "texto"` — vira um dos 32 textos
+   * constantes do cabeçalho LAB (ver `buildLabelBlock`). */
+  texto?: string;
   x: number;
   y: number;
   largura: number;
@@ -178,6 +192,23 @@ const FIELD_TEXTO_EXTRA_4 = 19;
 const FIELD_TEXTO_EXTRA_5 = 20;
 const FIELD_TEXTO_EXTRA_6 = 21;
 const FIELD_TEXTO_EXTRA_7 = 22;
+/**
+ * Flags de "imprimir esta data na etiqueta" — sem elas a balança até guarda
+ * o valor, mas nunca imprime. Nomes oficiais vindos de `pw_PLUIE_Display`
+ * (`Lang.xml` do software da Ramuza), que documenta o PLU campo a campo:
+ * idx23 "Imprimir data de venda", idx25 "Imprimir data de empacotamento",
+ * idx27 "Data de validade: 0 p/ não imprimir, 1 p/ imprimir".
+ *
+ * Era exatamente por isso que a validade não saía na etiqueta mesmo com
+ * `validadeDias` gravado corretamente em idx32 (card #30).
+ */
+const FIELD_IMPRIMIR_DATA_VENDA = 23;
+const FIELD_IMPRIMIR_DATA_EMBALAGEM = 25;
+const FIELD_IMPRIMIR_VALIDADE = 27;
+/** idx32 — "Data de validade: (em dias)" conforme `pw_PLUIE_Display`. Isto
+ * encerra a antiga dúvida de que este índice seria `PC_UD` (Price Change —
+ * Until Date): a documentação oficial do próprio software confirma que é a
+ * validade em dias, como já vínhamos usando. */
 const FIELD_VALIDADE_DIAS = 32;
 const FIELD_DESCONTO = 56;
 /** TaxType/Tax no código-fonte decompilado — idx57/58 do PLU. Semântica achada
@@ -190,6 +221,11 @@ const FIELD_DESCONTO = 56;
 const FIELD_TAX_TYPE = 57;
 const FIELD_TAX = 58;
 const FIELD_VINCULO_TABELA_NUTRICIONAL = 59;
+/** idx60/idx61 — "Fornecedor" e "Alérgicos" conforme `pw_PLUIE_Display`
+ * (`Lang.xml` oficial). Apontam pros blocos `SU2` e `IR2`. Só o de alérgico
+ * é usado hoje, pros selos "ALTO EM ..." (ver `buildAlergicoRow`). */
+const FIELD_VINCULO_FORNECEDOR = 60;
+const FIELD_VINCULO_ALERGICO = 61;
 
 /**
  * Template de um registro NU3 (tabela nutricional) capturado da balança
@@ -220,6 +256,11 @@ const NU3_FIELD_TEMPLATE = [
 ];
 const NU3_FIELD_INDEX = 1;
 const NU3_FIELD_NOME = 2;
+/** Campo de texto livre do NU3, logo depois do nome. Confirmado vazio em
+ * todas as tabelas lidas do hardware via `UPL/NU3`, e o `Custom.xml` do
+ * software oficial lista "Ingredientes" como parte do bloco NU3 (não é um
+ * cadastro separado como Fornecedor/Alérgicos). */
+const NU3_FIELD_INGREDIENTES = 3;
 const NU3_FIELD_PORCAO_QTD = 4;
 const NU3_FIELD_PORCAO_UNIDADE = 5;
 const NU3_FIELD_PORCOES_POR_EMBALAGEM = 6;
@@ -323,6 +364,7 @@ export function buildNu3Row(tabela: TabelaNutricionalPayload): string {
   if (tabela.porcoesPorEmbalagem != null) {
     fields[NU3_FIELD_PORCOES_POR_EMBALAGEM] = String(Math.round(tabela.porcoesPorEmbalagem));
   }
+  if (tabela.ingredientes) fields[NU3_FIELD_INGREDIENTES] = sanitizeField(tabela.ingredientes);
 
   for (const item of tabela.itens) {
     if (item.ordem >= 1 && item.ordem <= NU3_NUTRIENTES_PADRAO) {
@@ -358,10 +400,26 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   if (product.textoExtra2 != null) fields[FIELD_TEXTO_EXTRA_2] = sanitizeField(product.textoExtra2);
   if (product.textoExtra3 != null) fields[FIELD_TEXTO_EXTRA_3] = sanitizeField(product.textoExtra3);
   if (product.textoExtra4 != null) fields[FIELD_TEXTO_EXTRA_4] = sanitizeField(product.textoExtra4);
+  // Ingredientes só chegam na etiqueta pelo "Texto extra 4" (idx19) — é o que
+  // o template oficial usa e o único caminho confirmado imprimindo. O campo
+  // `Ingredientes` do NU3 persiste mas nenhum elemento o renderiza. Não
+  // sobrescreve um textoExtra4 que o usuário tenha preenchido à mão.
+  if (product.textoExtra4 == null && product.tabelaNutricional?.ingredientes) {
+    fields[FIELD_TEXTO_EXTRA_4] = sanitizeField(`Ingredientes: ${product.tabelaNutricional.ingredientes}`);
+  }
   if (product.textoExtra5 != null) fields[FIELD_TEXTO_EXTRA_5] = sanitizeField(product.textoExtra5);
   if (product.textoExtra6 != null) fields[FIELD_TEXTO_EXTRA_6] = sanitizeField(product.textoExtra6);
   if (product.textoExtra7 != null) fields[FIELD_TEXTO_EXTRA_7] = sanitizeField(product.textoExtra7);
-  if (product.validadeDias != null) fields[FIELD_VALIDADE_DIAS] = String(Math.round(product.validadeDias));
+  if (product.validadeDias != null) {
+    fields[FIELD_VALIDADE_DIAS] = String(Math.round(product.validadeDias));
+    // Sem este flag a balança guarda os dias mas não imprime a data.
+    fields[FIELD_IMPRIMIR_VALIDADE] = "1";
+  }
+  // Data de venda/embalagem só são impressas se o layout tiver a caixa
+  // correspondente — ligar o flag aqui é inofensivo quando não tem, e evita
+  // que o elemento saia em branco quando tem.
+  fields[FIELD_IMPRIMIR_DATA_VENDA] = "1";
+  fields[FIELD_IMPRIMIR_DATA_EMBALAGEM] = "1";
   if (product.taxType != null && product.taxType >= 1 && product.taxType <= 3) {
     fields[FIELD_TAX_TYPE] = String(product.taxType);
     fields[FIELD_TAX] = String(Math.round((product.taxaImposto ?? 0) * 10000));
@@ -371,6 +429,10 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   }
   if (product.tabelaNutricional != null) {
     fields[FIELD_VINCULO_TABELA_NUTRICIONAL] = String(product.tabelaNutricional.numero);
+    // O registro de Alérgico reusa o número da tabela nutricional (ver buildSyncBody).
+    if (product.tabelaNutricional.selos != null && product.tabelaNutricional.selos.length > 0) {
+      fields[FIELD_VINCULO_ALERGICO] = String(product.tabelaNutricional.numero);
+    }
   }
   fields[FIELD_NAME] = sanitizeField(product.nome);
   return fields.join("\t") + "\r\n";
@@ -398,8 +460,126 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
  * `alinhamento`/`fonte` são passados como inteiro cru. Nunca foi impresso
  * fisicamente numa etiqueta pra confirmar o efeito visual real.
  */
+/**
+ * Mapa `tipo` do elemento do editor visual → tripla `Flag1/Flag2/Flag3` do
+ * wire (`LabelItem`), que é o que diz pra balança QUAL dado cada caixa
+ * posicionada deve imprimir. Sem isso a etiqueta sai em branco (era o bug
+ * do card #30 — tudo ia hardcoded em 0).
+ *
+ * FONTE DEFINITIVA (não é mais inferência): `LabelItem.xml` do software
+ * oficial — `C:\Program Files (x86)\Ramuza\TM-xA V3.15A\Config\pt-BR\`.
+ * É o dicionário que o próprio Ramuza.exe carrega (`Program.MergeConfig`)
+ * pra montar os combos do editor de etiqueta, com os nomes em português de
+ * cada combinação. Estrutura confirmada em `LabelForm.cs`/`GetDisplay()`:
+ *
+ *   Flag1=0 Código de barras   (Flag2: 0=legível, 1=não legível)
+ *   Flag1=1 Item               → **Flag3** escolhe o campo do produto:
+ *                                 0=Nome, 1=Peso/Peças, 2=Tara,
+ *                                 3=Primeiro preço unit., 4=Preço unit. a
+ *                                 pagar, 5=Preço, 6=Número do PLU,
+ *                                 10=Código do produto, 11=Data impressão,
+ *                                 15=Data de validade, 23=Peso bruto,
+ *                                 25=Preço unit., 30=Número e nome do PLU
+ *   Flag1=2 Informação venda   → **Flag2**: 0=Nome da loja, 7=Peso,
+ *                                 8=Preço total, 12=Unid. peso,
+ *                                 16=Unid. dinheiro, 17-24=Texto extra 1-8
+ *   Flag1=3 Textos constantes  → Flag2 = índice do Text1-32 do cabeçalho LAB
+ *   Flag1=4 Borda / Flag1=5 Divisória / Flag1=6 Imagem
+ *   Flag1=7 Impressão customizada → Flag2: 0=Tabela Nutricional,
+ *                                 1=Fornecedor, 2=Alérgicos, 3=Outras
+ *                                 (Flag3 sub-seleciona: 3/4="Texto longo")
+ *
+ * Cruzado com os 36 elementos do template oficial PF-1 lidos do hardware —
+ * bate 1:1 (inclusive o "B" de peso bruto = 7/3/1 "Tare or Not(B/L)").
+ * `nome` e `codigoBarras` já reconfirmados imprimindo fisicamente.
+ * Tipos sem entrada aqui caem em 0/0/0 (comportamento antigo, sem regressão).
+ */
+const FLAG_POR_TIPO: Record<string, { flag1: number; flag2: number; flag3: number }> = {
+  nome: { flag1: 1, flag2: 0, flag3: 0 }, // Item → Nome (confirmado no hardware)
+  codigoBarras: { flag1: 0, flag2: 0, flag3: 0 }, // Código de barras → Código legível (confirmado)
+  preco: { flag1: 2, flag2: 8, flag3: 0 }, // Informação de venda → Preço total (a caixa "Total R$" da etiqueta oficial)
+  precoUnitario: { flag1: 1, flag2: 0, flag3: 4 }, // Item → Preço unit. a pagar ("Preço/kg")
+  peso: { flag1: 1, flag2: 0, flag3: 1 }, // Item → Peso/Peças
+  pesoBrutoLiquido: { flag1: 7, flag2: 3, flag3: 1 }, // Outras → "Tare or Not (B/L)" — o "B" ao lado do peso
+  tara: { flag1: 1, flag2: 0, flag3: 2 }, // Item → Tara
+  // Data e validade: o template oficial "Modelo com tabela 60x120" (LabelID 15,
+  // lido do banco do software) usa os campos de "Impressão customizada →
+  // Outras", NÃO os de "Item" (1/0/13 e 1/0/15). Os de Item existem no
+  // dicionário mas não foram os escolhidos por quem desenhou os modelos de
+  // fábrica — seguimos o que comprovadamente imprime.
+  dataEmbalagem: { flag1: 7, flag2: 3, flag3: 2 }, // Outras → Imprimir date (Date retro)
+  validade: { flag1: 7, flag2: 3, flag3: 3 }, // Outras → Data de validade (Date retro)
+  tabelaNutricional: { flag1: 7, flag2: 0, flag3: 0 }, // Impressão customizada → Tabela Nutricional
+  // Ingredientes: CONFIRMADO no hardware que sai por `1/0/19` ("Texto extra 4"
+  // do PLU), igual ao template oficial — o campo `Ingredientes` do bloco NU3
+  // existe e persiste, mas nenhum elemento de etiqueta o renderiza; testado
+  // `7/3/4` ("Texto longo") e saiu vazio. Por isso `buildPluRow` copia o texto
+  // de ingredientes da tabela nutricional pro idx19 do PLU quando o produto
+  // não usa esse texto extra pra outra coisa.
+  ingredientes: { flag1: 1, flag2: 0, flag3: 19 },
+  // Nem todo texto extra do PLU pode ir pra etiqueta: no dicionário oficial os
+  // Flag3 16/17/18 são "#NULL#" (não existem como elemento), só há "Texto
+  // extra 4" (19), "Texto extra 5" (20), "Lot" (21) e "Texto extra 7" (22).
+  // O 19 é o slot que `ingredientes` usa acima.
+  textoExtra5: { flag1: 1, flag2: 0, flag3: 20 },
+  lote: { flag1: 1, flag2: 0, flag3: 21 },
+  textoExtra7: { flag1: 1, flag2: 0, flag3: 22 },
+  selos: { flag1: 7, flag2: 2, flag3: 2 }, // Alérgicos → Informação (é assim que a balança desenha os selos "ALTO EM")
+  fornecedor: { flag1: 7, flag2: 1, flag3: 2 }, // Fornecedor → Informação (bloco SU2, idx60 do PLU — ainda sem UI)
+};
+
+/**
+ * O cabeçalho `LAB` leva largura/altura em MILÍMETROS, mas cada elemento
+ * (`LAS`) leva Left/Top/Width/Height em OITAVOS de milímetro. Confirmado no
+ * template oficial PF-1 lido do hardware: header diz `58 x 60` e os
+ * elementos vão até Left=424 / Top=480 — exatamente 58×8 e 60×8. Sem esta
+ * conversão tudo sai 8× menor, amontoado e sobreposto no canto superior
+ * esquerdo (foi o que aconteceu no teste de 2026-08-29).
+ */
+const WIRE_UNITS_PER_MM = 8;
+
+/**
+ * Fonte padrão por tipo quando o usuário não escolheu uma no editor (o
+ * campo `fonte` é opcional e vinha como 0, que é pequeno demais pra
+ * destaque). Valores copiados do template oficial PF-1 lido do hardware:
+ * nome e preço total usam 11, textos auxiliares 4-5, tabela nutricional 13.
+ */
+const FONTE_PADRAO_POR_TIPO: Record<string, number> = {
+  nome: 11,
+  preco: 11,
+  precoUnitario: 5,
+  peso: 5,
+  tara: 5,
+  validade: 5,
+  dataEmbalagem: 5,
+  pesoBrutoLiquido: 4,
+  codigoBarras: 1,
+  tabelaNutricional: 8, // font do template oficial LabelID 15 pra caixa da tabela
+  ingredientes: 4,
+  selos: 1, // os selos são desenhados graficamente; o oficial usa font 1
+  fornecedor: 1,
+};
+
+/** Quantos slots de texto constante o cabeçalho `LAB` carrega (Text1-32). */
+const MAX_TEXTOS_CONSTANTES = 32;
+
 function buildLabelBlock(formato: FormatoImpressaoPayload): string {
-  const emptyTexts = new Array(32).fill("");
+  const toWire = (mm: number) => String(Math.round(mm * WIRE_UNITS_PER_MM));
+
+  // Elementos de texto livre viram "Textos constantes" (Flag1=3): o texto em
+  // si mora num dos 32 slots do cabeçalho LAB e o elemento só aponta pro
+  // índice do slot via Flag2. Antes esses 32 slots iam sempre vazios, então
+  // toda legenda ("Data:", "Validade:", ...) saía em branco na impressão.
+  const textos: string[] = new Array(MAX_TEXTOS_CONSTANTES).fill("");
+  const slotPorElemento = new Map<number, number>();
+  formato.elementos.forEach((el, i) => {
+    if (el.tipo !== "texto" || !el.texto) return;
+    const slot = slotPorElemento.size;
+    if (slot >= MAX_TEXTOS_CONSTANTES) return; // além de 32 não há onde guardar
+    textos[slot] = sanitizeField(el.texto);
+    slotPorElemento.set(i, slot);
+  });
+
   const header =
     [
       "LAB",
@@ -408,29 +588,36 @@ function buildLabelBlock(formato: FormatoImpressaoPayload): string {
       "0", // Sort
       String(Math.round(formato.larguraMm)),
       String(Math.round(formato.alturaMm)),
-      ...emptyTexts.slice(0, 16), // Text1-16
+      ...textos.slice(0, 16), // Text1-16
       "0", // Version
-      ...emptyTexts.slice(16, 32), // Text17-32
+      ...textos.slice(16, 32), // Text17-32
     ].join("\t") + "\t\r\n";
 
   const elementos = formato.elementos
-    .map((el, i) =>
-      [
+    .map((el, i) => {
+      const slot = slotPorElemento.get(i);
+      const flag =
+        slot !== undefined
+          ? { flag1: 3, flag2: slot, flag3: 0 } // Textos constantes → Text(slot+1)
+          : el.tipo != null
+            ? FLAG_POR_TIPO[el.tipo]
+            : undefined;
+      return [
         "LAS",
         String(i + 1), // SubID
-        "0", // Flag1
-        "0", // Flag2
-        "0", // Flag3
+        String(flag?.flag1 ?? 0), // Flag1
+        String(flag?.flag2 ?? 0), // Flag2
+        String(flag?.flag3 ?? 0), // Flag3
         "1", // Print
         String(Math.round(((el.angulo ?? 0) / 90) % 4)), // Angle (índice de giro de 90°)
         String(el.alinhamento ?? 0), // Align
-        String(el.fonte ?? 0), // Font
-        String(Math.round(el.x)),
-        String(Math.round(el.y)),
-        String(Math.round(el.largura)),
-        String(Math.round(el.altura)),
-      ].join("\t") + "\t\r\n",
-    )
+        String(el.fonte ?? (el.tipo != null ? (FONTE_PADRAO_POR_TIPO[el.tipo] ?? 4) : 4)), // Font
+        toWire(el.x), // Left (1/8 mm)
+        toWire(el.y), // Top (1/8 mm)
+        toWire(el.largura), // Width (1/8 mm)
+        toWire(el.altura), // Height (1/8 mm)
+      ].join("\t") + "\t\r\n";
+    })
     .join("");
 
   return header + elementos + "LAE\t\r\n";
@@ -451,6 +638,29 @@ function buildLabelBlock(formato: FormatoImpressaoPayload): string {
 function buildClassRow(classe: ClassePayload): string {
   return (
     ["CLS", String(classe.numero), sanitizeField(classe.nome), "0", "0", "0", "0", "0", "0"].join("\t") + "\t\r\n"
+  );
+}
+
+/**
+ * Monta uma linha do bloco `DWL/IR2` ("Alérgicos" no `Custom.xml` oficial):
+ * `Número`, `Nome` (até 40 chars) e `Informação` (até 80). É o registro de
+ * advertência nativo da balança, referenciado pelo idx61 do PLU — usamos ele
+ * pros selos "ALTO EM ..." do PesoHub, que não têm cadastro próprio no
+ * equipamento. O bloco irmão `SU2` ("Fornecedor", idx60) tem o mesmo formato
+ * e ainda não é usado.
+ */
+const IR2_MAX_NOME = 40;
+const IR2_MAX_INFO = 80;
+
+function buildAlergicoRow(numero: number, selos: string[]): string {
+  const texto = selos.join(", ");
+  return (
+    [
+      "IR2",
+      String(numero),
+      sanitizeField(texto).slice(0, IR2_MAX_NOME),
+      sanitizeField(texto).slice(0, IR2_MAX_INFO),
+    ].join("\t") + "\t\r\n"
   );
 }
 
@@ -488,6 +698,21 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
       ? `DWL\tNU3\t\r\n` + [...tabelasNutricionais.values()].map(buildNu3Row).join("") + `END\tNU3\t\r\n`
       : "";
 
+  // Selos ("ALTO EM ...") viram registros de Alérgico (`IR2`), reaproveitando
+  // o número da própria tabela nutricional — é de lá que os selos vêm no
+  // PesoHub, então o vínculo fica 1:1 e sem namespace novo pra gerenciar.
+  const alergicos = new Map<number, string[]>();
+  for (const t of tabelasNutricionais.values()) {
+    if (t.selos != null && t.selos.length > 0) alergicos.set(t.numero, t.selos);
+  }
+
+  const ir2Block =
+    alergicos.size > 0
+      ? `DWL\tIR2\t\r\n` +
+        [...alergicos.entries()].map(([numero, selos]) => buildAlergicoRow(numero, selos)).join("") +
+        `END\tIR2\t\r\n`
+      : "";
+
   // Mesmo dedupe do NU3: vários produtos podem compartilhar o mesmo formato
   // de etiqueta.
   const formatosImpressao = new Map<number, FormatoImpressaoPayload>();
@@ -508,6 +733,7 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
     products.map((p, i) => buildPluRow(p, pluNumbers[i])).join("") +
     `END\tPLU\t\r\n` +
     nu3Block +
+    ir2Block +
     labBlock +
     `UPL\tTIM\t\r\n`
   );
