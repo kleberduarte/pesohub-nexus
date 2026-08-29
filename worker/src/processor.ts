@@ -51,6 +51,7 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
     const productInclude = {
       tabelaNutricional: { include: { itens: { orderBy: { ordem: "asc" as const } } } },
       formatoImpressao: true,
+      subSetor: { include: { setor: true } },
     };
 
     const products =
@@ -105,6 +106,7 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
         textoExtra6: p.textoExtra6 ?? undefined,
         textoExtra7: p.textoExtra7 ?? undefined,
         validadeDias: p.validadeDias ?? undefined,
+        setor: p.subSetor?.setor ? { numero: p.subSetor.setor.numero, nome: p.subSetor.setor.nome } : undefined,
         formatoImpressao: p.formatoImpressao
           ? {
               numero: p.formatoImpressao.numero,

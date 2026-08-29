@@ -22,6 +22,11 @@ export interface TabelaNutricionalPayload {
   itens: TabelaNutricionalItemPayload[];
 }
 
+export interface ClassePayload {
+  numero: number;
+  nome: string;
+}
+
 export interface FormatoImpressaoElementoPayload {
   x: number;
   y: number;
@@ -67,6 +72,7 @@ export interface SyncCommandPayload {
     validadeDias?: number;
     formatoImpressao?: FormatoImpressaoPayload;
     tabelaNutricional?: TabelaNutricionalPayload;
+    setor?: ClassePayload;
   }>;
 }
 

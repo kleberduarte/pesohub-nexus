@@ -33,6 +33,14 @@ export interface FormatoImpressaoElementoPayload {
   fonte?: number;
 }
 
+export interface ClassePayload {
+  /** Mesmo esquema de "número" que TabelaNutricional/FormatoImpressao usam —
+   * vira o `ClassID` do wire (comando `DWL/CLS`), referenciado pelo idx14
+   * do PLU. */
+  numero: number;
+  nome: string;
+}
+
 export interface FormatoImpressaoPayload {
   /** Mesmo esquema de "número" que TabelaNutricional usa — vira o `LabelID`
    * do wire (comando `DWL/LAB`), referenciado pelo vínculo idx8 do PLU. */
@@ -76,6 +84,10 @@ export interface ScaleSyncPayload {
   validadeDias?: number;
   formatoImpressao?: FormatoImpressaoPayload;
   tabelaNutricional?: TabelaNutricionalPayload;
+  /** Setor/departamento do produto — vira `ClassID` (idx14 do PLU). Ausente
+   * mantém o "9" neutro do template (mesmo fallback que o software oficial
+   * usa quando o PLU não referencia nenhuma Class válida, ver `RDS.cs`). */
+  setor?: ClassePayload;
 }
 
 export interface ScaleSyncOutcome {
@@ -135,6 +147,18 @@ const UNIDADE_VENDA_WIRE: Record<"PESO" | "PECA", string> = { PESO: "1", PECA: "
 const FIELD_PRICE = 5;
 const FIELD_COST = 6;
 const FIELD_TARA = 7;
+/** `ClassID` no código-fonte decompilado — idx14 do PLU. Referencia um
+ * cadastro próprio da balança (`Class`, comando `DWL/CLS`), não é um número
+ * solto — template mantém "9" (mesmo fallback do software oficial quando o
+ * PLU não tem Class válida, ver `RDS.cs` `logItemRow.Class = ... ?? 9`). */
+const FIELD_SETOR = 14;
+/** 1-9 são ClassIDs reservados pela balança (Diversos-Peso, Taxa de serviço,
+ * Padrão etc. — confirmado via `UPL/CLS` no hardware físico em 2026-08-29).
+ * O backend já bloqueia `Setor.numero` nessa faixa pra cadastros novos, mas
+ * um Setor criado ANTES dessa validação existir ainda pode ter um número
+ * baixo — nunca escrever/referenciar uma Class nessa faixa a partir daqui,
+ * pra não sobrescrever as classes do sistema. */
+const CLASS_ID_MIN_SAFE = 10;
 /** `LabelID1` no código-fonte decompilado do Ramuza.exe — vínculo com o
  * formato de etiqueta (mesmo namespace de "número" que FormatoImpressao usa
  * no PesoHub). Não confirmado ainda em hardware físico — ver
@@ -326,6 +350,9 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   fields[FIELD_PRICE] = encodePrice(product.preco);
   if (product.custo != null) fields[FIELD_COST] = encodePrice(product.custo);
   if (product.tara != null) fields[FIELD_TARA] = encodeTara(product.tara);
+  if (product.setor != null && product.setor.numero >= CLASS_ID_MIN_SAFE) {
+    fields[FIELD_SETOR] = String(product.setor.numero);
+  }
   if (product.desconto != null) fields[FIELD_DESCONTO] = encodePrice(product.desconto);
   if (product.textoExtra1 != null) fields[FIELD_TEXTO_EXTRA_1] = sanitizeField(product.textoExtra1);
   if (product.textoExtra2 != null) fields[FIELD_TEXTO_EXTRA_2] = sanitizeField(product.textoExtra2);
@@ -410,6 +437,24 @@ function buildLabelBlock(formato: FormatoImpressaoPayload): string {
 }
 
 /**
+ * Monta o bloco `DWL/CLS` (cadastro de Setor como "Class" na balança) —
+ * achado em `RDS.cs`/`NetForm.cs` (`checkPara.bclass`), enviado ANTES do
+ * bloco PLU na sequência real do software oficial (`ClassID` é referenciado
+ * pelo PLU, então precisa existir primeiro). Formato por linha: ClassID,
+ * Name, DeptID, LabelID1, BarT1, BarF1, LabelID2, BarT2, BarF2 — só
+ * ClassID/Name vêm do PesoHub, o resto fica neutro (0, mesmo padrão do
+ * `buildLabelBlock`) até termos demanda de usar Department/etiqueta por
+ * setor. NÃO CONFIRMADO EM HARDWARE FÍSICO ainda a faixa válida de
+ * `ClassID` (mesma classe de limite do `minUserLabelID`/`minUserPLUID`
+ * já vistos — testar antes de confiar cegamente).
+ */
+function buildClassRow(classe: ClassePayload): string {
+  return (
+    ["CLS", String(classe.numero), sanitizeField(classe.nome), "0", "0", "0", "0", "0", "0"].join("\t") + "\t\r\n"
+  );
+}
+
+/**
  * Monta o corpo DWL/PLU(+NU3)/UPL-TIM pra um lote de produtos — extraído de
  * `sendProductsToScale` pra ser reaproveitado tanto pela conexão efêmera
  * (probes, compat) quanto pela conexão persistente (`ScaleConnection`, ver
@@ -417,6 +462,15 @@ function buildLabelBlock(formato: FormatoImpressaoPayload): string {
  */
 export function buildSyncBody(products: ScaleSyncPayload[]): string {
   const pluNumbers = products.map((p, i) => resolvePluNumber(p.codigo, i));
+
+  // Mesmo dedupe do NU3/LAB: vários produtos podem compartilhar o mesmo Setor.
+  const classes = new Map<number, ClassePayload>();
+  for (const p of products) {
+    if (p.setor != null && p.setor.numero >= CLASS_ID_MIN_SAFE) classes.set(p.setor.numero, p.setor);
+  }
+
+  const clsBlock =
+    classes.size > 0 ? `DWL\tCLS\t\r\n` + [...classes.values()].map(buildClassRow).join("") + `END\tCLS\t\r\n` : "";
 
   // Dedupe por número da tabela: vários produtos podem apontar pra mesma
   // tabela nutricional, e a balança só precisa receber cada NU3 uma vez
@@ -449,6 +503,7 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
       : "";
 
   return (
+    clsBlock +
     `DWL\tPLU\t\r\n` +
     products.map((p, i) => buildPluRow(p, pluNumbers[i])).join("") +
     `END\tPLU\t\r\n` +
