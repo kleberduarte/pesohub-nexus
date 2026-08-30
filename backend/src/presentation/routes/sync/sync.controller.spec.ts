@@ -11,7 +11,19 @@ describe("SyncController", () => {
         Promise.resolve(devices[`${lojaId}:${id}`] ?? null),
       ),
     };
-    const prisma = { syncJob: { findMany: jest.fn().mockResolvedValue([]) } };
+    const prisma = {
+      syncJob: { findMany: jest.fn().mockResolvedValue([]) },
+      device: {
+        findMany: jest.fn(({ where }: any) =>
+          Promise.resolve(
+            (where.id.in as string[])
+              .map((id) => devices[`${where.lojaId}:${id}`])
+              .filter(Boolean)
+              .map((d) => ({ id: d.id })),
+          ),
+        ),
+      },
+    };
     const auditLog = { record: jest.fn().mockResolvedValue(undefined) };
     const controller = new SyncController(queue as any, deviceRepo as any, prisma as any, auditLog as any);
     return { controller, queue, deviceRepo, auditLog };

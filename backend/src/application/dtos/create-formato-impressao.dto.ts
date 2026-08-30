@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 
 export class CreateFormatoImpressaoDto {
   /** Vira o `LabelID` do protocolo da balança (`DWL/LAB`) — faixa 1-99
@@ -12,6 +12,7 @@ export class CreateFormatoImpressaoDto {
   numero!: number;
 
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome!: string;
 

@@ -16,14 +16,18 @@ describe("JwtAuthGuard", () => {
     return { getAllAndOverride: jest.fn(() => skipBillingCheck) } as any;
   }
 
+  function makeSessions(revoked = false) {
+    return { isRevoked: jest.fn().mockResolvedValue(revoked) } as any;
+  }
+
   it("rejeita requisição sem cookie de sessão", async () => {
-    const guard = new JwtAuthGuard({} as any, {} as any, makeReflector());
+    const guard = new JwtAuthGuard({} as any, {} as any, makeReflector(), makeSessions());
     await expect(guard.canActivate(makeContext({}))).rejects.toThrow(UnauthorizedException);
   });
 
   it("rejeita token inválido", async () => {
     const jwt = { verify: jest.fn(() => { throw new Error("bad token"); }) };
-    const guard = new JwtAuthGuard(jwt as any, {} as any, makeReflector());
+    const guard = new JwtAuthGuard(jwt as any, {} as any, makeReflector(), makeSessions());
     await expect(guard.canActivate(makeContext({ [AUTH_COOKIE_NAME]: "xxx" }))).rejects.toThrow(UnauthorizedException);
   });
 
@@ -31,7 +35,7 @@ describe("JwtAuthGuard", () => {
     const payload = { sub: "user-1", clienteId: "cliente-a", role: "ADMIN" };
     const jwt = { verify: jest.fn(() => payload) };
     const prisma = { assinatura: { findUnique: jest.fn(() => null) } };
-    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector());
+    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector(), makeSessions());
     const context = makeContext({ [AUTH_COOKIE_NAME]: "valid" });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
@@ -42,7 +46,7 @@ describe("JwtAuthGuard", () => {
     const payload = { sub: "user-1", clienteId: "cliente-a", role: "ADMIN" };
     const jwt = { verify: jest.fn(() => payload) };
     const prisma = { assinatura: { findUnique: jest.fn(() => ({ status: "INADIMPLENTE" })) } };
-    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector());
+    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector(), makeSessions());
     const context = makeContext({ [AUTH_COOKIE_NAME]: "valid" });
 
     await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
@@ -52,9 +56,33 @@ describe("JwtAuthGuard", () => {
     const payload = { sub: "user-1", clienteId: "cliente-a", role: "SUPERADMIN" };
     const jwt = { verify: jest.fn(() => payload) };
     const prisma = { assinatura: { findUnique: jest.fn(() => ({ status: "INADIMPLENTE" })) } };
-    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector());
+    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector(), makeSessions());
     const context = makeContext({ [AUTH_COOKIE_NAME]: "valid" });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
+  });
+});
+
+describe("JwtAuthGuard e sessões revogadas", () => {
+  function makeContext(cookies: Record<string, string>) {
+    const request: any = { cookies };
+    return {
+      switchToHttp: () => ({ getRequest: () => request }),
+      getHandler: () => ({}),
+      getClass: () => ({}),
+    } as any;
+  }
+
+  it("recusa um token válido cuja sessão foi encerrada no logout", async () => {
+    const payload = { sub: "user-1", clienteId: "cliente-a", role: "ADMIN", jti: "sessao-1" };
+    const jwt = { verify: jest.fn(() => payload) };
+    const reflector = { getAllAndOverride: jest.fn(() => false) };
+    const sessions = { isRevoked: jest.fn().mockResolvedValue(true) };
+    const guard = new JwtAuthGuard(jwt as any, {} as any, reflector as any, sessions as any);
+
+    await expect(guard.canActivate(makeContext({ [AUTH_COOKIE_NAME]: "valid" }))).rejects.toThrow(
+      UnauthorizedException,
+    );
+    expect(sessions.isRevoked).toHaveBeenCalledWith("sessao-1");
   });
 });

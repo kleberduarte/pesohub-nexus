@@ -1,11 +1,7 @@
 import { Device } from "../entities/device.entity";
 
-export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
+export { PaginatedResult } from "./pagination";
+import { PaginatedResult } from "./pagination";
 
 export interface DeviceStats {
   total: number;

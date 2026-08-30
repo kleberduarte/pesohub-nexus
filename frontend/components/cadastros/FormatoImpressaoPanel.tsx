@@ -146,7 +146,7 @@ export function FormatoImpressaoPanel() {
 
   useEffect(load, []);
   useEffect(() => {
-    productsApi.list().then(setProducts).catch(() => setProducts([]));
+    productsApi.listForPicker().then(setProducts).catch(() => setProducts([]));
     imagensApi.list().then(setImagens).catch(() => setImagens([]));
     tabelasNutricionaisApi.list().then(setTabelasNutricionais).catch(() => setTabelasNutricionais([]));
   }, []);

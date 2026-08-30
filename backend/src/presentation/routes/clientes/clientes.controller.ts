@@ -14,6 +14,7 @@ import {
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
+import { randomBytes } from "crypto";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
@@ -72,7 +73,14 @@ export class ClientesController {
   async create(@Body() dto: CreateClienteDto, @Req() req: Request) {
     this.assertUnscoped(req);
     return this.prisma.cliente.create({
-      data: { nome: dto.nome.trim(), dominio: dto.dominio?.trim().toLowerCase() || null },
+      // `accessToken` é o segredo do link público de acesso da empresa; o
+      // default do schema (cuid) é sequencial/derivado de timestamp e portanto
+      // adivinhável em lote. Aqui geramos 32 bytes de CSPRNG.
+      data: {
+        nome: dto.nome.trim(),
+        dominio: dto.dominio?.trim().toLowerCase() || null,
+        accessToken: randomBytes(32).toString("base64url"),
+      },
       select: CLIENTE_SELECT,
     });
   }

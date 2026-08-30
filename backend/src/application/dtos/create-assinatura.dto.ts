@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsNumber, IsString, Min } from "class-validator";
+import { IsEnum, IsNotEmpty, IsNumber, IsString, MaxLength, Min } from "class-validator";
 
 export class CreateAssinaturaDto {
   @IsEnum(["PIX", "BOLETO", "CARTAO_CREDITO"])
@@ -9,6 +9,7 @@ export class CreateAssinaturaDto {
   valor!: number;
 
   @IsString()
+  @MaxLength(24)
   @IsNotEmpty()
   cpfCnpj!: string;
 }

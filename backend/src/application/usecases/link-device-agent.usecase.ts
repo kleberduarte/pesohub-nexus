@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { DEVICE_REPOSITORY, DeviceRepository } from "../../domain/repositories/device.repository";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
+import { hashAgentToken } from "../../domain/services/agent-token";
 
 /**
  * Vincula um Device a um Agent Local pelo token do agente (o mesmo usado em
@@ -19,7 +20,7 @@ export class LinkDeviceAgentUseCase {
     const device = await this.devices.findById(deviceId, lojaId);
     if (!device) throw new NotFoundException("Balança não encontrada.");
 
-    const agent = await this.prisma.agent.findUnique({ where: { token: agentToken } });
+    const agent = await this.prisma.agent.findUnique({ where: { tokenHash: hashAgentToken(agentToken) } });
     if (!agent || agent.lojaId !== lojaId) {
       throw new NotFoundException("Agent Local não encontrado para o token informado.");
     }

@@ -88,15 +88,15 @@ describe("ProductsController.removeAll", () => {
  * em vez de responder vazio / uma mensagem clara.
  */
 describe("ProductsController com sessão sem Loja (lojaId null)", () => {
-  it("findAll responde lista vazia em vez de chamar o repositório com null", async () => {
-    const products = { findAll: jest.fn() };
+  it("findAll responde página vazia em vez de chamar o repositório com null", async () => {
+    const products = { findAllPaginated: jest.fn() };
     const controller = new ProductsController({} as any, {} as any, products as any, {} as any);
     const req = { user: { clienteId: "cliente-a", lojaId: null, sub: "user-1" } } as any;
 
     const result = await controller.findAll(req);
 
-    expect(result).toEqual([]);
-    expect(products.findAll).not.toHaveBeenCalled();
+    expect(result).toEqual({ data: [], total: 0, page: 1, pageSize: 50 });
+    expect(products.findAllPaginated).not.toHaveBeenCalled();
   });
 
   it("create lança BadRequestException em vez de deixar o Prisma quebrar", () => {
@@ -104,5 +104,53 @@ describe("ProductsController com sessão sem Loja (lojaId null)", () => {
     const req = { user: { clienteId: "cliente-a", lojaId: null, sub: "user-1" } } as any;
 
     expect(() => controller.create({} as any, req)).toThrow("Nenhuma loja associada à sua sessão");
+  });
+});
+
+describe("ProductsController.findAll (paginação)", () => {
+  const makeController = () => {
+    const products = {
+      findAllPaginated: jest.fn().mockResolvedValue({ data: [], total: 0, page: 1, pageSize: 50 }),
+    };
+    const controller = new ProductsController({} as any, {} as any, products as any, {} as any);
+    const req = { user: { clienteId: "cliente-a", lojaId: "loja-a", sub: "user-1" } } as any;
+    return { controller, products, req };
+  };
+
+  it("aplica os padrões de página quando nada é informado", async () => {
+    const { controller, products, req } = makeController();
+
+    await controller.findAll(req);
+
+    expect(products.findAllPaginated).toHaveBeenCalledWith("loja-a", {
+      page: 1,
+      pageSize: 50,
+      search: undefined,
+      ativo: undefined,
+    });
+  });
+
+  it("limita o pageSize ao teto e ignora valores inválidos", async () => {
+    const { controller, products, req } = makeController();
+
+    await controller.findAll(req, "0", "99999");
+
+    expect(products.findAllPaginated).toHaveBeenCalledWith(
+      "loja-a",
+      expect.objectContaining({ page: 1, pageSize: 500 }),
+    );
+  });
+
+  it("traduz o filtro de status para booleano", async () => {
+    const { controller, products, req } = makeController();
+
+    await controller.findAll(req, "2", "10", "queijo", "false");
+
+    expect(products.findAllPaginated).toHaveBeenCalledWith("loja-a", {
+      page: 2,
+      pageSize: 10,
+      search: "queijo",
+      ativo: false,
+    });
   });
 });

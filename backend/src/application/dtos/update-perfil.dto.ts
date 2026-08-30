@@ -1,8 +1,9 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsArray, IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class UpdatePerfilDto {
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 

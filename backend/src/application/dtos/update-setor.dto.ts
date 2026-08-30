@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, Min } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from "class-validator";
 
 export class UpdateSetorDto {
   // Ver ressalva em create-setor.dto.ts — 1-9 são ClassIDs reservados pela balança.
@@ -9,6 +9,7 @@ export class UpdateSetorDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 }

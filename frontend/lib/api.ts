@@ -390,8 +390,43 @@ export interface CreateProductInput {
 
 export type UpdateProductInput = Partial<CreateProductInput>;
 
+export interface PaginatedProducts {
+  data: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ProductListParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  /** Omitido traz ativos e inativos. */
+  ativo?: boolean;
+}
+
+/** Teto que o backend aceita em pageSize (ver ProductsController.MAX_PAGE_SIZE). */
+export const PRODUCTS_MAX_PAGE_SIZE = 500;
+
 export const productsApi = {
-  list: () => request<Product[]>("/products"),
+  list: ({ page = 1, pageSize = 50, search, ativo }: ProductListParams = {}) => {
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (search?.trim()) query.set("search", search.trim());
+    if (ativo !== undefined) query.set("ativo", String(ativo));
+    return request<PaginatedProducts>(`/products?${query}`);
+  },
+
+  /** Só o total, para contadores — traz uma linha em vez do catálogo inteiro. */
+  count: async () => (await productsApi.list({ page: 1, pageSize: 1 })).total,
+
+  /**
+   * Lista para seletores de produto (combos de etiqueta e tecla rápida). Traz
+   * no máximo uma página cheia: catálogos maiores que isso dependem do campo
+   * de busca, que filtra no banco.
+   */
+  listForPicker: async (search?: string) =>
+    (await productsApi.list({ page: 1, pageSize: PRODUCTS_MAX_PAGE_SIZE, search })).data,
+
   create: (data: CreateProductInput) =>
     request<Product>("/products", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: UpdateProductInput) =>

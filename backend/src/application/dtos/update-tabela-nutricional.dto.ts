@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { ArrayMaxSize, IsArray, IsInt, IsNotEmpty, IsOptional, IsString, ValidateNested } from "class-validator";
+import { ArrayMaxSize, IsArray, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from "class-validator";
 import { TabelaNutricionalItemDto } from "./create-tabela-nutricional.dto";
 
 export class UpdateTabelaNutricionalDto {
@@ -9,11 +9,13 @@ export class UpdateTabelaNutricionalDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(60)
   porcao?: string;
 
   @IsOptional()
@@ -22,6 +24,7 @@ export class UpdateTabelaNutricionalDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   ingredientes?: string;
 
   @IsOptional()

@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsInt, IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class UpdateAlergicoDto {
   @IsOptional()
@@ -7,10 +7,12 @@ export class UpdateAlergicoDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   informacao?: string;
 }

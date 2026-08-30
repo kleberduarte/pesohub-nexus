@@ -1,8 +1,9 @@
-import { IsIP, IsInt, IsNotEmpty, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsIP, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 
 export class UpdateDeviceDto {
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 
@@ -18,5 +19,6 @@ export class UpdateDeviceDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   grupoId?: string;
 }

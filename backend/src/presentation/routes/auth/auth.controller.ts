@@ -10,15 +10,28 @@ import { SwitchLojaDto } from "../../../application/dtos/switch-loja.dto";
 import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
+import { SessionRevocationService } from "../../../infrastructure/auth/session-revocation.service";
 
 type AuthenticatedRequest = Request & {
-  user: { sub: string; email: string; role: string; clienteId: string | null; lojaId: string | null; scoped?: boolean };
+  user: {
+    sub: string;
+    email: string;
+    role: string;
+    clienteId: string | null;
+    lojaId: string | null;
+    scoped?: boolean;
+    jti?: string;
+    exp?: number;
+  };
 };
 
 @ApiTags("auth")
 @Controller("auth")
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly sessions: SessionRevocationService,
+  ) {}
 
   @Post("login")
   @Throttle({ default: { ttl: 60000, limit: 5 } })
@@ -37,6 +50,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, user } = await this.auth.switchCompany(req.user, dto.clienteId);
+    // O token anterior aponta para a empresa antiga e continuaria válido até
+    // expirar; trocar de empresa tem que aposentá-lo.
+    await this.sessions.revoke(req.user.jti, req.user.exp);
     setAuthCookie(res, accessToken);
     return { user };
   }
@@ -49,13 +65,17 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, user } = await this.auth.switchLoja(req.user, dto.lojaId);
+    await this.sessions.revoke(req.user.jti, req.user.exp);
     setAuthCookie(res, accessToken);
     return { user };
   }
 
   @Post("logout")
   @UseGuards(JwtAuthGuard)
-  logout(@Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response) {
+    // Apagar o cookie não basta: quem já tiver uma cópia do token continuaria
+    // autenticado até ele expirar. A revogação encerra a sessão de verdade.
+    await this.sessions.revoke(req.user.jti, req.user.exp);
     clearAuthCookie(res);
     return { ok: true };
   }

@@ -1,4 +1,4 @@
-import { IsInt, IsString, Max, Min } from "class-validator";
+import { IsInt, IsString, Max, MaxLength, Min } from "class-validator";
 
 export class CreateTextoGlobalDto {
   @IsInt()
@@ -7,5 +7,6 @@ export class CreateTextoGlobalDto {
   indice!: number;
 
   @IsString()
+  @MaxLength(255)
   texto!: string;
 }

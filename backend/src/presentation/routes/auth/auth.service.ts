@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import { UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
+import { randomUUID } from "crypto";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 
 interface AuthenticatedUser {
@@ -12,6 +13,10 @@ interface AuthenticatedUser {
   lojaId: string | null;
   perfilId?: string | null;
   scoped?: boolean;
+  /** Identificador da sessão, usado pela lista de revogação no logout. */
+  jti?: string;
+  /** Expiração do token (segundos desde a época), preenchida pelo jsonwebtoken. */
+  exp?: number;
 }
 
 @Injectable()
@@ -45,6 +50,7 @@ export class AuthService {
       lojaId: effectiveLojaId,
       perfilId: user.perfilId,
       scoped,
+      jti: randomUUID(),
     };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
@@ -82,6 +88,7 @@ export class AuthService {
       // Perfil, que é um conceito por-Cliente) — sempre null aqui.
       perfilId: null,
       scoped: false,
+      jti: randomUUID(),
     };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),
@@ -116,6 +123,7 @@ export class AuthService {
       lojaId,
       perfilId: currentUser.perfilId ?? null,
       scoped: currentUser.scoped ?? false,
+      jti: randomUUID(),
     };
     return {
       accessToken: this.jwt.sign(payload, { expiresIn: "15m" }),

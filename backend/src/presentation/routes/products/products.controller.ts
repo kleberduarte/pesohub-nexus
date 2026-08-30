@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from "@nestjs/common";
@@ -35,11 +36,37 @@ export class ProductsController {
     private readonly auditLog: AuditLogService,
   ) {}
 
+  private static readonly DEFAULT_PAGE_SIZE = 50;
+  private static readonly MAX_PAGE_SIZE = 500;
+
+  /**
+   * Paginado desde sempre: um catálogo de loja grande passa de dezenas de
+   * milhares de itens, e devolver tudo estourava a memória do processo e o
+   * tempo de resposta. Busca e filtro de status são resolvidos no banco, para
+   * que a página não precise carregar o catálogo inteiro só para filtrar.
+   */
   @Get()
-  findAll(@Req() req: Request) {
+  findAll(
+    @Req() req: Request,
+    @Query("page") pageQuery?: string,
+    @Query("pageSize") pageSizeQuery?: string,
+    @Query("search") search?: string,
+    @Query("ativo") ativo?: string,
+  ) {
+    const page = Math.max(1, parseInt(pageQuery ?? "1", 10) || 1);
+    const pageSize = Math.min(
+      ProductsController.MAX_PAGE_SIZE,
+      Math.max(1, parseInt(pageSizeQuery ?? "", 10) || ProductsController.DEFAULT_PAGE_SIZE),
+    );
     const lojaId = this.lojaId(req);
-    if (!lojaId) return [];
-    return this.products.findAll(lojaId);
+    if (!lojaId) return { data: [], total: 0, page, pageSize };
+
+    return this.products.findAllPaginated(lojaId, {
+      page,
+      pageSize,
+      search,
+      ativo: ativo === "true" ? true : ativo === "false" ? false : undefined,
+    });
   }
 
   @Get(":id")

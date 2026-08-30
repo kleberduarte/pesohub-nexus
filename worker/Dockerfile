@@ -1,18 +1,26 @@
-FROM node:20-alpine AS build
+# --- build -------------------------------------------------------------
+FROM node:22-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
+RUN npm ci
 COPY prisma ./prisma
-RUN npm install
 COPY tsconfig.json ./
 COPY src ./src
 RUN npm run prisma:generate && npm run build
 
-FROM node:20-alpine
+# --- runtime -----------------------------------------------------------
+FROM node:22-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+
 COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
 COPY prisma ./prisma
-RUN npm install --omit=dev
 RUN npx prisma generate
-COPY --from=build /app/dist ./dist
+
+COPY --from=builder /app/dist ./dist
+
+USER node
+
 CMD ["node", "dist/index.js"]

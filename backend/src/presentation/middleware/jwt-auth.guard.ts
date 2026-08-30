@@ -4,6 +4,7 @@ import { Reflector } from "@nestjs/core";
 import { AUTH_COOKIE_NAME } from "../routes/auth/auth-cookie";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { SKIP_BILLING_CHECK_KEY } from "./skip-billing-check.decorator";
+import { SessionRevocationService } from "../../infrastructure/auth/session-revocation.service";
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -11,6 +12,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwt: JwtService,
     private readonly prisma: PrismaService,
     private readonly reflector: Reflector,
+    private readonly sessions: SessionRevocationService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -21,12 +23,18 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException("Token ausente");
     }
 
-    let user: { clienteId: string; role: string; scoped?: boolean };
+    let user: { clienteId: string; role: string; scoped?: boolean; jti?: string };
     try {
       user = this.jwt.verify(token);
       request.user = user;
     } catch {
       throw new UnauthorizedException("Token inválido ou expirado");
+    }
+
+    // Um token cuja sessão foi encerrada continua criptograficamente válido
+    // até expirar — só a lista de revogação distingue os dois casos.
+    if (await this.sessions.isRevoked(user.jti)) {
+      throw new UnauthorizedException("Sessão encerrada. Faça login novamente.");
     }
 
     const skipBillingCheck = this.reflector.getAllAndOverride<boolean>(SKIP_BILLING_CHECK_KEY, [

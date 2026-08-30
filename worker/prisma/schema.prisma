@@ -158,6 +158,8 @@ model Loja {
   specParametros       SpecParametro[]
   configuracaoAvancada ConfiguracaoAvancada?
   integracaoVeltrix    IntegracaoVeltrix?
+
+  @@index([clienteId])
 }
 
 /// Um perfil de acesso configurável (ex.: "Gerente Regional", "Operador Açaí")
@@ -183,6 +185,7 @@ model PerfilLojaAcesso {
   loja     Loja   @relation(fields: [lojaId], references: [id], onDelete: Cascade)
 
   @@unique([perfilId, lojaId])
+  @@index([lojaId])
 }
 
 model Assinatura {
@@ -211,6 +214,8 @@ model Fatura {
   dataVencimento DateTime?
   dataPagamento  DateTime?
   createdAt      DateTime     @default(now())
+
+  @@index([assinaturaId])
 }
 
 model Device {
@@ -233,6 +238,10 @@ model Device {
   updatedAt    DateTime     @updatedAt
 
   @@unique([lojaId, ip])
+  @@index([clienteId])
+  @@index([agentId])
+  @@index([grupoId])
+  @@index([lojaId, status])
 }
 
 model DeviceGroup {
@@ -243,6 +252,9 @@ model DeviceGroup {
   loja      Loja     @relation(fields: [lojaId], references: [id])
   nome      String
   devices   Device[]
+
+  @@index([lojaId])
+  @@index([clienteId])
 }
 
 model Agent {
@@ -256,6 +268,9 @@ model Agent {
   ultimoHeartbeat DateTime?
   devices         Device[]
   createdAt       DateTime  @default(now())
+
+  @@index([clienteId])
+  @@index([lojaId])
 }
 
 model Setor {
@@ -293,6 +308,9 @@ model SubSetor {
   updatedAt             DateTime             @updatedAt
 
   @@unique([lojaId, numero])
+  @@index([setorId])
+  @@index([formatoImpressaoId])
+  @@index([codigoBarrasFormatoId])
 }
 
 model Fornecedor {
@@ -356,6 +374,8 @@ model TabelaNutricionalItem {
   unidade     NutrienteUnidade
   valor       Decimal           @db.Decimal(10, 2)
   porcentagem Decimal           @db.Decimal(5, 2)
+
+  @@index([tabelaId])
 }
 
 model Operador {
@@ -388,6 +408,9 @@ model Imagem {
   products  Product[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  @@index([lojaId])
+  @@index([clienteId])
 }
 
 model FormatoImpressao {
@@ -457,6 +480,9 @@ model TeclaAcessoRapido {
   layout    Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([lojaId])
+  @@index([clienteId])
 }
 
 model SpecParametro {
@@ -487,6 +513,8 @@ model ConfiguracaoAvancada {
   importacaoPluCampos  Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  @@index([clienteId])
 }
 
 model Product {
@@ -499,8 +527,14 @@ model Product {
   codigoBarras     String
   nome             String
   preco            Decimal       @db.Decimal(10, 2)
+  /// Custo do produto (idx6 do PLU, `Cost` no wire) — só armazenado/enviado
+  /// pra balança, não usado em cálculo de venda no PesoHub.
   custo            Decimal?      @db.Decimal(10, 2)
   categoriaImposto String?
+  /// Modo de cálculo do imposto na balança (TaxType do wire, idx57 do PLU):
+  /// 0=sem imposto, 1=soma por fora do preço, 2=informativo (não altera o preço),
+  /// 3=embutido no preço (extrai) — semântica achada em RDS.cs do Ramuza.exe
+  /// decompilado, ver memória project_ramuza_full_field_map_2026_08_28.
   taxType          Int?          @default(0)
   taxaImposto      Decimal?      @db.Decimal(5, 2)
   ativo            Boolean       @default(true)
@@ -550,6 +584,15 @@ model Product {
 
   @@unique([lojaId, codigo])
   @@unique([lojaId, codigoBarras])
+  @@index([clienteId])
+  @@index([lojaId, ativo])
+  @@index([subSetorId])
+  @@index([tabelaNutricionalId])
+  @@index([fornecedorId])
+  @@index([alergicoId])
+  @@index([imagemId])
+  @@index([formatoImpressaoId])
+  @@index([codigoBarrasFormatoId])
 }
 
 model SyncJob {
@@ -562,6 +605,9 @@ model SyncJob {
   concluidoEm DateTime?
   erro        String?
   items       SyncJobItem[]
+
+  @@index([deviceId, id])
+  @@index([status])
 }
 
 model SyncJobItem {
@@ -572,6 +618,9 @@ model SyncJobItem {
   product   Product           @relation(fields: [productId], references: [id])
   acao      SyncJobItemAction
   status    SyncJobStatus     @default(PENDING)
+
+  @@index([jobId])
+  @@index([productId])
 }
 
 model User {
@@ -595,6 +644,11 @@ model User {
   senha           String
   role            UserRole @default(OPERADOR)
   createdAt       DateTime @default(now())
+
+  @@index([clienteId])
+  @@index([perfilId])
+  @@index([activeClienteId])
+  @@index([activeLojaId])
 }
 
 model AuditLog {
@@ -603,6 +657,9 @@ model AuditLog {
   acao      String
   payload   Json?
   timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
 }
 
 /// Configuração de integração com o ERP Veltrix (`C:\Projetos\veltrix`) para um

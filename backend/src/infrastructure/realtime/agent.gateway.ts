@@ -12,6 +12,7 @@ import { Server, Socket } from "socket.io";
 import Redis from "ioredis";
 import { PrismaService } from "../database/prisma.service";
 import { getRedisUrl } from "../queue/redis-connection";
+import { hashAgentToken } from "../../domain/services/agent-token";
 
 /**
  * Ponte entre o backend e os Agents Locais (processos que rodam dentro da rede
@@ -34,6 +35,16 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // clienteId de cada agent conectado — necessário pra não misturar balanças
   // descobertas de agents de clientes diferentes em getDiscoveredDevices().
   private readonly clienteIdByAgent = new Map<string, string>();
+  // correlationId -> agentId pra quem o comando foi despachado. Sem isso,
+  // qualquer agent autenticado pode publicar o resultado de um comando
+  // destinado a outro agent (de outro cliente), forjando "sync concluído".
+  private readonly agentByCorrelation = new Map<string, string>();
+  // Último instante em que marcamos os devices de cada agent como ONLINE.
+  // O heartbeat chega a cada poucos segundos por agent; sem esse teto, cada
+  // um dispara um UPDATE em toda a tabela de devices daquele agent — com
+  // milhares de agents isso vira o gargalo de escrita do banco.
+  private readonly lastDeviceTouch = new Map<string, number>();
+  private static readonly DEVICE_TOUCH_INTERVAL_MS = 60_000;
 
   @WebSocketServer()
   server!: Server;
@@ -55,14 +66,19 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
         );
         return;
       }
-      socket.emit("sync:command", JSON.parse(message));
+      const command = JSON.parse(message);
+      if (command.correlationId) {
+        this.agentByCorrelation.set(command.correlationId, agentId);
+      }
+      socket.emit("sync:command", command);
     });
   }
 
   async handleConnection(socket: Socket): Promise<void> {
-    const token = (socket.handshake.auth?.token ?? socket.handshake.query?.token) as
-      | string
-      | undefined;
+    // Só `auth.token`: um token em query string acaba gravado em log de proxy,
+    // histórico e referer. O agent-local sempre enviou por `auth` (ver
+    // agent-local/src/index.ts), então não há agente em campo a quebrar.
+    const token = socket.handshake.auth?.token as string | undefined;
 
     if (!token) {
       this.logger.warn(`Conexão de agente rejeitada: token ausente (socket ${socket.id})`);
@@ -70,7 +86,7 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
-    const agent = await this.prisma.agent.findUnique({ where: { token } });
+    const agent = await this.prisma.agent.findUnique({ where: { tokenHash: hashAgentToken(token) } });
     if (!agent) {
       this.logger.warn(`Conexão de agente rejeitada: token inválido (socket ${socket.id})`);
       socket.disconnect(true);
@@ -98,6 +114,7 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.sockets.delete(agentId);
       this.clienteIdByAgent.delete(agentId);
       this.discoveredByAgent.delete(agentId);
+      this.lastDeviceTouch.delete(agentId);
       await this.prisma.device.updateMany({
         where: { agentId },
         data: { status: "OFFLINE" },
@@ -114,6 +131,11 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
       where: { id: agentId },
       data: { ultimoHeartbeat: new Date() },
     });
+
+    const now = Date.now();
+    const last = this.lastDeviceTouch.get(agentId) ?? 0;
+    if (now - last < AgentGateway.DEVICE_TOUCH_INTERVAL_MS) return;
+    this.lastDeviceTouch.set(agentId, now);
     await this.prisma.device.updateMany({
       where: { agentId },
       data: { status: "ONLINE", ultimoAcesso: new Date() },
@@ -121,8 +143,17 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage("sync:result")
-  onSyncResult(@MessageBody() body: { correlationId: string; ok: boolean; erro?: string; itensProcessados?: number }): void {
+  onSyncResult(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { correlationId: string; ok: boolean; erro?: string; itensProcessados?: number },
+  ): void {
+    const agentId = socket.data?.agentId as string | undefined;
     const { correlationId, ...result } = body;
+    if (!agentId || this.agentByCorrelation.get(correlationId) !== agentId) {
+      this.logger.warn(`Resultado de sync descartado: agent ${agentId} não é o destinatário de ${correlationId}`);
+      return;
+    }
+    this.agentByCorrelation.delete(correlationId);
     this.redisPub.publish(`agent:result:${correlationId}`, JSON.stringify(result));
   }
 

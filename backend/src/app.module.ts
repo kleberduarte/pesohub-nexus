@@ -6,6 +6,7 @@ import { RedisThrottlerStorageService } from "./infrastructure/throttler/redis-t
 import { LoggerModule } from "nestjs-pino";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
 import { AuditLogModule } from "./infrastructure/audit/audit-log.module";
+import { SessionRevocationModule } from "./infrastructure/auth/session-revocation.module";
 import { HealthModule } from "./presentation/routes/health/health.module";
 import { DevicesModule } from "./presentation/routes/devices/devices.module";
 import { ProductsModule } from "./presentation/routes/products/products.module";
@@ -50,6 +51,7 @@ import { PerfisModule } from "./presentation/routes/perfis/perfis.module";
       },
     }),
     PrismaModule,
+    SessionRevocationModule,
     HealthModule,
     AuditLogModule,
     AuthModule,
