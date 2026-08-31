@@ -388,6 +388,17 @@ export function buildNu3Row(tabela: TabelaNutricionalPayload): string {
   return fields.join("\t") + "\r\n";
 }
 
+/**
+ * Um campo de texto conta como "não usado" tanto quando vem nulo quanto quando
+ * vem em branco. O formulário do frontend manda `""` para todo campo opcional
+ * que o usuário não preencheu, e `"" == null` é falso em JavaScript — por isso
+ * um Texto extra 4 vazio bloqueava a cópia dos ingredientes como se o usuário
+ * o tivesse reservado para outra coisa, e a etiqueta saía sem ingredientes.
+ */
+export function estaEmBranco(valor: string | null | undefined): boolean {
+  return valor == null || valor.trim() === "";
+}
+
 export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): string {
   const fields = [...PLU_FIELD_TEMPLATE];
   fields[FIELD_PLU_NUMBER] = String(pluNumber);
@@ -409,7 +420,7 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   // o template oficial usa e o único caminho confirmado imprimindo. O campo
   // `Ingredientes` do NU3 persiste mas nenhum elemento o renderiza. Não
   // sobrescreve um textoExtra4 que o usuário tenha preenchido à mão.
-  if (product.textoExtra4 == null && product.tabelaNutricional?.ingredientes) {
+  if (estaEmBranco(product.textoExtra4) && product.tabelaNutricional?.ingredientes) {
     fields[FIELD_TEXTO_EXTRA_4] = sanitizeField(`Ingredientes: ${product.tabelaNutricional.ingredientes}`);
   }
   if (product.textoExtra5 != null) fields[FIELD_TEXTO_EXTRA_5] = sanitizeField(product.textoExtra5);

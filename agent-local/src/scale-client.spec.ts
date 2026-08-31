@@ -1,4 +1,4 @@
-import { encodePrice, encodeTara } from "./scale-client";
+import { buildPluRow, encodePrice, encodeTara } from "./scale-client";
 
 describe("encodePrice", () => {
   it("codifica valores confirmados por captura A/B do software oficial", () => {
@@ -32,5 +32,45 @@ describe("encodeTara", () => {
 
   it("remove zeros à direita reduzindo as casas decimais", () => {
     expect(encodeTara(2.0)).toBe("2,0");
+  });
+});
+
+describe("buildPluRow e os ingredientes", () => {
+  const IDX_TEXTO_EXTRA_4 = 19;
+
+  const produto = (textoExtra4?: string | null) =>
+    ({
+      codigo: "700",
+      codigoBarras: "1234567890123",
+      nome: "IOGURTE",
+      preco: 9.9,
+      textoExtra4,
+      tabelaNutricional: {
+        numero: 40,
+        nome: "IOGURTE TESTE",
+        ingredientes: "Leite pasteurizado, fermento lacteo, acucar.",
+        selos: [],
+        itens: [],
+      },
+    }) as any;
+
+  const campo = (linha: string, idx: number) => linha.split("\t")[idx];
+
+  it("copia os ingredientes para o Texto extra 4 quando o campo vem nulo", () => {
+    const linha = buildPluRow(produto(null), 700);
+    expect(campo(linha, IDX_TEXTO_EXTRA_4)).toContain("Leite pasteurizado");
+  });
+
+  // O formulário do frontend manda "" para todo campo opcional não preenchido.
+  // Com a checagem antiga (`== null`) isso bloqueava a cópia e a etiqueta saía
+  // sem ingredientes, mesmo com a tabela nutricional preenchida.
+  it("copia os ingredientes quando o Texto extra 4 vem em branco", () => {
+    expect(campo(buildPluRow(produto(""), 700), IDX_TEXTO_EXTRA_4)).toContain("Leite pasteurizado");
+    expect(campo(buildPluRow(produto("   "), 700), IDX_TEXTO_EXTRA_4)).toContain("Leite pasteurizado");
+  });
+
+  it("preserva um Texto extra 4 que o usuário preencheu", () => {
+    const linha = buildPluRow(produto("Consumir gelado"), 700);
+    expect(campo(linha, IDX_TEXTO_EXTRA_4)).toBe("Consumir gelado");
   });
 });
