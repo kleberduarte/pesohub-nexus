@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -21,6 +22,7 @@ import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { CreateUserDto } from "../../../application/dtos/create-user.dto";
 import { UpdateUserDto } from "../../../application/dtos/update-user.dto";
+import { acrescentarAoHistorico, validarComplexidade } from "../../../domain/services/password-policy";
 
 interface AuthenticatedRequest extends Request {
   user: { sub: string; role: string; clienteId: string | null };
@@ -107,6 +109,11 @@ export class UsersController {
       perfilId = perfil.id;
     }
 
+    const problemas = validarComplexidade(dto.senha, dto.email);
+    if (problemas.length > 0) {
+      throw new BadRequestException(problemas.join(" "));
+    }
+
     const senha = await bcrypt.hash(dto.senha, 10);
     return this.prisma.user.create({
       data: {
@@ -115,7 +122,11 @@ export class UsersController {
         role: dto.role,
         clienteId: clienteIdParaUsuario,
         perfilId,
-        activeLojaId: dto.lojaId ?? null,
+        // Quem cria a conta escolhe a primeira senha e portanto a conhece.
+        // A troca no primeiro acesso é o que faz a senha voltar a ser
+        // conhecida só pelo dono — sem isso não há como responsabilizar
+        // ninguém pelo que a conta fizer.
+        mustChangePassword: true,
       },
       select: { id: true, email: true, role: true, createdAt: true, perfil: { select: { nome: true } } },
     });
@@ -137,9 +148,31 @@ export class UsersController {
       throw new ForbiddenException("O perfil SUPERADMIN só é permitido na empresa padrão");
     }
 
-    const data: { role?: typeof dto.role; senha?: string } = {};
+    const data: {
+      role?: typeof dto.role;
+      senha?: string;
+      mustChangePassword?: boolean;
+      passwordChangedAt?: Date;
+      senhasAnteriores?: string[];
+      failedLoginAttempts?: number;
+      lockedUntil?: Date | null;
+    } = {};
     if (dto.role) data.role = dto.role;
-    if (dto.senha) data.senha = await bcrypt.hash(dto.senha, 10);
+    if (dto.senha) {
+      const problemas = validarComplexidade(dto.senha, target.email);
+      if (problemas.length > 0) {
+        throw new BadRequestException(problemas.join(" "));
+      }
+      data.senha = await bcrypt.hash(dto.senha, 10);
+      data.senhasAnteriores = acrescentarAoHistorico(target.senhasAnteriores, target.senha);
+      data.passwordChangedAt = new Date();
+      // Reset feito por um administrador: ele conhece a senha que acabou de
+      // definir, então ela só vale até o dono entrar e trocar.
+      data.mustChangePassword = true;
+      // Um reset de senha também é a forma de destrancar uma conta bloqueada.
+      data.failedLoginAttempts = 0;
+      data.lockedUntil = null;
+    }
 
     return this.prisma.user.update({
       where: { id },

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Mail, Lock, Eye, EyeOff, Scale } from "lucide-react";
-import { login, ApiError, type ClienteBranding } from "../../lib/api";
+import { login, ApiError, takeSessionEndReason, type ClienteBranding } from "../../lib/api";
 
 type AuthMode = "login" | "first-access";
 
@@ -44,6 +44,14 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  // Aviso do fim da sessão anterior ("sua conta foi acessada em outro
+  // dispositivo"). É um recado diferente de um erro de login, e some assim que
+  // a pessoa tenta entrar de novo.
+  const [sessionEndReason, setSessionEndReason] = useState<string | null>(null);
+
+  useEffect(() => {
+    setSessionEndReason(takeSessionEndReason());
+  }, []);
 
   const brandName = branding?.nome ?? "PesoHub";
   const tagline = branding?.tagline ?? "Conectando dados, pesando o futuro";
@@ -51,11 +59,14 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSessionEndReason(null);
     setLoading(true);
     try {
-      await login(email, password);
+      const { user } = await login(email, password);
       if (onLoginSuccess) await onLoginSuccess();
-      router.push("/");
+      // Primeiro acesso ou senha vencida: a senha ainda é conhecida por quem
+      // criou a conta, então não há sessão útil antes da troca.
+      router.push(user.precisaTrocarSenha ? "/trocar-senha" : "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível conectar à API. Tente novamente.");
     } finally {
@@ -157,6 +168,12 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
 
           {mode === "login" ? (
             <form onSubmit={handleLogin} className="space-y-5">
+              {sessionEndReason && !error && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                  {sessionEndReason}
+                </div>
+              )}
+
               {error && (
                 <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm text-red-600">
                   {error}

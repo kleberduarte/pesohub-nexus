@@ -91,7 +91,8 @@ async function main() {
       senha,
       role: "ADMIN",
       clienteId: ramuza.id,
-      activeLojaId: lojas["loja-ramuza-carrefour"].id,
+      // A loja ativa é estado de sessão desde o card #48 — a sessão começa na
+      // primeira loja do Cliente e trocar de loja vale só para quem trocou.
     },
   });
 

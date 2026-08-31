@@ -21,6 +21,80 @@ const USER_CACHE_KEY = "pesohub_user";
 // continuar mostrando a identidade visual correta após o logout (que
 // só derruba o USER_CACHE_KEY). Ver ClienteBranding.accessToken.
 const ACTIVE_CLIENTE_TOKEN_KEY = "pesohub_active_cliente_token";
+// Por que a última sessão terminou, para a tela de login explicar. Fica em
+// sessionStorage (não localStorage) para morrer junto com a aba: é um recado
+// de uma navegação só, não um estado a carregar adiante.
+const SESSION_END_REASON_KEY = "pesohub_session_end_reason";
+
+/** Lê e consome o motivo do fim da última sessão. */
+export function takeSessionEndReason(): string | null {
+  if (typeof window === "undefined") return null;
+  const motivo = sessionStorage.getItem(SESSION_END_REASON_KEY);
+  if (motivo) sessionStorage.removeItem(SESSION_END_REASON_KEY);
+  return motivo;
+}
+
+// Empresa/loja ativa DESTA aba. Fica em sessionStorage porque ele é por aba —
+// localStorage e cookie são por navegador, e enquanto o escopo morava no
+// cookie, trocar de loja numa aba mudava a loja de todas as outras: dava para
+// cadastrar produto numa aba e sincronizar para a balança que a outra aba
+// tinha selecionado. Estes cabeçalhos são revalidados no backend a cada
+// requisição (ver SessionScopeService), então não são uma via de privilégio.
+const SCOPE_KEY = "pesohub_scope";
+const HEADER_LOJA = "x-pesohub-loja";
+const HEADER_CLIENTE = "x-pesohub-cliente";
+
+export interface SessionScope {
+  clienteId: string | null;
+  lojaId: string | null;
+}
+
+export function getSessionScope(): SessionScope | null {
+  if (typeof window === "undefined") return null;
+  const raw = sessionStorage.getItem(SCOPE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as SessionScope;
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionScope(scope: SessionScope) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(SCOPE_KEY, JSON.stringify(scope));
+}
+
+export function clearSessionScope() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(SCOPE_KEY);
+}
+
+// Identificador da sessão que ESTA aba conhece. Duas abas do mesmo navegador
+// compartilham o cookie, então quando alguém faz login de novo a aba antiga
+// passa a usar a sessão nova sem perceber. Guardar o jti aqui é o que permite
+// notar a troca e avisar — sem isso o segundo login é invisível.
+const LAST_SESSION_KEY = "pesohub_last_jti";
+
+export function getLastSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(LAST_SESSION_KEY);
+}
+
+export function setLastSessionId(jti: string | null) {
+  if (typeof window === "undefined") return;
+  if (jti) sessionStorage.setItem(LAST_SESSION_KEY, jti);
+  else sessionStorage.removeItem(LAST_SESSION_KEY);
+}
+
+function scopeHeaders(): Record<string, string> {
+  const scope = getSessionScope();
+  if (!scope) return {};
+  const headers: Record<string, string> = {};
+  if (scope.lojaId) headers[HEADER_LOJA] = scope.lojaId;
+  if (scope.clienteId) headers[HEADER_CLIENTE] = scope.clienteId;
+  return headers;
+}
 
 export function getCurrentUser(): DecodedUser | null {
   if (typeof window === "undefined") return null;
@@ -65,6 +139,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...scopeHeaders(),
       ...options.headers,
     },
   });
@@ -81,6 +156,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       clearCurrentUser();
       const { pathname } = window.location;
       if (pathname !== "/login" && !pathname.startsWith("/acesso/")) {
+        // O motivo vem do backend e atravessa o redirect: ser derrubado por um
+        // login em outro dispositivo é a única pista de que alguém está usando
+        // a sua conta — sumir com essa mensagem esconde justamente o incidente
+        // que a sessão única existe para revelar.
+        if (message) sessionStorage.setItem(SESSION_END_REASON_KEY, message);
         window.location.href = "/login";
       }
     }
@@ -102,10 +182,15 @@ export interface DecodedUser {
   role: UserRole;
   clienteId: string | null;
   lojaId: string | null;
+  /** Identificador da sessão. Muda a cada login/refresh. */
+  jti?: string;
 }
 
 export interface LoginResponse {
-  user: DecodedUser;
+  user: DecodedUser & {
+    /** Primeiro acesso ou senha vencida: o app leva direto para a troca. */
+    precisaTrocarSenha?: boolean;
+  };
 }
 
 export async function login(email: string, senha: string) {
@@ -114,18 +199,42 @@ export async function login(email: string, senha: string) {
     body: JSON.stringify({ email, senha }),
   });
   setCurrentUser(data.user);
+  // Toda aba começa no escopo padrão da conta; a partir daí ela é dona do
+  // próprio escopo.
+  setSessionScope({ clienteId: data.user.clienteId, lojaId: data.user.lojaId });
+  setLastSessionId(data.user.jti ?? null);
   return data;
 }
 
 export const authApi = {
   me: () => request<DecodedUser>("/auth/me"),
-  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+  logout: async () => {
+    const r = await request<{ ok: boolean }>("/auth/logout", { method: "POST" });
+    clearSessionScope();
+    return r;
+  },
+  refresh: async () => {
+    const data = await request<LoginResponse>("/auth/refresh", { method: "POST" });
+    setLastSessionId(data.user.jti ?? null);
+    return data;
+  },
+  trocarSenha: async (senhaAtual: string, novaSenha: string) => {
+    const data = await request<LoginResponse>("/auth/trocar-senha", {
+      method: "POST",
+      body: JSON.stringify({ senhaAtual, novaSenha }),
+    });
+    setCurrentUser(data.user);
+    return data;
+  },
+  // Os dois switches gravam o escopo só desta aba. O backend não reemite o
+  // cookie de propósito — se reemitisse, a troca vazaria para as outras abas.
   switchCompany: async (clienteId: string) => {
     const data = await request<LoginResponse>("/auth/switch-company", {
       method: "POST",
       body: JSON.stringify({ clienteId }),
     });
     setCurrentUser(data.user);
+    setSessionScope({ clienteId: data.user.clienteId, lojaId: data.user.lojaId });
     return data;
   },
   switchLoja: async (lojaId: string) => {
@@ -134,6 +243,7 @@ export const authApi = {
       body: JSON.stringify({ lojaId }),
     });
     setCurrentUser(data.user);
+    setSessionScope({ clienteId: data.user.clienteId, lojaId: data.user.lojaId });
     return data;
   },
 };

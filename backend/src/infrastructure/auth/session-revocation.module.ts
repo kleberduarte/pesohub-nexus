@@ -1,5 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 import { SessionRevocationService } from "./session-revocation.service";
+import { SessionScopeService } from "./session-scope.service";
 
 /**
  * Global porque o JwtAuthGuard é instanciado em praticamente todos os módulos
@@ -7,7 +8,7 @@ import { SessionRevocationService } from "./session-revocation.service";
  */
 @Global()
 @Module({
-  providers: [SessionRevocationService],
-  exports: [SessionRevocationService],
+  providers: [SessionRevocationService, SessionScopeService],
+  exports: [SessionRevocationService, SessionScopeService],
 })
 export class SessionRevocationModule {}
