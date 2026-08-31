@@ -888,6 +888,15 @@ export interface AppUser {
   role: UserRole;
   createdAt: string;
   perfil?: { nome: string } | null;
+  /** Data futura enquanto a conta estiver travada por erros de senha. */
+  lockedUntil?: string | null;
+  /** Conta ainda com a senha definida por quem a criou. */
+  mustChangePassword?: boolean;
+}
+
+/** True se a conta está travada agora. */
+export function contaBloqueada(user: AppUser): boolean {
+  return !!user.lockedUntil && new Date(user.lockedUntil) > new Date();
 }
 
 export interface CreateUserInput {
@@ -908,6 +917,11 @@ export const usersApi = {
   update: (id: string, data: UpdateUserInput) =>
     request<AppUser>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   remove: (id: string) => request<void>(`/users/${id}`, { method: "DELETE" }),
+  // Destrava sem trocar a senha: quem travou continua sabendo a própria senha,
+  // e obrigar o administrador a definir uma nova recria o hábito de senha
+  // repassada que este fluxo veio eliminar.
+  desbloquear: (id: string) =>
+    request<{ desbloqueado: boolean }>(`/users/${id}/desbloquear`, { method: "POST" }),
 };
 
 // ---------- Sync ----------

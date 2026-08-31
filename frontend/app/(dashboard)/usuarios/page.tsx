@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
-import { usersApi, clientesApi, lojasApi, ApiError, getCurrentUser, type AppUser, type Loja, type UserRole } from "../../../lib/api";
+import { LockOpen, Pencil, Trash2 } from "lucide-react";
+import { usersApi, clientesApi, lojasApi, ApiError, getCurrentUser, type AppUser, type Loja, type UserRole,
+  contaBloqueada,
+} from "../../../lib/api";
 
 const ROLES_RESTRINGIVEIS_A_LOJA: UserRole[] = ["OPERADOR", "VIEWER"];
 
@@ -45,6 +47,16 @@ export default function UsuariosPage() {
       .then(setUsers)
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível carregar os usuários."))
       .finally(() => setLoading(false));
+  };
+
+  const handleDesbloquear = async (user: AppUser) => {
+    setError("");
+    try {
+      await usersApi.desbloquear(user.id);
+      loadUsers();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível desbloquear a conta.");
+    }
   };
 
   useEffect(() => {
@@ -257,6 +269,16 @@ export default function UsuariosPage() {
                       <td className="px-6 py-4 font-medium text-slate-800">
                         {user.email}
                         {isSelf && <span className="ml-2 text-xs text-slate-400">(você)</span>}
+                        {contaBloqueada(user) && (
+                          <span className="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                            Bloqueada
+                          </span>
+                        )}
+                        {!contaBloqueada(user) && user.mustChangePassword && (
+                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            Senha provisória
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-slate-500">
                         {user.role}
@@ -271,6 +293,17 @@ export default function UsuariosPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
+                          {contaBloqueada(user) && (
+                            <button
+                              type="button"
+                              disabled={lacksPermission}
+                              onClick={() => handleDesbloquear(user)}
+                              className="p-2 text-red-500 hover:text-red-700 transition-colors rounded-lg hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={lacksPermission ? permissionTitle : "Desbloquear conta (sem trocar a senha)"}
+                            >
+                              <LockOpen className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             disabled={editDisabled}

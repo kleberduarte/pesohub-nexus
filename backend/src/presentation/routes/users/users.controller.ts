@@ -23,6 +23,7 @@ import { Roles } from "../../middleware/roles.decorator";
 import { CreateUserDto } from "../../../application/dtos/create-user.dto";
 import { UpdateUserDto } from "../../../application/dtos/update-user.dto";
 import { acrescentarAoHistorico, validarComplexidade } from "../../../domain/services/password-policy";
+import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 
 interface AuthenticatedRequest extends Request {
   user: { sub: string; role: string; clienteId: string | null };
@@ -32,7 +33,10 @@ interface AuthenticatedRequest extends Request {
 @UseGuards(JwtAuthGuard)
 @Controller("users")
 export class UsersController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLog: AuditLogService,
+  ) {}
 
   @Get()
   @UseGuards(RolesGuard)
@@ -43,9 +47,48 @@ export class UsersController {
 
     return this.prisma.user.findMany({
       where: { clienteId },
-      select: { id: true, email: true, role: true, createdAt: true, perfil: { select: { nome: true } } },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        perfil: { select: { nome: true } },
+        // Sem isso o administrador não enxerga que a conta de alguém travou —
+        // e a pessoa fica só com um "credenciais inválidas" que não explica
+        // nada.
+        lockedUntil: true,
+        mustChangePassword: true,
+      },
       orderBy: { createdAt: "asc" },
     });
+  }
+
+  /**
+   * Destrava uma conta bloqueada por tentativas de senha, sem trocar a senha.
+   *
+   * Antes o único jeito de destravar era definir uma senha nova — o que
+   * obrigava o administrador a inventar uma senha e a repassá-la, justamente
+   * o hábito que este card veio eliminar. Quem errou a senha e travou continua
+   * sabendo a própria senha; só precisa que o cadeado saia.
+   */
+  @Post(":id/desbloquear")
+  @UseGuards(RolesGuard)
+  @Roles("SUPERADMIN", "ADMIN")
+  async desbloquear(@Param("id") id: string, @Req() req: AuthenticatedRequest) {
+    const target = await this.prisma.user.findUnique({ where: { id } });
+    if (!target || target.clienteId !== req.user.clienteId) {
+      throw new NotFoundException("Usuário não encontrado");
+    }
+    if (target.role === "SUPERADMIN" && req.user.role !== "SUPERADMIN") {
+      throw new ForbiddenException("Apenas SUPERADMIN pode desbloquear um usuário SUPERADMIN");
+    }
+
+    await this.prisma.user.update({
+      where: { id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+    });
+    await this.auditLog.record(req, "users.desbloquear", { userId: id, email: target.email });
+    return { desbloqueado: true };
   }
 
   @Post()
