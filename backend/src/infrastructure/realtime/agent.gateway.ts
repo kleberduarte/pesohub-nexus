@@ -8,6 +8,7 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import { Logger } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { Server, Socket } from "socket.io";
 import Redis from "ioredis";
 import { PrismaService } from "../database/prisma.service";
@@ -22,6 +23,42 @@ import { hashAgentToken } from "../../domain/services/agent-token";
  * no Redis (canal agent:command:<agentId>) e espera a resposta em
  * agent:result:<correlationId>. Este gateway faz a ponte final: Redis <-> socket.io.
  */
+export interface SlotEtiquetaSalvo {
+  numero: number;
+  nome: string;
+}
+
+/**
+ * Une o mapa de slots conhecido com o que a balança acabou de reportar.
+ *
+ * Aditivo de propósito (card #59). O `UPL/LAB` da balança é incompleto e varia
+ * entre chamadas — o mesmo equipamento devolveu 65, 64, 54 e 52 registros em
+ * leituras seguidas, e duas delas ainda sinalizaram fim com `END	LAB`.
+ * Substituir o mapa faria um slot ocupado sumir por truncamento, e o cadastro
+ * passaria a oferecê-lo como livre: exatamente o erro que o card #55 existe
+ * para evitar.
+ *
+ * Os dois erros possíveis não são simétricos. Errar para "ocupado" custa ao
+ * usuário escolher outro número; errar para "livre" o manda gravar num slot de
+ * fábrica, que a balança descarta em silêncio.
+ *
+ * O que chega agora vence no NOME — um slot regravado tem nome novo. Só a
+ * AUSÊNCIA é que não conta como informação.
+ */
+export function unirSlotsEtiqueta(
+  anteriores: unknown,
+  recebidos: SlotEtiquetaSalvo[],
+): SlotEtiquetaSalvo[] {
+  const porNumero = new Map<number, SlotEtiquetaSalvo>();
+  const previos = Array.isArray(anteriores) ? (anteriores as { numero?: unknown; nome?: unknown }[]) : [];
+  for (const slot of previos) {
+    if (!Number.isInteger(slot?.numero)) continue;
+    porNumero.set(slot.numero as number, { numero: slot.numero as number, nome: String(slot.nome ?? "") });
+  }
+  for (const slot of recebidos) porNumero.set(slot.numero, slot);
+  return [...porNumero.values()].sort((a, b) => a.numero - b.numero);
+}
+
 @WebSocketGateway({
   namespace: "/agents",
   cors: { origin: (process.env.CORS_ORIGIN ?? "http://localhost:3001").split(",").map((o) => o.trim()) },
@@ -195,14 +232,16 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
     if (!device) return;
 
-    const slots = body.slots
+    const recebidos = body.slots
       .filter((s) => Number.isInteger(s?.numero))
       .map((s) => ({ numero: s.numero, nome: String(s.nome ?? "") }));
+
+    const slots = unirSlotsEtiqueta(device.slotsEtiqueta, recebidos);
 
     try {
       await this.prisma.device.update({
         where: { id: device.id },
-        data: { slotsEtiqueta: slots, slotsEtiquetaLidosEm: new Date() },
+        data: { slotsEtiqueta: slots as unknown as Prisma.InputJsonValue, slotsEtiquetaLidosEm: new Date() },
       });
     } catch (err) {
       this.logger.warn(

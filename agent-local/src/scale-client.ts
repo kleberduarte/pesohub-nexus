@@ -896,17 +896,24 @@ function repararAcentuacao(nome: string): string {
 }
 
 /**
- * Lista todos os slots `LAB` ocupados na balança.
+ * Slots `LAB` **observados como ocupados** nesta leitura.
  *
- * É o que permite ao cadastro de Formato de Impressão parar de pedir um número
- * no escuro (card #55): quem sabe quais slots estão tomados é o equipamento, e
- * isso varia de balança para balança conforme o que veio de fábrica e o que a
- * loja já gravou. Não existe faixa fixa que sirva — os slots 22 e 23 estão na
- * região "de fábrica" e gravam normalmente.
+ * Note a semântica: é o que foi visto, não a lista completa. O `UPL/LAB` sem
+ * número é comprovadamente incompleto (card #59) — quatro leituras seguidas
+ * contra a mesma balança devolveram 65, 64, 54 e 52 registros, com slots
+ * realmente gravados faltando. Pior: duas delas terminaram com `END\tLAB`, o
+ * marcador de fim do protocolo. **A balança sinaliza "acabei" numa resposta
+ * incompleta**, então não há como distinguir completa de truncada aqui.
  *
- * Falha de leitura devolve erro, nunca lista vazia. Tratar vazio como "nada
- * ocupado" faria o cadastro liberar justamente os slots que descartam em
- * silêncio — o inverso do objetivo.
+ * Por isso quem consome isto NUNCA pode concluir "livre" a partir da ausência
+ * de um número. O uso correto é aditivo: unir com o que já se sabia. Errar para
+ * "ocupado" é a direção segura — o pior caso é sugerir outro número livre; o
+ * inverso manda a pessoa para um slot de fábrica, que descarta em silêncio.
+ *
+ * Para saber com certeza sobre UM slot, use a leitura filtrada
+ * (`UPL/LAB/<n>`, via `verificarFormatosGravados`), que é confiável.
+ *
+ * Falha de leitura devolve erro, nunca lista vazia — vazio não é dado.
  */
 export function listarSlotsEtiqueta(
   ip: string,
