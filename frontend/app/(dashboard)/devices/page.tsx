@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, Search, Trash2, Edit2, Wifi, RefreshCw, X, Link2, Upload, Download } from "lucide-react";
+import { Plus, Search, Trash2, Edit2, Wifi, RefreshCw, Link2, Upload } from "lucide-react";
 import {
   devicesApi,
   agentsApi,
@@ -16,6 +16,8 @@ import {
   ApiError,
 } from "../../../lib/api";
 import { splitCsvLine } from "../../../lib/csv";
+import { BalancaFormModal } from "../../../components/devices/BalancaFormModal";
+import { ImportarBalancasModal } from "../../../components/devices/ImportarBalancasModal";
 import { VincularAgentModal } from "../../../components/devices/VincularAgentModal";
 
 const emptyForm = { nome: "", ip: "", porta: "33581" };
@@ -516,68 +518,14 @@ export default function DevicesPage() {
 
       {/* Add / Edit Device Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="text-lg font-semibold text-slate-800">
-                {editingId ? "Editar Dispositivo" : "Adicionar Dispositivo"}
-              </h3>
-              <button onClick={closeDeviceModal} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSaveDevice} className="p-6 space-y-4">
-              <div>
-                <label htmlFor="device-nome-da-balanca" className="block text-sm font-medium text-slate-700 mb-1">Nome da Balança</label>
-                <input id="device-nome-da-balanca"
-                  type="text"
-                  required
-                  placeholder="Ex: Balança Frios 02"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  value={deviceForm.nome}
-                  onChange={(e) => setDeviceForm({ ...deviceForm, nome: e.target.value })}
-                />
-              </div>
-              <div>
-                <label htmlFor="device-endereco-ip" className="block text-sm font-medium text-slate-700 mb-1">Endereço IP</label>
-                <input id="device-endereco-ip"
-                  type="text"
-                  required
-                  placeholder="Ex: 192.168.0.155"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-                  value={deviceForm.ip}
-                  onChange={(e) => setDeviceForm({ ...deviceForm, ip: e.target.value })}
-                />
-              </div>
-              <div>
-                <label htmlFor="device-porta" className="block text-sm font-medium text-slate-700 mb-1">Porta</label>
-                <input id="device-porta"
-                  type="text"
-                  required
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
-                  value={deviceForm.porta}
-                  onChange={(e) => setDeviceForm({ ...deviceForm, porta: e.target.value })}
-                />
-              </div>
-              <div className="pt-4 flex space-x-3">
-                <button
-                  type="button"
-                  onClick={closeDeviceModal}
-                  className="flex-1 px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium disabled:opacity-60"
-                >
-                  {saving ? "Salvando..." : "Salvar"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <BalancaFormModal
+          form={deviceForm}
+          setForm={setDeviceForm}
+          editingId={editingId}
+          saving={saving}
+          onSubmit={handleSaveDevice}
+          onClose={closeDeviceModal}
+        />
       )}
 
       {/* Link to Agent Local Modal */}
@@ -606,87 +554,14 @@ export default function DevicesPage() {
         onChange={handleImportFile}
       />
       {isImportModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h3 className="text-lg font-semibold text-slate-800">Importar Balanças em Lote</h3>
-              <button onClick={closeImportModal} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 space-y-4 overflow-y-auto">
-              <p className="text-sm text-slate-500">
-                Envie um CSV com as colunas <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">lojaId</code>,{" "}
-                <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">nome</code>,{" "}
-                <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">ip</code> e opcionalmente{" "}
-                <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">porta</code> (padrão 33581). Uma linha por
-                balança — várias linhas com o mesmo <code className="text-xs bg-slate-50 px-1 py-0.5 rounded">lojaId</code>{" "}
-                reaproveitam o mesmo Agent Local daquela loja.
-              </p>
-
-              {importError && (
-                <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{importError}</div>
-              )}
-
-              {!importResult && (
-                <button
-                  onClick={handleImportClick}
-                  disabled={importing}
-                  className="w-full flex items-center justify-center px-4 py-3 bg-white border-2 border-dashed border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  {importing ? "Importando..." : "Selecionar arquivo CSV"}
-                </button>
-              )}
-
-              {importResult && (
-                <div className="space-y-4">
-                  <div className="p-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg">
-                    {importResult.reduce((sum, r) => sum + r.devicesCreated, 0)} balança(s) importada(s) em{" "}
-                    {importResult.length} loja(s).
-                  </div>
-                  <div className="border border-slate-100 rounded-lg overflow-hidden">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 text-slate-500">
-                        <tr>
-                          <th className="px-4 py-2 font-medium">Loja</th>
-                          <th className="px-4 py-2 font-medium">Balanças</th>
-                          <th className="px-4 py-2 font-medium">Agent</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {importResult.map((r) => (
-                          <tr key={r.lojaId}>
-                            <td className="px-4 py-2 text-slate-700">{r.lojaId}</td>
-                            <td className="px-4 py-2 text-slate-500">{r.devicesCreated}</td>
-                            <td className="px-4 py-2 text-xs">
-                              {r.agentToken ? (
-                                <span className="text-emerald-700">novo token gerado</span>
-                              ) : (
-                                <span className="text-slate-400">agent já existente</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-xs text-slate-400">
-                    Por segurança, o token de cada Agent Local só é exibido uma vez. Baixe a planilha abaixo e
-                    entregue aos técnicos que vão instalar o Agent Local em cada loja nova.
-                  </p>
-                  <button
-                    onClick={handleExportTokens}
-                    className="w-full flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Baixar CSV com os tokens
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <ImportarBalancasModal
+          importing={importing}
+          importError={importError}
+          importResult={importResult}
+          onEscolherArquivo={handleImportClick}
+          onExportarTokens={handleExportTokens}
+          onClose={closeImportModal}
+        />
       )}
     </div>
   );
