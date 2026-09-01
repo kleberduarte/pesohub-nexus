@@ -1,4 +1,13 @@
-import { buildPluRow, encodePrice, encodeTara } from "./scale-client";
+import { createServer } from "net";
+import type { AddressInfo } from "net";
+import {
+  buildPluRow,
+  descreverFormatosDivergentes,
+  encodePrice,
+  encodeTara,
+  listarSlotsEtiqueta,
+  verificarFormatosGravados,
+} from "./scale-client";
 
 describe("encodePrice", () => {
   it("codifica valores confirmados por captura A/B do software oficial", () => {
@@ -173,5 +182,163 @@ describe("buildSyncBody — formatos avulsos", () => {
     expect(labs).toHaveLength(1);
     // O do produto vence: é ele que carrega o vínculo com o bitmap de selos.
     expect(labs[0]).toContain("PELO PRODUTO");
+  });
+});
+
+/**
+ * Detecção de descarte silencioso (card #54).
+ *
+ * A balança aceita e descarta a gravação de um LAB cujo número caia num slot
+ * de fábrica. ACK não prova nada — só a releitura prova. Estes testes cobrem
+ * os quatro desfechos, incluindo o que mais engana: leitura que FALHA não pode
+ * ser lida como "slot vazio".
+ */
+describe("verificarFormatosGravados", () => {
+  const formato = (numero: number, nome: string) => ({
+    numero,
+    nome,
+    larguraMm: 58,
+    alturaMm: 40,
+    elementos: [],
+  });
+
+  /** Sobe uma balança de mentira que responde UPL/LAB conforme `slots`. */
+  function balancaFake(slots: Record<number, string | null>, opcoes: { derruba?: boolean } = {}) {
+    const servidor = createServer((socket) => {
+      if (opcoes.derruba) {
+        socket.destroy();
+        return;
+      }
+      socket.setEncoding("latin1");
+      socket.on("data", (chunk: string) => {
+        const m = /UPL\tLAB\t(\d+)\t/.exec(chunk);
+        if (!m) return;
+        const numero = Number(m[1]);
+        const nome = slots[numero];
+        const linha = nome != null ? `LAB\t${numero}\t${nome}\t0\t58\t40\t\r\n` : "";
+        socket.write(`${linha}END\tLAB\t\r\n`, "latin1");
+      });
+    });
+    return new Promise<{ porta: number; fechar: () => void }>((resolve) => {
+      servidor.listen(0, "127.0.0.1", () => {
+        const addr = servidor.address() as AddressInfo;
+        resolve({ porta: addr.port, fechar: () => servidor.close() });
+      });
+    });
+  }
+
+  it("não acusa divergência quando o nome gravado bate com o enviado", async () => {
+    const b = await balancaFake({ 23: "Etiqueta 60x80" });
+    const r = await verificarFormatosGravados("127.0.0.1", b.porta, [formato(23, "Etiqueta 60x80")]);
+    b.fechar();
+    expect(r).toEqual({ ok: true, divergentes: [] });
+  });
+
+  it("acusa o slot que continua com um modelo de fábrica", async () => {
+    const b = await balancaFake({ 1: "PF-1" });
+    const r = await verificarFormatosGravados("127.0.0.1", b.porta, [formato(1, "Minha Etiqueta")]);
+    b.fechar();
+    expect(r).toEqual({
+      ok: true,
+      divergentes: [{ numero: 1, esperado: "Minha Etiqueta", encontrado: "PF-1" }],
+    });
+  });
+
+  it("acusa o slot que voltou vazio", async () => {
+    const b = await balancaFake({});
+    const r = await verificarFormatosGravados("127.0.0.1", b.porta, [formato(40, "Avulso")]);
+    b.fechar();
+    expect(r).toEqual({
+      ok: true,
+      divergentes: [{ numero: 40, esperado: "Avulso", encontrado: null }],
+    });
+  });
+
+  // O de sempre: em 2026-09-01 uma leitura que falhou foi lida como "0 PLUs" e
+  // gerou alarme falso de balança zerada. Falha de leitura NÃO é slot vazio.
+  it("reporta erro quando a leitura falha, em vez de concluir que o slot está vazio", async () => {
+    const b = await balancaFake({}, { derruba: true });
+    const r = await verificarFormatosGravados("127.0.0.1", b.porta, [formato(23, "Etiqueta")]);
+    b.fechar();
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toMatch(/Conexão encerrada|Falha ao reler|recusou a conexão/);
+  });
+});
+
+describe("descreverFormatosDivergentes", () => {
+  it("explica o slot ocupado e sugere trocar o número", () => {
+    const msg = descreverFormatosDivergentes([
+      { numero: 1, esperado: "Minha Etiqueta", encontrado: "PF-1" },
+    ]);
+    expect(msg).toContain('formato 1 ("Minha Etiqueta") não foi gravado');
+    expect(msg).toContain('ainda contém "PF-1"');
+    expect(msg).toContain("modelo de fábrica");
+    expect(msg).toContain("Escolha outro número");
+  });
+
+  it("distingue slot vazio de slot ocupado", () => {
+    const msg = descreverFormatosDivergentes([
+      { numero: 40, esperado: "Avulso", encontrado: null },
+    ]);
+    expect(msg).toContain("o slot está vazio");
+  });
+});
+
+
+/**
+ * Mapa de slots ocupados (card #55) — é o que faz o cadastro parar de pedir um
+ * número de 1 a 99 no escuro.
+ */
+describe("listarSlotsEtiqueta", () => {
+  function balancaFake(linhas: string, opcoes: { derruba?: boolean } = {}) {
+    const servidor = createServer((socket) => {
+      if (opcoes.derruba) {
+        socket.destroy();
+        return;
+      }
+      socket.setEncoding("latin1");
+      socket.on("data", (chunk: string) => {
+        if (!chunk.includes("UPL\tLAB")) return;
+        socket.write(`${linhas}END\tLAB\t\r\n`, "latin1");
+      });
+    });
+    return new Promise<{ porta: number; fechar: () => void }>((resolve) => {
+      servidor.listen(0, "127.0.0.1", () => {
+        const addr = servidor.address() as AddressInfo;
+        resolve({ porta: addr.port, fechar: () => servidor.close() });
+      });
+    });
+  }
+
+  it("lista os slots ocupados com número e nome", async () => {
+    const b = await balancaFake(
+      "LAB\t1\tPF-1\t0\t58\t60\t\r\n" + "LAB\t23\tEtiqueta 60x80\t0\t58\t79\t\r\n",
+    );
+    const r = await listarSlotsEtiqueta("127.0.0.1", b.porta);
+    b.fechar();
+    expect(r).toEqual({
+      ok: true,
+      slots: [
+        { numero: 1, nome: "PF-1" },
+        { numero: 23, nome: "Etiqueta 60x80" },
+      ],
+    });
+  });
+
+  it("devolve lista vazia quando a balança não tem nenhum slot gravado", async () => {
+    const b = await balancaFake("");
+    const r = await listarSlotsEtiqueta("127.0.0.1", b.porta);
+    b.fechar();
+    expect(r).toEqual({ ok: true, slots: [] });
+  });
+
+  // O caso que importa: se falha de leitura virasse lista vazia, o cadastro
+  // ofereceria como "livre" justamente os slots de fábrica, que descartam em
+  // silêncio — o oposto do objetivo do card.
+  it("erra em vez de devolver lista vazia quando a leitura falha", async () => {
+    const b = await balancaFake("", { derruba: true });
+    const r = await listarSlotsEtiqueta("127.0.0.1", b.porta);
+    b.fechar();
+    expect(r.ok).toBe(false);
   });
 });

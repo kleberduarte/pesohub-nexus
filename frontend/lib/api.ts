@@ -333,6 +333,19 @@ export interface DeviceStats {
   online: number;
 }
 
+export interface SlotEtiquetaOcupado {
+  numero: number;
+  nome: string;
+  deviceId: string;
+  deviceNome: string;
+  lidosEm: string;
+}
+
+export interface SlotsEtiquetaResponse {
+  slots: SlotEtiquetaOcupado[];
+  livres: number[];
+}
+
 export const devicesApi = {
   list: (page = 1, pageSize = 50) =>
     request<PaginatedDevices>(`/devices?page=${page}&pageSize=${pageSize}`),
@@ -343,6 +356,9 @@ export const devicesApi = {
     request<Device>(`/devices/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   remove: (id: string) => request<void>(`/devices/${id}`, { method: "DELETE" }),
   discover: () => request<DiscoveredDevice[]>("/devices/discovered"),
+  /** Slots de etiqueta já ocupados nas balanças da loja, lidos do equipamento
+   * pelo Agent Local. Ver card #55. */
+  slotsEtiqueta: () => request<SlotsEtiquetaResponse>("/devices/slots-etiqueta"),
   linkAgent: (id: string, agentToken: string) =>
     request<Device>(`/devices/${id}/link-agent`, { method: "POST", body: JSON.stringify({ agentToken }) }),
   import: (rows: ImportDeviceRow[]) =>

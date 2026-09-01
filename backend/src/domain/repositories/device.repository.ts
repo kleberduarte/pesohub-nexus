@@ -8,7 +8,25 @@ export interface DeviceStats {
   online: number;
 }
 
+/**
+ * Um slot de etiqueta ocupado numa balança da loja, com a origem para a tela
+ * poder dizer QUAL balança está usando o número.
+ */
+export interface SlotEtiquetaOcupado {
+  numero: number;
+  nome: string;
+  deviceId: string;
+  deviceNome: string;
+  /** Quando o mapa daquela balança foi lido. Um mapa velho continua útil, mas
+   * a tela precisa mostrar a idade em vez de fingir certeza. */
+  lidosEm: Date;
+}
+
 export interface DeviceRepository {
+  /** Slots ocupados nas balanças da loja, unindo o mapa de cada uma. Balança
+   * cujo mapa nunca foi lido simplesmente não contribui — ausência aqui
+   * significa "não sei", nunca "está livre". */
+  findSlotsEtiquetaOcupados(lojaId: string): Promise<SlotEtiquetaOcupado[]>;
   findAll(lojaId: string): Promise<Device[]>;
   findAllPaginated(lojaId: string, page: number, pageSize: number): Promise<PaginatedResult<Device>>;
   countStats(lojaId: string): Promise<DeviceStats>;
