@@ -1,4 +1,4 @@
-import { sendProductsToScale } from "./scale-client";
+import { sendProductsToScale } from "../src/scale-client";
 import { Socket } from "net";
 
 /**

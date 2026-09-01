@@ -1,7 +1,7 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { sendProductsToScale } from "./scale-client";
+import { sendProductsToScale } from "../src/scale-client";
 
 const SCALE_IP = process.env.SCALE_IP ?? "10.10.40.35";
 const SCALE_PORT = Number(process.env.SCALE_PORT ?? 33581);

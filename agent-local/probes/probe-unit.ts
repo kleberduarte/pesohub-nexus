@@ -1,5 +1,5 @@
 import { Socket } from "net";
-import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
+import { sendProductsToScale, ScaleSyncPayload } from "../src/scale-client";
 
 /**
  * Testa o wiring novo de UnitID (idx4 do PLU): escreve dois PLUs de teste,
