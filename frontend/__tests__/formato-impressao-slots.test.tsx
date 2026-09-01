@@ -70,3 +70,57 @@ describe("Formato de Impressão — mapa de slots da balança", () => {
     expect(await screen.findByText(/não foi possível ler os números/i)).toBeVisible();
   });
 });
+
+/**
+ * Aviso de sincronização ao salvar o layout (card #51).
+ *
+ * Antes, salvar o layout não mandava nada para a balança E não avisava: a
+ * pessoa fechava o modal achando que a balança tinha recebido. Foi a primeira
+ * "armadilha de silêncio" corrigida nesta sequência de cards.
+ *
+ * O aviso é a prova visível de que o envio acontece — se ele sumir, voltamos ao
+ * comportamento que enganava.
+ */
+describe("Formato de Impressão — aviso de envio à balança", () => {
+  const formato = {
+    id: "f-1",
+    numero: 23,
+    nome: "60x80 Padrão",
+    larguraMm: 58,
+    alturaMm: 79,
+    layout: { elementos: [] },
+  };
+
+  beforeEach(() => {
+    (devicesApi.slotsEtiqueta as jest.Mock).mockResolvedValue({ slots: [], livres: [23] });
+    (formatosImpressaoApi.list as jest.Mock).mockResolvedValue([formato]);
+  });
+
+  it("diz para quantas balanças o layout foi enviado", async () => {
+    (formatosImpressaoApi.update as jest.Mock).mockResolvedValue({
+      ...formato,
+      sincronizacao: { balancas: 2, produtos: 5 },
+    });
+
+    render(<FormatoImpressaoPanel />);
+    await userEvent.click(await screen.findByTitle(/editar layout/i));
+    await userEvent.click(await screen.findByRole("button", { name: /salvar layout/i }));
+
+    expect(await screen.findByText(/enviado para 2 balanças/i)).toBeVisible();
+  });
+
+  // O caso que mais engana: sem agent vinculado, NADA sai do servidor. A tela
+  // precisa dizer isso, não ficar em silêncio.
+  it("avisa quando nenhuma balança recebeu, em vez de calar", async () => {
+    (formatosImpressaoApi.update as jest.Mock).mockResolvedValue({
+      ...formato,
+      sincronizacao: { balancas: 0, produtos: 0 },
+    });
+
+    render(<FormatoImpressaoPanel />);
+    await userEvent.click(await screen.findByTitle(/editar layout/i));
+    await userEvent.click(await screen.findByRole("button", { name: /salvar layout/i }));
+
+    expect(await screen.findByText(/nenhuma balança com agent local/i)).toBeVisible();
+  });
+});
