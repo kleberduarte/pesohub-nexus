@@ -22,6 +22,7 @@ import {
   type FormatoImpressao,
   ApiError,
 } from "../../../lib/api";
+import { parseCsv, toCsv } from "../../../lib/produtos-csv";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 
 const emptyForm: CreateProductInput = {
@@ -61,53 +62,6 @@ const emptyForm: CreateProductInput = {
 };
 
 type StatusFilter = "todos" | "ativos" | "inativos";
-
-function toCsv(products: Product[]): string {
-  const header = ["codigo", "codigoBarras", "nome", "preco", "categoriaImposto", "ativo"];
-  const rows = products.map((p) =>
-    [p.codigo, p.codigoBarras, p.nome, p.preco, p.categoriaImposto ?? "", p.ativo ? "1" : "0"]
-      .map((field) => `"${String(field).replace(/"/g, '""')}"`)
-      .join(","),
-  );
-  return [header.join(","), ...rows].join("\r\n");
-}
-
-function parseCsv(text: string): CreateProductInput[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length === 0) return [];
-
-  const splitLine = (line: string) =>
-    line
-      .split(",")
-      .map((field) => field.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
-
-  const header = splitLine(lines[0]).map((h) => h.toLowerCase());
-  const idx = {
-    codigo: header.indexOf("codigo"),
-    codigoBarras: header.indexOf("codigobarras"),
-    nome: header.indexOf("nome"),
-    preco: header.indexOf("preco"),
-    categoriaImposto: header.indexOf("categoriaimposto"),
-    ativo: header.indexOf("ativo"),
-  };
-  if (idx.codigo === -1 || idx.codigoBarras === -1 || idx.nome === -1 || idx.preco === -1) {
-    throw new Error(
-      'CSV inválido: cabeçalho deve conter ao menos "codigo,codigoBarras,nome,preco" (categoriaImposto e ativo são opcionais).',
-    );
-  }
-
-  return lines.slice(1).map((line) => {
-    const fields = splitLine(line);
-    return {
-      codigo: fields[idx.codigo] ?? "",
-      codigoBarras: fields[idx.codigoBarras] ?? "",
-      nome: fields[idx.nome] ?? "",
-      preco: Number(fields[idx.preco]?.replace(",", ".") ?? 0),
-      categoriaImposto: idx.categoriaImposto >= 0 ? fields[idx.categoriaImposto] : undefined,
-      ativo: idx.ativo >= 0 ? fields[idx.ativo] === "1" || fields[idx.ativo]?.toLowerCase() === "true" : true,
-    };
-  });
-}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
