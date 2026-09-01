@@ -92,10 +92,15 @@ export class DevicesController {
 
     const slots = await this.devices.findSlotsEtiquetaOcupados(lojaId);
     const ocupados = new Set(slots.map((s) => s.numero));
-    const livres: number[] = [];
-    for (let n = 1; n <= 99; n++) if (!ocupados.has(n)) livres.push(n);
 
-    return { slots, livres };
+    // "Sem uso conhecido", não "livre" (card #59). O dump da balança é
+    // incompleto, então a ausência de um número aqui significa que não o vimos
+    // ocupado — não que ele esteja disponível. A garantia de verdade continua
+    // sendo a releitura na hora de gravar (card #54), que falha explicando.
+    const semUsoConhecido: number[] = [];
+    for (let n = 1; n <= 99; n++) if (!ocupados.has(n)) semUsoConhecido.push(n);
+
+    return { slots, livres: semUsoConhecido };
   }
 
   @Get(":id")
