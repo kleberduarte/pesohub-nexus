@@ -465,9 +465,10 @@ export function FormatoImpressaoPanel() {
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
+                <label htmlFor="formato-numero" className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
                 <input
                   type="number"
+                  id="formato-numero"
                   value={numero}
                   onChange={(e) => setNumero(Number(e.target.value))}
                   className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
@@ -504,9 +505,10 @@ export function FormatoImpressaoPanel() {
                 ) : null}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
+                <label htmlFor="formato-nome" className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
                 <input
                   type="text"
+                  id="formato-nome"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -514,19 +516,21 @@ export function FormatoImpressaoPanel() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Largura (mm) *</label>
+                  <label htmlFor="formato-largura" className="block text-sm font-medium text-slate-700 mb-1">Largura (mm) *</label>
                   <input
                     type="number"
-                    value={larguraMm}
+                    id="formato-largura"
+                  value={larguraMm}
                     onChange={(e) => setLarguraMm(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Altura (mm) *</label>
+                  <label htmlFor="formato-altura" className="block text-sm font-medium text-slate-700 mb-1">Altura (mm) *</label>
                   <input
                     type="number"
-                    value={alturaMm}
+                    id="formato-altura"
+                  value={alturaMm}
                     onChange={(e) => setAlturaMm(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
