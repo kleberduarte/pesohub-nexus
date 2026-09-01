@@ -7,6 +7,7 @@ export class UpdateOperadorDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 
@@ -18,6 +19,7 @@ export class UpdateOperadorDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   codigo?: string;
 
   @IsOptional()

@@ -21,6 +21,80 @@ const USER_CACHE_KEY = "pesohub_user";
 // continuar mostrando a identidade visual correta após o logout (que
 // só derruba o USER_CACHE_KEY). Ver ClienteBranding.accessToken.
 const ACTIVE_CLIENTE_TOKEN_KEY = "pesohub_active_cliente_token";
+// Por que a última sessão terminou, para a tela de login explicar. Fica em
+// sessionStorage (não localStorage) para morrer junto com a aba: é um recado
+// de uma navegação só, não um estado a carregar adiante.
+const SESSION_END_REASON_KEY = "pesohub_session_end_reason";
+
+/** Lê e consome o motivo do fim da última sessão. */
+export function takeSessionEndReason(): string | null {
+  if (typeof window === "undefined") return null;
+  const motivo = sessionStorage.getItem(SESSION_END_REASON_KEY);
+  if (motivo) sessionStorage.removeItem(SESSION_END_REASON_KEY);
+  return motivo;
+}
+
+// Empresa/loja ativa DESTA aba. Fica em sessionStorage porque ele é por aba —
+// localStorage e cookie são por navegador, e enquanto o escopo morava no
+// cookie, trocar de loja numa aba mudava a loja de todas as outras: dava para
+// cadastrar produto numa aba e sincronizar para a balança que a outra aba
+// tinha selecionado. Estes cabeçalhos são revalidados no backend a cada
+// requisição (ver SessionScopeService), então não são uma via de privilégio.
+const SCOPE_KEY = "pesohub_scope";
+const HEADER_LOJA = "x-pesohub-loja";
+const HEADER_CLIENTE = "x-pesohub-cliente";
+
+export interface SessionScope {
+  clienteId: string | null;
+  lojaId: string | null;
+}
+
+export function getSessionScope(): SessionScope | null {
+  if (typeof window === "undefined") return null;
+  const raw = sessionStorage.getItem(SCOPE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as SessionScope;
+  } catch {
+    return null;
+  }
+}
+
+export function setSessionScope(scope: SessionScope) {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(SCOPE_KEY, JSON.stringify(scope));
+}
+
+export function clearSessionScope() {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(SCOPE_KEY);
+}
+
+// Identificador da sessão que ESTA aba conhece. Duas abas do mesmo navegador
+// compartilham o cookie, então quando alguém faz login de novo a aba antiga
+// passa a usar a sessão nova sem perceber. Guardar o jti aqui é o que permite
+// notar a troca e avisar — sem isso o segundo login é invisível.
+const LAST_SESSION_KEY = "pesohub_last_jti";
+
+export function getLastSessionId(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(LAST_SESSION_KEY);
+}
+
+export function setLastSessionId(jti: string | null) {
+  if (typeof window === "undefined") return;
+  if (jti) sessionStorage.setItem(LAST_SESSION_KEY, jti);
+  else sessionStorage.removeItem(LAST_SESSION_KEY);
+}
+
+function scopeHeaders(): Record<string, string> {
+  const scope = getSessionScope();
+  if (!scope) return {};
+  const headers: Record<string, string> = {};
+  if (scope.lojaId) headers[HEADER_LOJA] = scope.lojaId;
+  if (scope.clienteId) headers[HEADER_CLIENTE] = scope.clienteId;
+  return headers;
+}
 
 export function getCurrentUser(): DecodedUser | null {
   if (typeof window === "undefined") return null;
@@ -65,6 +139,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      ...scopeHeaders(),
       ...options.headers,
     },
   });
@@ -81,6 +156,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       clearCurrentUser();
       const { pathname } = window.location;
       if (pathname !== "/login" && !pathname.startsWith("/acesso/")) {
+        // O motivo vem do backend e atravessa o redirect: ser derrubado por um
+        // login em outro dispositivo é a única pista de que alguém está usando
+        // a sua conta — sumir com essa mensagem esconde justamente o incidente
+        // que a sessão única existe para revelar.
+        if (message) sessionStorage.setItem(SESSION_END_REASON_KEY, message);
         window.location.href = "/login";
       }
     }
@@ -102,10 +182,15 @@ export interface DecodedUser {
   role: UserRole;
   clienteId: string | null;
   lojaId: string | null;
+  /** Identificador da sessão. Muda a cada login/refresh. */
+  jti?: string;
 }
 
 export interface LoginResponse {
-  user: DecodedUser;
+  user: DecodedUser & {
+    /** Primeiro acesso ou senha vencida: o app leva direto para a troca. */
+    precisaTrocarSenha?: boolean;
+  };
 }
 
 export async function login(email: string, senha: string) {
@@ -114,18 +199,42 @@ export async function login(email: string, senha: string) {
     body: JSON.stringify({ email, senha }),
   });
   setCurrentUser(data.user);
+  // Toda aba começa no escopo padrão da conta; a partir daí ela é dona do
+  // próprio escopo.
+  setSessionScope({ clienteId: data.user.clienteId, lojaId: data.user.lojaId });
+  setLastSessionId(data.user.jti ?? null);
   return data;
 }
 
 export const authApi = {
   me: () => request<DecodedUser>("/auth/me"),
-  logout: () => request<{ ok: boolean }>("/auth/logout", { method: "POST" }),
+  logout: async () => {
+    const r = await request<{ ok: boolean }>("/auth/logout", { method: "POST" });
+    clearSessionScope();
+    return r;
+  },
+  refresh: async () => {
+    const data = await request<LoginResponse>("/auth/refresh", { method: "POST" });
+    setLastSessionId(data.user.jti ?? null);
+    return data;
+  },
+  trocarSenha: async (senhaAtual: string, novaSenha: string) => {
+    const data = await request<LoginResponse>("/auth/trocar-senha", {
+      method: "POST",
+      body: JSON.stringify({ senhaAtual, novaSenha }),
+    });
+    setCurrentUser(data.user);
+    return data;
+  },
+  // Os dois switches gravam o escopo só desta aba. O backend não reemite o
+  // cookie de propósito — se reemitisse, a troca vazaria para as outras abas.
   switchCompany: async (clienteId: string) => {
     const data = await request<LoginResponse>("/auth/switch-company", {
       method: "POST",
       body: JSON.stringify({ clienteId }),
     });
     setCurrentUser(data.user);
+    setSessionScope({ clienteId: data.user.clienteId, lojaId: data.user.lojaId });
     return data;
   },
   switchLoja: async (lojaId: string) => {
@@ -134,6 +243,7 @@ export const authApi = {
       body: JSON.stringify({ lojaId }),
     });
     setCurrentUser(data.user);
+    setSessionScope({ clienteId: data.user.clienteId, lojaId: data.user.lojaId });
     return data;
   },
 };
@@ -390,8 +500,43 @@ export interface CreateProductInput {
 
 export type UpdateProductInput = Partial<CreateProductInput>;
 
+export interface PaginatedProducts {
+  data: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface ProductListParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  /** Omitido traz ativos e inativos. */
+  ativo?: boolean;
+}
+
+/** Teto que o backend aceita em pageSize (ver ProductsController.MAX_PAGE_SIZE). */
+export const PRODUCTS_MAX_PAGE_SIZE = 500;
+
 export const productsApi = {
-  list: () => request<Product[]>("/products"),
+  list: ({ page = 1, pageSize = 50, search, ativo }: ProductListParams = {}) => {
+    const query = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+    if (search?.trim()) query.set("search", search.trim());
+    if (ativo !== undefined) query.set("ativo", String(ativo));
+    return request<PaginatedProducts>(`/products?${query}`);
+  },
+
+  /** Só o total, para contadores — traz uma linha em vez do catálogo inteiro. */
+  count: async () => (await productsApi.list({ page: 1, pageSize: 1 })).total,
+
+  /**
+   * Lista para seletores de produto (combos de etiqueta e tecla rápida). Traz
+   * no máximo uma página cheia: catálogos maiores que isso dependem do campo
+   * de busca, que filtra no banco.
+   */
+  listForPicker: async (search?: string) =>
+    (await productsApi.list({ page: 1, pageSize: PRODUCTS_MAX_PAGE_SIZE, search })).data,
+
   create: (data: CreateProductInput) =>
     request<Product>("/products", { method: "POST", body: JSON.stringify(data) }),
   update: (id: string, data: UpdateProductInput) =>
@@ -572,9 +717,15 @@ export interface FormatoImpressao {
   larguraMm: number;
   alturaMm: number;
   layout?: Record<string, unknown> | null;
+  /**
+   * Só vem em create/update: quantas balanças o backend acionou ao salvar, e
+   * quantos produtos entraram no pacote. Serve para a tela dizer que o envio
+   * foi disparado — antes o layout ficava só no banco, em silêncio.
+   */
+  sincronizacao?: { balancas: number; produtos: number };
 }
 
-export type CreateFormatoImpressaoInput = Omit<FormatoImpressao, "id">;
+export type CreateFormatoImpressaoInput = Omit<FormatoImpressao, "id" | "sincronizacao">;
 export type UpdateFormatoImpressaoInput = Partial<CreateFormatoImpressaoInput>;
 
 export const formatosImpressaoApi = {
@@ -743,6 +894,15 @@ export interface AppUser {
   role: UserRole;
   createdAt: string;
   perfil?: { nome: string } | null;
+  /** Data futura enquanto a conta estiver travada por erros de senha. */
+  lockedUntil?: string | null;
+  /** Conta ainda com a senha definida por quem a criou. */
+  mustChangePassword?: boolean;
+}
+
+/** True se a conta está travada agora. */
+export function contaBloqueada(user: AppUser): boolean {
+  return !!user.lockedUntil && new Date(user.lockedUntil) > new Date();
 }
 
 export interface CreateUserInput {
@@ -763,6 +923,11 @@ export const usersApi = {
   update: (id: string, data: UpdateUserInput) =>
     request<AppUser>(`/users/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   remove: (id: string) => request<void>(`/users/${id}`, { method: "DELETE" }),
+  // Destrava sem trocar a senha: quem travou continua sabendo a própria senha,
+  // e obrigar o administrador a definir uma nova recria o hábito de senha
+  // repassada que este fluxo veio eliminar.
+  desbloquear: (id: string) =>
+    request<{ desbloqueado: boolean }>(`/users/${id}/desbloquear`, { method: "POST" }),
 };
 
 // ---------- Sync ----------

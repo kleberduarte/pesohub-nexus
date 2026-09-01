@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Plus, Search, Filter, Download, Upload, Pencil, Trash2, X, Save, Loader2, AlertTriangle } from "lucide-react";
 import {
   productsApi,
+  PRODUCTS_MAX_PAGE_SIZE,
   getCurrentUser,
   subSetoresApi,
   tabelasNutricionaisApi,
@@ -110,6 +111,8 @@ function parseCsv(text: string): CreateProductInput[] {
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -123,11 +126,15 @@ export default function ProductsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   const [deleteAllConfirmText, setDeleteAllConfirmText] = useState("");
   const [deletingAll, setDeletingAll] = useState(false);
-  const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
+  /** Linhas por página na tabela de produtos. */
+const PAGE_SIZE = 50;
+
+const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [deletingOne, setDeletingOne] = useState(false);
   const [subSetores, setSubSetores] = useState<SubSetor[]>([]);
@@ -146,7 +153,16 @@ export default function ProductsPage() {
     formatosImpressaoApi.list().then(setFormatosImpressao).catch(() => setFormatosImpressao([]));
   }, []);
 
-  const loadProducts = async () => {
+  /** Busca e filtro de status vão para o banco — a página nunca carrega o
+   *  catálogo inteiro só para filtrar na memória do navegador. */
+  const listParams = (targetPage: number) => ({
+    page: targetPage,
+    pageSize: PAGE_SIZE,
+    search: searchTerm,
+    ativo: statusFilter === "ativos" ? true : statusFilter === "inativos" ? false : undefined,
+  });
+
+  const loadProducts = async (targetPage = page) => {
     setLoading(true);
     setError("");
     if (!getCurrentUser()?.clienteId) {
@@ -155,7 +171,10 @@ export default function ProductsPage() {
       return;
     }
     try {
-      setProducts(await productsApi.list());
+      const resultado = await productsApi.list(listParams(targetPage));
+      setProducts(resultado.data);
+      setTotal(resultado.total);
+      setPage(resultado.page);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível carregar os produtos.");
     } finally {
@@ -163,23 +182,20 @@ export default function ProductsPage() {
     }
   };
 
+  // Digitar na busca não pode disparar uma requisição por tecla; o atraso
+  // curto agrupa a digitação numa consulta só. Qualquer mudança de busca ou
+  // filtro volta para a primeira página — a página 7 do resultado anterior
+  // provavelmente nem existe no novo.
   useEffect(() => {
-    loadProducts();
-  }, []);
+    const timer = setTimeout(() => loadProducts(1), 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, statusFilter]);
 
-  const filteredProducts = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    return products.filter((p) => {
-      if (statusFilter === "ativos" && !p.ativo) return false;
-      if (statusFilter === "inativos" && p.ativo) return false;
-      if (!term) return true;
-      return (
-        p.codigo.toLowerCase().includes(term) ||
-        p.codigoBarras.toLowerCase().includes(term) ||
-        p.nome.toLowerCase().includes(term)
-      );
-    });
-  }, [products, searchTerm, statusFilter]);
+  const temFiltroAtivo = searchTerm.trim().length > 0 || statusFilter !== "todos";
+  const totalPaginas = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const primeiroDaPagina = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const ultimoDaPagina = Math.min(page * PAGE_SIZE, total);
 
   const openCreateModal = () => {
     setEditingId(null);
@@ -291,8 +307,31 @@ export default function ProductsPage() {
     }
   };
 
-  const handleExport = () => {
-    const csv = toCsv(filteredProducts);
+  // O CSV exporta tudo que casa com o filtro atual, não só a página na tela —
+  // por isso percorre as páginas em vez de usar `products`.
+  const handleExport = async () => {
+    setExporting(true);
+    setError("");
+    try {
+      const todos: Product[] = [];
+      let paginaAtual = 1;
+      let paginas = 1;
+      do {
+        const resultado = await productsApi.list({ ...listParams(paginaAtual), pageSize: PRODUCTS_MAX_PAGE_SIZE });
+        todos.push(...resultado.data);
+        paginas = Math.max(1, Math.ceil(resultado.total / PRODUCTS_MAX_PAGE_SIZE));
+        paginaAtual += 1;
+      } while (paginaAtual <= paginas);
+      baixarCsv(todos);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível exportar os produtos.");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const baixarCsv = (lista: Product[]) => {
+    const csv = toCsv(lista);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -368,15 +407,15 @@ export default function ProductsPage() {
           </button>
           <button
             onClick={handleExport}
-            disabled={filteredProducts.length === 0}
+            disabled={total === 0 || exporting}
             className="flex items-center justify-center px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
           >
-            <Download className="w-4 h-4 mr-2" />
-            Exportar
+            {exporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            {exporting ? "Exportando..." : "Exportar"}
           </button>
           <button
             onClick={() => setIsDeleteAllOpen(true)}
-            disabled={products.length === 0}
+            disabled={total === 0 && !temFiltroAtivo}
             className="flex items-center justify-center px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium disabled:opacity-60"
           >
             <Trash2 className="w-4 h-4 mr-2" />
@@ -466,7 +505,7 @@ export default function ProductsPage() {
                 </tr>
               )}
               {!loading &&
-                filteredProducts.map((product) => (
+                products.map((product) => (
                   <tr key={product.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 text-slate-500 font-mono">{product.codigo}</td>
                     <td className="px-6 py-4 text-slate-500 font-mono">{product.codigoBarras}</td>
@@ -498,22 +537,43 @@ export default function ProductsPage() {
                     </td>
                   </tr>
                 ))}
-              {!loading && filteredProducts.length === 0 && (
+              {!loading && products.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center text-slate-500">
-                    {products.length === 0
-                      ? "Nenhum produto cadastrado."
-                      : "Nenhum produto encontrado para os filtros aplicados."}
+                    {temFiltroAtivo
+                      ? "Nenhum produto encontrado para os filtros aplicados."
+                      : "Nenhum produto cadastrado."}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500">
+        <div className="px-6 py-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500">
           <span>
-            {filteredProducts.length} de {products.length} produto(s)
+            {total === 0
+              ? "Nenhum produto"
+              : `Mostrando ${primeiroDaPagina}–${ultimoDaPagina} de ${total} produto(s)`}
           </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => loadProducts(page - 1)}
+              disabled={page <= 1 || loading}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+            >
+              Anterior
+            </button>
+            <span className="tabular-nums">
+              Página {page} de {totalPaginas}
+            </span>
+            <button
+              onClick={() => loadProducts(page + 1)}
+              disabled={page >= totalPaginas || loading}
+              className="px-3 py-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:hover:bg-transparent"
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1018,9 +1078,10 @@ export default function ProductsPage() {
             </div>
             <div className="p-6 space-y-4">
               <p className="text-sm text-slate-600">
-                Você está prestes a excluir <strong>{products.length} produto(s)</strong> cadastrados
-                permanentemente, incluindo o histórico de sincronização deles nas balanças. Essa ação
-                não pode ser desfeita.
+                Você está prestes a excluir <strong>todos os produtos desta loja</strong>
+                permanentemente{temFiltroAtivo ? " — inclusive os que os filtros atuais escondem" : ""},
+                incluindo o histórico de sincronização deles nas balanças. Essa ação não pode ser
+                desfeita.
               </p>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">

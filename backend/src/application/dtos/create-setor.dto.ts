@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsString, Min } from "class-validator";
+import { IsInt, IsNotEmpty, IsString, MaxLength, Min } from "class-validator";
 
 export class CreateSetorDto {
   // 1-9 são ClassIDs reservados pela balança (Diversos-Peso, Taxa de
@@ -11,6 +11,7 @@ export class CreateSetorDto {
   numero!: number;
 
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome!: string;
 }

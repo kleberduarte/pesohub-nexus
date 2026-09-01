@@ -33,6 +33,7 @@ import {
   type Loja,
 } from "../../lib/api";
 import { applyBranding } from "../../lib/branding";
+import SessionKeepAlive from "../../components/auth/SessionKeepAlive";
 
 const baseNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -112,6 +113,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-slate-50 flex w-full">
+      {/* Renova a sessão enquanto há atividade e avisa antes de expirar. */}
+      <SessionKeepAlive />
       {/* Sidebar */}
       <div className="w-64 bg-brand-50 border-r border-brand-100 flex flex-col h-screen overflow-y-auto">
         <div className="h-16 flex items-center px-6 border-b border-brand-100 shrink-0 sticky top-0 bg-brand-50 z-10">

@@ -5,11 +5,13 @@ const DOMINIO = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/;
 
 export class UpdateClienteParametrosDto {
   @IsString()
+  @MaxLength(120)
   @Length(3, 200)
   nome!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   @Matches(DOMINIO, { message: "dominio deve ser um domínio válido, ex.: empresa.com.br" })
   dominio?: string;
 
@@ -25,31 +27,37 @@ export class UpdateClienteParametrosDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   @Matches(HEX6, { message: "corPrimaria deve estar no formato #RRGGBB" })
   corPrimaria?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   @Matches(HEX6, { message: "corSecundaria deve estar no formato #RRGGBB" })
   corSecundaria?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   @Matches(HEX6, { message: "corFundo deve estar no formato #RRGGBB" })
   corFundo?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   @Matches(HEX6, { message: "corTexto deve estar no formato #RRGGBB" })
   corTexto?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   @Matches(HEX6, { message: "corBotao deve estar no formato #RRGGBB" })
   corBotao?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   @Matches(HEX6, { message: "corBotaoTexto deve estar no formato #RRGGBB" })
   corBotaoTexto?: string;
 
@@ -60,6 +68,7 @@ export class UpdateClienteParametrosDto {
 
   @IsOptional()
   @IsEmail()
+  @MaxLength(160)
   suporteEmail?: string;
 
   @IsOptional()

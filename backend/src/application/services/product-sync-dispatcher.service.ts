@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { InjectQueue } from "@nestjs/bull";
-import { Queue } from "bull";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
 import { DEVICE_REPOSITORY, DeviceRepository } from "../../domain/repositories/device.repository";
 
 /**

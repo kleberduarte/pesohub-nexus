@@ -23,7 +23,9 @@ type ElementoTipo =
   | "imagem"
   | "tabelaNutricional"
   | "selos"
-  | "ingredientes";
+  | "ingredientes"
+  | "borda"
+  | "divisoria";
 
 interface LayoutElemento {
   id: string;
@@ -53,6 +55,8 @@ const TIPO_LABEL: Record<ElementoTipo, string> = {
   tabelaNutricional: "Tabela Nutricional",
   selos: "Selos (Alto em...)",
   ingredientes: "Ingredientes",
+  borda: "Borda / Moldura",
+  divisoria: "Linha divisória",
 };
 
 /** Peso/tara não existem no cadastro (vêm da pesagem na balança) — o preview
@@ -76,6 +80,15 @@ const PX_PER_MM = 5;
 function getElementos(layout: Record<string, unknown> | null | undefined): LayoutElemento[] {
   const el = (layout as { elementos?: LayoutElemento[] } | undefined)?.elementos;
   return el ?? [];
+}
+
+/**
+ * Corpo de fonte que cabe na altura do elemento. Os layouts de fábrica reservam
+ * caixas bem diferentes para o preço (de ~4mm no 30x30 a ~12mm no 60x120); uma
+ * fonte fixa ou estourava a caixa ou deixava o número minúsculo.
+ */
+function alturaFonte(alturaMm: number, minPx: number, maxPx: number): number {
+  return Math.round(Math.min(maxPx, Math.max(minPx, alturaMm * PX_PER_MM * 0.72)));
 }
 
 function formatPrecoValor(preco: number): string {
@@ -224,12 +237,25 @@ export function EtiquetaPreview({
                   {elementos.map((el) => (
                     <div
                       key={el.id}
-                      className="absolute flex items-center justify-center overflow-hidden text-center leading-tight"
+                      className={`absolute flex items-center justify-center overflow-hidden text-center leading-tight ${
+                        // Borda desenha a moldura; divisória é o próprio
+                        // traço. Sem isso a pré-visualização mostraria a
+                        // etiqueta sem nenhuma das linhas que a balança imprime.
+                        el.tipo === "borda"
+                          ? "border border-slate-900"
+                          : el.tipo === "divisoria"
+                            ? "bg-slate-900"
+                            : ""
+                      }`}
                       style={{
                         left: el.x * PX_PER_MM,
                         top: el.y * PX_PER_MM,
                         width: el.largura * PX_PER_MM,
-                        height: el.altura * PX_PER_MM,
+                        // Um traço de 0,5mm arredondaria para 0 e sumiria.
+                        height: Math.max(
+                          el.altura * PX_PER_MM,
+                          el.tipo === "borda" || el.tipo === "divisoria" ? 1 : 0,
+                        ),
                       }}
                     >
                       {el.tipo === "nome" && (
@@ -237,21 +263,18 @@ export function EtiquetaPreview({
                           {product.nome}
                         </span>
                       )}
+                      {/* A balança imprime só o número, em preto sobre o papel:
+                          a legenda "R$" é um elemento separado (a "unidade de
+                          dinheiro" dos layouts de fábrica). O desenho anterior
+                          empilhava um selo preto "Total R$" sobre o valor, que
+                          não existe na impressão e ainda cobria o número quando
+                          o elemento era baixo. */}
                       {el.tipo === "preco" && (
-                        <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-white">
-                          <div className="text-white text-[7px] font-bold text-center leading-none px-2 py-0.5 shrink-0 rounded-[2px] border border-slate-900 bg-slate-900">
-                            Total R$
-                          </div>
-                          <div
-                            className="w-full flex-1 flex items-center justify-center text-[13px] font-bold text-white leading-none border border-slate-900 bg-slate-900"
-                            style={{
-                              clipPath:
-                                "polygon(8% 0%, 92% 0%, 100% 30%, 100% 100%, 0% 100%, 0% 30%)",
-                            }}
-                          >
-                            {formatPrecoValor(product.preco)}
-                          </div>
-                        </div>
+                        <span className="w-full text-slate-900 font-bold text-center leading-none tabular-nums whitespace-nowrap"
+                          style={{ fontSize: alturaFonte(el.altura, 8, 22) }}
+                        >
+                          {formatPrecoValor(product.preco)}
+                        </span>
                       )}
                       {el.tipo === "precoUnitario" && (
                         <span className="w-full text-[9px] text-slate-900 text-left px-0.5 whitespace-nowrap">

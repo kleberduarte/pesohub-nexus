@@ -33,7 +33,12 @@ type ElementoTipo =
   | "imagem"
   | "tabelaNutricional"
   | "selos"
-  | "ingredientes";
+  | "ingredientes"
+  // Linhas e molduras. Vieram para permitir importar os modelos de fábrica da
+  // Ramuza (card #52), onde 181 elementos são exatamente isso — sem eles todo
+  // layout importado abre com os campos soltos no branco.
+  | "borda"
+  | "divisoria";
 
 interface LayoutElemento {
   id: string;
@@ -55,6 +60,10 @@ interface LayoutElemento {
    * valores confirmada ainda, aceita qualquer inteiro >= 0 (0 = padrão da
    * balança). */
   fonte?: number;
+  /** Espessura da linha, só para `borda`/`divisoria`. Em Borda o wire usa o
+   * próprio Flag2 como espessura (1..15, documentado no LabelItem.xml
+   * oficial); os modelos de fábrica usam quase só 2 e 15. */
+  espessura?: number;
 }
 
 const ALINHAMENTO_LABEL: Record<0 | 1 | 2, string> = { 0: "Esquerda", 1: "Centro", 2: "Direita" };
@@ -78,6 +87,8 @@ const TIPO_LABEL: Record<ElementoTipo, string> = {
   tabelaNutricional: "Tabela Nutricional",
   selos: "Selos (Alto em...)",
   ingredientes: "Ingredientes",
+  borda: "Borda / Moldura",
+  divisoria: "Linha divisória",
 };
 
 const TIPO_DEFAULT_SIZE: Record<ElementoTipo, { largura: number; altura: number }> = {
@@ -98,6 +109,8 @@ const TIPO_DEFAULT_SIZE: Record<ElementoTipo, { largura: number; altura: number 
   tabelaNutricional: { largura: 50, altura: 40 },
   selos: { largura: 50, altura: 10 },
   ingredientes: { largura: 50, altura: 16 },
+  borda: { largura: 50, altura: 10 },
+  divisoria: { largura: 50, altura: 0.5 },
 };
 
 const PX_PER_MM = 4;
@@ -111,6 +124,9 @@ export function FormatoImpressaoPanel() {
   const [formatos, setFormatos] = useState<FormatoImpressao[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Salvar dispara a sincronização no backend; sem dizer isso na tela a pessoa
+  // não tem como saber se a balança recebeu o layout novo.
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<FormatoImpressao | null>(null);
@@ -146,7 +162,7 @@ export function FormatoImpressaoPanel() {
 
   useEffect(load, []);
   useEffect(() => {
-    productsApi.list().then(setProducts).catch(() => setProducts([]));
+    productsApi.listForPicker().then(setProducts).catch(() => setProducts([]));
     imagensApi.list().then(setImagens).catch(() => setImagens([]));
     tabelasNutricionaisApi.list().then(setTabelasNutricionais).catch(() => setTabelasNutricionais([]));
   }, []);
@@ -169,16 +185,25 @@ export function FormatoImpressaoPanel() {
     setModalOpen(true);
   };
 
+
+  const descreverSync = (sinc?: { balancas: number; produtos: number }) => {
+    if (!sinc || sinc.balancas === 0) {
+      return "Layout salvo. Nenhuma balança com Agent Local vinculado nesta loja — nada foi enviado.";
+    }
+    const b = sinc.balancas === 1 ? "1 balança" : `${sinc.balancas} balanças`;
+    return `Layout salvo e enviado para ${b}. Acompanhe em Sincronização.`;
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+    setAviso(null);
     try {
       const payload = { numero, nome, tipo: 1, larguraMm, alturaMm };
-      if (editing) {
-        await formatosImpressaoApi.update(editing.id, payload);
-      } else {
-        await formatosImpressaoApi.create({ ...payload, layout: {} });
-      }
+      const salvo = editing
+        ? await formatosImpressaoApi.update(editing.id, payload)
+        : await formatosImpressaoApi.create({ ...payload, layout: {} });
+      setAviso(descreverSync(salvo.sincronizacao));
       setModalOpen(false);
       load();
     } catch (err) {
@@ -286,8 +311,10 @@ export function FormatoImpressaoPanel() {
     if (!layoutEditing) return;
     setSavingLayout(true);
     setError(null);
+    setAviso(null);
     try {
-      await formatosImpressaoApi.update(layoutEditing.id, { layout: { elementos } });
+      const salvo = await formatosImpressaoApi.update(layoutEditing.id, { layout: { elementos } });
+      setAviso(descreverSync(salvo.sincronizacao));
       closeLayout();
       load();
     } catch (err) {
@@ -318,6 +345,15 @@ export function FormatoImpressaoPanel() {
 
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+      )}
+
+      {aviso && (
+        <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-sm flex items-start justify-between gap-3">
+          <span>{aviso}</span>
+          <button onClick={() => setAviso(null)} className="text-blue-500 hover:text-blue-700 shrink-0">
+            Fechar
+          </button>
+        </div>
       )}
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -495,27 +531,41 @@ export function FormatoImpressaoPanel() {
                 className="relative bg-white border-2 border-slate-300 rounded shrink-0"
                 style={{ width: canvasSize.width, height: canvasSize.height }}
               >
-                {elementos.map((el) => (
-                  <div
-                    key={el.id}
-                    onPointerDown={(e) => handlePointerDown(e, el)}
-                    className={`absolute flex items-center text-center text-[9px] leading-tight cursor-move select-none border ${
-                      selectedId === el.id
-                        ? "border-brand-500 bg-brand-50 text-brand-800 ring-2 ring-brand-300"
-                        : "border-slate-300 bg-slate-50 text-slate-500"
-                    }`}
-                    style={{
-                      left: el.x * PX_PER_MM,
-                      top: el.y * PX_PER_MM,
-                      width: el.largura * PX_PER_MM,
-                      height: el.altura * PX_PER_MM,
-                      justifyContent: ALINHAMENTO_CSS[el.alinhamento ?? 0],
-                      transform: el.angulo ? `rotate(${el.angulo}deg)` : undefined,
-                    }}
-                  >
-                    {el.tipo === "texto" ? el.texto : TIPO_LABEL[el.tipo]}
-                  </div>
-                ))}
+                {elementos.map((el) => {
+                  // Borda e divisória são o traço em si, não uma caixa com
+                  // rótulo dentro: desenhar o nome do tipo dentro delas
+                  // deixaria a etiqueta ilegível, já que num layout de fábrica
+                  // elas são dezenas.
+                  const eTraco = el.tipo === "borda" || el.tipo === "divisoria";
+                  const selecionado = selectedId === el.id;
+                  return (
+                    <div
+                      key={el.id}
+                      onPointerDown={(e) => handlePointerDown(e, el)}
+                      className={`absolute flex items-center text-center text-[9px] leading-tight cursor-move select-none ${
+                        eTraco
+                          ? selecionado
+                            ? "border-2 border-brand-500 bg-brand-100/40"
+                            : "border border-slate-400 bg-slate-400/20"
+                          : selecionado
+                            ? "border border-brand-500 bg-brand-50 text-brand-800 ring-2 ring-brand-300"
+                            : "border border-slate-300 bg-slate-50 text-slate-500"
+                      }`}
+                      style={{
+                        left: el.x * PX_PER_MM,
+                        top: el.y * PX_PER_MM,
+                        width: el.largura * PX_PER_MM,
+                        // Uma linha de 0,5mm sumiria na tela; garante 1px.
+                        height: Math.max(el.altura * PX_PER_MM, eTraco ? 1 : 0),
+                        justifyContent: ALINHAMENTO_CSS[el.alinhamento ?? 0],
+                        transform: el.angulo ? `rotate(${el.angulo}deg)` : undefined,
+                      }}
+                      title={eTraco ? TIPO_LABEL[el.tipo] : undefined}
+                    >
+                      {eTraco ? null : el.tipo === "texto" ? el.texto : TIPO_LABEL[el.tipo]}
+                    </div>
+                  );
+                })}
               </div>
 
               <div className="flex-1 min-w-[220px]">
@@ -601,16 +651,31 @@ export function FormatoImpressaoPanel() {
                           ))}
                         </select>
                       </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Fonte (tamanho)</label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={selected.fonte ?? 0}
-                          onChange={(e) => updateElemento(selected.id, { fonte: Number(e.target.value) })}
-                          className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
-                        />
-                      </div>
+                      {selected.tipo === "borda" ? (
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Espessura</label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={15}
+                            value={selected.espessura ?? 2}
+                            onChange={(e) => updateElemento(selected.id, { espessura: Number(e.target.value) })}
+                            className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                          />
+                          <p className="mt-1 text-xs text-slate-400">De 1 a 15. Os modelos da Ramuza usam 2 ou 15.</p>
+                        </div>
+                      ) : (
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Fonte (tamanho)</label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={selected.fonte ?? 0}
+                            onChange={(e) => updateElemento(selected.id, { fonte: Number(e.target.value) })}
+                            className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
+                          />
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => removeElemento(selected.id)}

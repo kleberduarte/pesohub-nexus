@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { randomBytes } from "crypto";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
+import { generateAgentToken, hashAgentToken } from "../../domain/services/agent-token";
 
 /**
  * Gera um Agent (token único) por loja. Esse token vai no AGENT_TOKEN do .env
@@ -13,9 +13,13 @@ export class CreateAgentUseCase {
   constructor(private readonly prisma: PrismaService) {}
 
   async execute(clienteId: string, lojaId: string) {
-    const token = randomBytes(24).toString("base64url");
-    return this.prisma.agent.create({
-      data: { clienteId, lojaId, token, versao: "0.0.0" },
+    // O banco guarda só o hash — este é o único momento em que o token real
+    // existe, e por isso ele volta junto na resposta para ser copiado para o
+    // AGENT_TOKEN do agente. Não há como reexibi-lo depois.
+    const token = generateAgentToken();
+    const agent = await this.prisma.agent.create({
+      data: { clienteId, lojaId, tokenHash: hashAgentToken(token), versao: "0.0.0" },
     });
+    return { ...agent, token };
   }
 }

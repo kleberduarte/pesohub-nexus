@@ -21,11 +21,11 @@ export default function DashboardPage() {
       return;
     }
 
-    Promise.all([devicesApi.stats(), devicesApi.list(1, 5), productsApi.list()])
-      .then(([statsRes, devicesRes, productsRes]) => {
+    Promise.all([devicesApi.stats(), devicesApi.list(1, 5), productsApi.count()])
+      .then(([statsRes, devicesRes, produtosTotal]) => {
         setDeviceStats(statsRes);
         setRecentDevices(devicesRes.data);
-        setProductCount(productsRes.length);
+        setProductCount(produtosTotal);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Não foi possível carregar o painel."))
       .finally(() => setLoading(false));

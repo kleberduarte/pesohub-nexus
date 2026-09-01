@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { InjectQueue } from "@nestjs/bull";
-import { Queue } from "bull";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
 import { Request } from "express";
 import { CreateSyncJobDto } from "../../../application/dtos/create-sync-job.dto";
 import { DEVICE_REPOSITORY, DeviceRepository } from "../../../domain/repositories/device.repository";
@@ -24,8 +24,14 @@ export class SyncController {
   async create(@Body() dto: CreateSyncJobDto, @Req() req: Request) {
     const lojaId = this.lojaId(req);
 
-    const owned = await Promise.all(dto.deviceIds.map((id) => this.devices.findById(id, lojaId)));
-    const notOwned = dto.deviceIds.filter((_, i) => !owned[i]);
+    // Uma query só para validar a posse do lote inteiro — o Promise.all de
+    // findById fazia uma ida ao banco por device (até 500 por requisição).
+    const owned = await this.prisma.device.findMany({
+      where: { id: { in: dto.deviceIds }, lojaId },
+      select: { id: true },
+    });
+    const ownedIds = new Set(owned.map((d) => d.id));
+    const notOwned = dto.deviceIds.filter((id) => !ownedIds.has(id));
     if (notOwned.length > 0) {
       throw new BadRequestException(
         `Dispositivo(s) não encontrado(s) ou não pertencem à sua empresa: ${notOwned.join(", ")}`,

@@ -1,4 +1,4 @@
-import { IsIn, IsInt, IsNotEmpty, IsObject, IsOptional, IsString } from "class-validator";
+import { IsIn, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength } from "class-validator";
 
 const TIPOS = ["EAN13", "EAN128"] as const;
 
@@ -9,6 +9,7 @@ export class UpdateCodigoBarrasFormatoDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 

@@ -2,11 +2,14 @@ import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import { ValidationPipe } from "@nestjs/common";
 import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
+import { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { Request, Response, NextFunction } from "express";
 import { Logger } from "nestjs-pino";
 import { AppModule } from "./app.module";
+import { AllExceptionsFilter } from "./presentation/middleware/all-exceptions.filter";
+import express from "express";
 
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -30,11 +33,27 @@ function csrfOriginGuard(corsOrigins: string[]) {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   app.useLogger(app.get(Logger));
+  // Em produção a aplicação roda atrás do proxy do Railway. Sem `trust proxy`,
+  // o Express enxerga o IP do proxy em TODA requisição — o ThrottlerGuard
+  // então joga o mundo inteiro no mesmo balde: os 100 req/min viram um teto
+  // global (auto-DoS no primeiro pico real) e o limite de 5 tentativas de
+  // login por minuto passa a ser compartilhado, deixando um único atacante
+  // trancar o login de todos os clientes. Com isso ligado, cada limite volta
+  // a valer por IP real (X-Forwarded-For).
+  if (process.env.NODE_ENV === "production") {
+    app.set("trust proxy", 1);
+  }
   app.enableShutdownHooks();
   app.use(helmet());
   app.use(cookieParser());
+  // Teto explícito no corpo da requisição: o import em massa de balanças aceita
+  // até 5000 linhas, e sem um limite declarado o default do Express (100kb)
+  // rejeitava lotes grandes enquanto qualquer outra rota ficava sem proteção
+  // contra corpos gigantes.
+  app.use(express.json({ limit: "2mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "2mb" }));
 
   const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:3001")
     .split(",")
@@ -44,6 +63,7 @@ async function bootstrap() {
   app.use(csrfOriginGuard(corsOrigins));
 
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalFilters(new AllExceptionsFilter());
   app.setGlobalPrefix("api/v1");
 
   if (process.env.NODE_ENV !== "production") {

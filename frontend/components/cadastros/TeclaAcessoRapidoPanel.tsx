@@ -55,7 +55,7 @@ export function TeclaAcessoRapidoPanel() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([teclasAcessoRapidoApi.list(), productsApi.list()])
+    Promise.all([teclasAcessoRapidoApi.list(), productsApi.listForPicker()])
       .then(([t, p]) => {
         setTeclas(t);
         setProducts(p);

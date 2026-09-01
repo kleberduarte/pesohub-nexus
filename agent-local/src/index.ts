@@ -3,7 +3,7 @@ dotenv.config();
 
 import * as dgram from "dgram";
 import { io } from "socket.io-client";
-import { ScaleSyncPayload, sendProductsToScale } from "./scale-client";
+import { FormatoImpressaoPayload, ScaleSyncPayload, sendProductsToScale } from "./scale-client";
 
 const BACKEND_URL = process.env.AGENT_BACKEND_URL ?? "http://localhost:3000";
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
@@ -38,6 +38,8 @@ interface SyncCommand {
   devicePort: number;
   tipo: "TOTAL" | "INCREMENTAL";
   products: ScaleSyncPayload[];
+  /** Formatos de etiqueta a gravar mesmo que nenhum produto do lote os use. */
+  formatosImpressao?: FormatoImpressaoPayload[];
 }
 
 const socket = io(`${BACKEND_URL}/agents`, {
@@ -108,7 +110,7 @@ setInterval(reportDiscovered, 15_000);
 socket.on("sync:command", async (command: SyncCommand) => {
   console.log(
     `[sync:command] device=${command.deviceId} ip=${command.deviceIp}:${command.devicePort} ` +
-      `tipo=${command.tipo} produtos=${command.products.length}`,
+      `tipo=${command.tipo} produtos=${command.products.length} formatos=${command.formatosImpressao?.length ?? 0}`,
   );
 
   if (!isAllowedDeviceIp(command.deviceIp)) {
@@ -129,7 +131,12 @@ socket.on("sync:command", async (command: SyncCommand) => {
   // testada ANTES do fix real ser encontrado, nunca reverificada com o fix
   // aplicado, e uma sincronização real em produção via esse caminho não
   // persistiu no hardware apesar do ACK — ver [[project_scale_protocol_field_gap]].
-  const outcome = await sendProductsToScale(command.deviceIp, command.devicePort, command.products);
+  const outcome = await sendProductsToScale(
+    command.deviceIp,
+    command.devicePort,
+    command.products,
+    command.formatosImpressao ?? [],
+  );
 
   socket.emit("sync:result", {
     correlationId: command.correlationId,

@@ -103,7 +103,6 @@ model Cliente {
   agents                Agent[]
   products              Product[]
   users                 User[]
-  activeForUsers        User[]                 @relation("UserActiveCliente")
   setores               Setor[]
   subSetores            SubSetor[]
   fornecedores          Fornecedor[]
@@ -139,7 +138,6 @@ model Loja {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   perfilAcessos        PerfilLojaAcesso[]
-  activeForUsers       User[]                @relation("UserActiveLoja")
   devices              Device[]
   deviceGroups         DeviceGroup[]
   agents               Agent[]
@@ -158,6 +156,8 @@ model Loja {
   specParametros       SpecParametro[]
   configuracaoAvancada ConfiguracaoAvancada?
   integracaoVeltrix    IntegracaoVeltrix?
+
+  @@index([clienteId])
 }
 
 /// Um perfil de acesso configurável (ex.: "Gerente Regional", "Operador Açaí")
@@ -183,6 +183,7 @@ model PerfilLojaAcesso {
   loja     Loja   @relation(fields: [lojaId], references: [id], onDelete: Cascade)
 
   @@unique([perfilId, lojaId])
+  @@index([lojaId])
 }
 
 model Assinatura {
@@ -211,6 +212,8 @@ model Fatura {
   dataVencimento DateTime?
   dataPagamento  DateTime?
   createdAt      DateTime     @default(now())
+
+  @@index([assinaturaId])
 }
 
 model Device {
@@ -233,6 +236,10 @@ model Device {
   updatedAt    DateTime     @updatedAt
 
   @@unique([lojaId, ip])
+  @@index([clienteId])
+  @@index([agentId])
+  @@index([grupoId])
+  @@index([lojaId, status])
 }
 
 model DeviceGroup {
@@ -243,6 +250,9 @@ model DeviceGroup {
   loja      Loja     @relation(fields: [lojaId], references: [id])
   nome      String
   devices   Device[]
+
+  @@index([lojaId])
+  @@index([clienteId])
 }
 
 model Agent {
@@ -251,11 +261,14 @@ model Agent {
   cliente         Cliente   @relation(fields: [clienteId], references: [id])
   lojaId          String
   loja            Loja      @relation(fields: [lojaId], references: [id])
-  token           String    @unique
+  tokenHash       String    @unique
   versao          String
   ultimoHeartbeat DateTime?
   devices         Device[]
   createdAt       DateTime  @default(now())
+
+  @@index([clienteId])
+  @@index([lojaId])
 }
 
 model Setor {
@@ -293,6 +306,9 @@ model SubSetor {
   updatedAt             DateTime             @updatedAt
 
   @@unique([lojaId, numero])
+  @@index([setorId])
+  @@index([formatoImpressaoId])
+  @@index([codigoBarrasFormatoId])
 }
 
 model Fornecedor {
@@ -356,6 +372,8 @@ model TabelaNutricionalItem {
   unidade     NutrienteUnidade
   valor       Decimal           @db.Decimal(10, 2)
   porcentagem Decimal           @db.Decimal(5, 2)
+
+  @@index([tabelaId])
 }
 
 model Operador {
@@ -388,6 +406,9 @@ model Imagem {
   products  Product[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+
+  @@index([lojaId])
+  @@index([clienteId])
 }
 
 model FormatoImpressao {
@@ -457,6 +478,9 @@ model TeclaAcessoRapido {
   layout    Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([lojaId])
+  @@index([clienteId])
 }
 
 model SpecParametro {
@@ -487,6 +511,8 @@ model ConfiguracaoAvancada {
   importacaoPluCampos  Json?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  @@index([clienteId])
 }
 
 model Product {
@@ -556,6 +582,15 @@ model Product {
 
   @@unique([lojaId, codigo])
   @@unique([lojaId, codigoBarras])
+  @@index([clienteId])
+  @@index([lojaId, ativo])
+  @@index([subSetorId])
+  @@index([tabelaNutricionalId])
+  @@index([fornecedorId])
+  @@index([alergicoId])
+  @@index([imagemId])
+  @@index([formatoImpressaoId])
+  @@index([codigoBarrasFormatoId])
 }
 
 model SyncJob {
@@ -568,6 +603,9 @@ model SyncJob {
   concluidoEm DateTime?
   erro        String?
   items       SyncJobItem[]
+
+  @@index([deviceId, id])
+  @@index([status])
 }
 
 model SyncJobItem {
@@ -578,29 +616,46 @@ model SyncJobItem {
   product   Product           @relation(fields: [productId], references: [id])
   acao      SyncJobItemAction
   status    SyncJobStatus     @default(PENDING)
+
+  @@index([jobId])
+  @@index([productId])
 }
 
 model User {
   id              String   @id @default(cuid())
   clienteId       String?
   cliente         Cliente? @relation(fields: [clienteId], references: [id])
-  /// Última empresa selecionada via "trocar de empresa" (só usado por SUPERADMIN).
-  /// Persistido para que a sessão volte pra mesma empresa após logout/login —
-  /// sem isso, o token de login sempre reconstrói a partir de `clienteId` (null
-  /// pro SUPERADMIN), perdendo a troca feita em sessões anteriores.
-  activeClienteId String?
-  activeCliente   Cliente? @relation("UserActiveCliente", fields: [activeClienteId], references: [id], onDelete: SetNull)
   /// Perfil configurável que define a quais Lojas este usuário tem acesso
   /// (dentro do Cliente). Nulo para SUPERADMIN, que não precisa de escopo de loja.
   perfilId        String?
   perfil          Perfil?  @relation(fields: [perfilId], references: [id])
-  /// Última loja selecionada via "trocar de loja", dentre as permitidas pelo Perfil.
-  activeLojaId    String?
-  activeLoja      Loja?    @relation("UserActiveLoja", fields: [activeLojaId], references: [id], onDelete: SetNull)
   email           String   @unique
   senha           String
   role            UserRole @default(OPERADOR)
   createdAt       DateTime @default(now())
+
+  /// --- Política de acesso (card #48) ---
+  /// A empresa/loja ativa NÃO mora mais aqui: virou estado de sessão (o `jti`
+  /// do JWT carrega `clienteId`/`lojaId`). Enquanto era coluna no usuário, duas
+  /// pessoas na mesma conta — ou duas abas do mesmo usuário — se empurravam
+  /// entre lojas, e o efeito prático era sincronizar produto para a balança da
+  /// loja errada, sem aviso na tela.
+
+  /// Falhas de senha consecutivas. Zera a cada login bem-sucedido.
+  failedLoginAttempts Int       @default(0)
+  /// Enquanto estiver no futuro, o login é recusado mesmo com a senha certa.
+  /// Bloqueio é por conta (não por IP): uma loja inteira atrás de um IP público
+  /// compartilha o rate limit e conseguia se trancar entre si.
+  lockedUntil         DateTime?
+  /// Força a troca de senha no próximo acesso (contas recém-criadas e resets).
+  mustChangePassword  Boolean   @default(false)
+  /// Base para a expiração periódica de senha.
+  passwordChangedAt   DateTime?
+  /// Hashes das senhas anteriores, para vedar reuso. Guarda as últimas 5.
+  senhasAnteriores    String[]  @default([])
+
+  @@index([clienteId])
+  @@index([perfilId])
 }
 
 model AuditLog {
@@ -608,7 +663,14 @@ model AuditLog {
   userId    String?
   acao      String
   payload   Json?
+  /// Quem fez, de onde. Com conta compartilhada o userId sozinho não identifica
+  /// ninguém; IP e user agent são o que resta para separar as pessoas.
+  ip        String?
+  userAgent String?
   timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([timestamp])
 }
 
 /// Configuração de integração com o ERP Veltrix (`C:\Projetos\veltrix`) para um

@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Max, MaxLength, Min } from "class-validator";
 
 export class UpdateFormatoImpressaoDto {
   /** Ver comentário no CreateFormatoImpressaoDto — faixa 1-99 confirmada
@@ -11,6 +11,7 @@ export class UpdateFormatoImpressaoDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome?: string;
 

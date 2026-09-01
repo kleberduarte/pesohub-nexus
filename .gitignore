@@ -32,3 +32,8 @@ frontend/tsconfig.tsbuildinfo
 # Client-specific operational files, not project code
 /propostas/
 /scripts/
+
+# Log de execução do Agent Local, escrito em runtime na máquina da loja
+agent-local/LogInfo.txt
+# JSONs intermediários da extração do ECS.mdb; o catálogo gerado é que é versionado
+backend/scripts/layouts-ramuza/

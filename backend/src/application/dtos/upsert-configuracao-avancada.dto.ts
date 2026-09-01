@@ -1,4 +1,4 @@
-import { IsInt, IsObject, IsOptional, IsString } from "class-validator";
+import { IsInt, IsObject, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class UpsertConfiguracaoAvancadaDto {
   @IsOptional()
@@ -11,10 +11,12 @@ export class UpsertConfiguracaoAvancadaDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(60)
   fonteExibicao?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(60)
   formatoDataHora?: string;
 
   @IsOptional()

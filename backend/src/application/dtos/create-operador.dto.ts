@@ -5,6 +5,7 @@ export class CreateOperadorDto {
   numero!: number;
 
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome!: string;
 
@@ -15,6 +16,7 @@ export class CreateOperadorDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   codigo?: string;
 
   @IsOptional()

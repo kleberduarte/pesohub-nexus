@@ -2,7 +2,8 @@ import { ConflictException, Injectable, NotFoundException } from "@nestjs/common
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "./prisma.service";
 import { Product } from "../../domain/entities/product.entity";
-import { ProductRepository } from "../../domain/repositories/product.repository";
+import { ProductListQuery, ProductRepository } from "../../domain/repositories/product.repository";
+import { PaginatedResult } from "../../domain/repositories/pagination";
 
 const RELATION_ID_FIELDS = [
   "subSetorId",
@@ -53,6 +54,41 @@ export class ProductPrismaRepository implements ProductRepository {
   async findAll(lojaId: string): Promise<Product[]> {
     const rows = await this.prisma.product.findMany({ where: { lojaId } });
     return rows.map((row) => toProduct(row as unknown as Record<string, unknown>) as Product);
+  }
+
+  async findAllPaginated(lojaId: string, query: ProductListQuery): Promise<PaginatedResult<Product>> {
+    const { page, pageSize, search, ativo } = query;
+    const termo = search?.trim();
+    const where: Prisma.ProductWhereInput = {
+      lojaId,
+      ...(ativo === undefined ? {} : { ativo }),
+      ...(termo
+        ? {
+            OR: [
+              { nome: { contains: termo, mode: "insensitive" } },
+              { codigo: { contains: termo } },
+              { codigoBarras: { contains: termo } },
+            ],
+          }
+        : {}),
+    };
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.product.findMany({
+        where,
+        orderBy: { nome: "asc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.product.count({ where }),
+    ]);
+
+    return {
+      data: rows.map((row) => toProduct(row as unknown as Record<string, unknown>) as Product),
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async findById(id: string, lojaId: string): Promise<Product | null> {

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { randomBytes } from "crypto";
+import { generateAgentToken, hashAgentToken } from "../../domain/services/agent-token";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { ImportDeviceRowDto } from "../dtos/import-devices.dto";
 
@@ -64,9 +64,9 @@ export class BulkImportDevicesUseCase {
       let agentToken: string | null = null;
 
       if (!agent) {
-        const token = randomBytes(24).toString("base64url");
+        const token = generateAgentToken();
         agent = await this.prisma.agent.create({
-          data: { clienteId, lojaId, token, versao: "0.0.0" },
+          data: { clienteId, lojaId, tokenHash: hashAgentToken(token), versao: "0.0.0" },
         });
         agentToken = token;
       }

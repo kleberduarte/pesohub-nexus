@@ -45,6 +45,11 @@ export interface FormatoImpressaoElementoPayload {
   y: number;
   largura: number;
   altura: number;
+  /** Espessura da linha dos elementos `tipo: "borda"`/`"divisoria"`, em
+   * pontos. Vai no Flag2 do wire: o `LabelItem.xml` oficial documenta
+   * Flag1=4 (Borda) com Flag2 de 1 a 15 sendo a própria espessura. Os
+   * modelos de fábrica usam quase só 2 e 15. */
+  espessura?: number;
   /** Angle/Align/Font do wire (`LabelItem`) — ver ressalva de mapeamento
    * ainda não confirmado visualmente em `scale-client.ts` (buildLabelBlock). */
   angulo?: number;
@@ -388,6 +393,17 @@ export function buildNu3Row(tabela: TabelaNutricionalPayload): string {
   return fields.join("\t") + "\r\n";
 }
 
+/**
+ * Um campo de texto conta como "não usado" tanto quando vem nulo quanto quando
+ * vem em branco. O formulário do frontend manda `""` para todo campo opcional
+ * que o usuário não preencheu, e `"" == null` é falso em JavaScript — por isso
+ * um Texto extra 4 vazio bloqueava a cópia dos ingredientes como se o usuário
+ * o tivesse reservado para outra coisa, e a etiqueta saía sem ingredientes.
+ */
+export function estaEmBranco(valor: string | null | undefined): boolean {
+  return valor == null || valor.trim() === "";
+}
+
 export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): string {
   const fields = [...PLU_FIELD_TEMPLATE];
   fields[FIELD_PLU_NUMBER] = String(pluNumber);
@@ -409,7 +425,7 @@ export function buildPluRow(product: ScaleSyncPayload, pluNumber: number): strin
   // o template oficial usa e o único caminho confirmado imprimindo. O campo
   // `Ingredientes` do NU3 persiste mas nenhum elemento o renderiza. Não
   // sobrescreve um textoExtra4 que o usuário tenha preenchido à mão.
-  if (product.textoExtra4 == null && product.tabelaNutricional?.ingredientes) {
+  if (estaEmBranco(product.textoExtra4) && product.tabelaNutricional?.ingredientes) {
     fields[FIELD_TEXTO_EXTRA_4] = sanitizeField(`Ingredientes: ${product.tabelaNutricional.ingredientes}`);
   }
   if (product.textoExtra5 != null) fields[FIELD_TEXTO_EXTRA_5] = sanitizeField(product.textoExtra5);
@@ -529,6 +545,15 @@ const FLAG_POR_TIPO: Record<string, { flag1: number; flag2: number; flag3: numbe
   textoExtra5: { flag1: 1, flag2: 0, flag3: 20 },
   lote: { flag1: 1, flag2: 0, flag3: 21 },
   textoExtra7: { flag1: 1, flag2: 0, flag3: 22 },
+  // Borda e Divisória: documentados no `Config/pt-BR/LabelItem.xml` oficial.
+  // Em Borda (Flag1=4) o Flag2 é a própria espessura (1..15) — por isso o
+  // valor real vem de `el.espessura` em buildLabelBlock, e o 2 aqui é só o
+  // padrão (a espessura mais usada nos modelos de fábrica, junto com 15).
+  // Em Divisória (Flag1=5) o Flag2 escolhe o comportamento: 0="Flag da área"
+  // (marcador de região, NÃO desenha nada), 1="Imprimir página",
+  // 2="Imprimir linha". Só o 2 é uma linha visível, e é o que usamos.
+  borda: { flag1: 4, flag2: 2, flag3: 0 },
+  divisoria: { flag1: 5, flag2: 2, flag3: 0 },
   selos: { flag1: 7, flag2: 2, flag3: 2 }, // Alérgicos → Informação (é assim que a balança desenha os selos "ALTO EM")
   fornecedor: { flag1: 7, flag2: 1, flag3: 2 }, // Fornecedor → Informação (bloco SU2, idx60 do PLU — ainda sem UI)
 };
@@ -613,11 +638,17 @@ function buildLabelBlock(formato: FormatoImpressaoPayload, bmpSelosId?: number):
               : el.tipo != null
                 ? FLAG_POR_TIPO[el.tipo]
                 : undefined;
+      // Só em Borda o Flag2 É a espessura. Em Divisória ele escolhe o
+      // COMPORTAMENTO (0=Flag da área, 1=Imprimir página, 2=Imprimir linha) —
+      // deixar a espessura sobrescrevê-lo transformaria a linha em outra
+      // coisa, provavelmente num marcador invisível.
+      const flag2 = el.tipo === "borda" && el.espessura != null ? el.espessura : (flag?.flag2 ?? 0);
+
       return [
         "LAS",
         String(i + 1), // SubID
         String(flag?.flag1 ?? 0), // Flag1
-        String(flag?.flag2 ?? 0), // Flag2
+        String(flag2), // Flag2
         String(flag?.flag3 ?? 0), // Flag3
         "1", // Print
         String(Math.round(((el.angulo ?? 0) / 90) % 4)), // Angle (índice de giro de 90°)
@@ -681,7 +712,15 @@ function buildAlergicoRow(numero: number, selos: string[]): string {
  * (probes, compat) quanto pela conexão persistente (`ScaleConnection`, ver
  * scale-connection.ts) usada em produção pelo agent-local.
  */
-export function buildSyncBody(products: ScaleSyncPayload[]): string {
+export function buildSyncBody(
+  products: ScaleSyncPayload[],
+  /**
+   * Formatos a enviar mesmo sem produto que os use. Sem isso o bloco LAB só
+   * existe como efeito colateral dos produtos do pacote, e um formato recém
+   * editado que nenhum produto referencia nunca teria como chegar à balança.
+   */
+  formatosAvulsos: FormatoImpressaoPayload[] = [],
+): string {
   const pluNumbers = products.map((p, i) => resolvePluNumber(p.codigo, i));
 
   // Mesmo dedupe do NU3/LAB: vários produtos podem compartilhar o mesmo Setor.
@@ -746,6 +785,11 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
       entrada.bmpSelosId = bmpSelosId;
     }
   }
+  // Os avulsos não sobrescrevem um formato que já veio por produto: aquele
+  // carrega o vínculo com o bitmap de selos.
+  for (const formato of formatosAvulsos) {
+    if (!formatosImpressao.has(formato.numero)) formatosImpressao.set(formato.numero, { formato });
+  }
 
   const labBlock =
     formatosImpressao.size > 0
@@ -803,6 +847,7 @@ export async function sendProductsToScale(
   ip: string,
   port: number,
   products: ScaleSyncPayload[],
+  formatosAvulsos: FormatoImpressaoPayload[] = [],
 ): Promise<ScaleSyncOutcome> {
   return new Promise((resolve) => {
     const socket = new Socket();
@@ -820,7 +865,7 @@ export async function sendProductsToScale(
     };
 
     socket.connect(port, ip, () => {
-      socket.write(buildSyncBody(products), "latin1");
+      socket.write(buildSyncBody(products, formatosAvulsos), "latin1");
     });
 
     socket.on("data", (chunk: string) => {

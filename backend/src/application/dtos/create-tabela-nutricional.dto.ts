@@ -1,15 +1,5 @@
 import { Type } from "class-transformer";
-import {
-  ArrayMaxSize,
-  IsArray,
-  IsIn,
-  IsInt,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  IsString,
-  ValidateNested,
-} from "class-validator";
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, ValidateNested } from "class-validator";
 
 const UNIDADES = ["KCAL_KJ", "G", "MG", "MCG"] as const;
 
@@ -18,6 +8,7 @@ export class TabelaNutricionalItemDto {
   ordem!: number;
 
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   ingrediente!: string;
 
@@ -38,11 +29,13 @@ export class CreateTabelaNutricionalDto {
   numero!: number;
 
   @IsString()
+  @MaxLength(120)
   @IsNotEmpty()
   nome!: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(60)
   porcao?: string;
 
   @IsOptional()
@@ -51,6 +44,7 @@ export class CreateTabelaNutricionalDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   ingredientes?: string;
 
   @IsOptional()
