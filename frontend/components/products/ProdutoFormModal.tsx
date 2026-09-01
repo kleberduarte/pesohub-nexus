@@ -426,8 +426,11 @@ export function ProdutoFormModal({
                     const key = `textoExtra${n}` as keyof CreateProductInput;
                     return (
                       <div key={n}>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Texto extra {n}</label>
+                        <label htmlFor={`produto-texto-extra-${n}`} className="block text-xs font-medium text-slate-700 mb-1">
+                          Texto extra {n}
+                        </label>
                         <input
+                          id={`produto-texto-extra-${n}`}
                           type="text"
                           maxLength={250}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
