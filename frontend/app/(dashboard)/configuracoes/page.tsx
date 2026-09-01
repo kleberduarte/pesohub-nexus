@@ -173,8 +173,8 @@ export default function ConfiguracoesPage() {
         <h3 className="text-sm font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2">Comum / Exibição</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Fonte</label>
-            <input
+            <label htmlFor="config-fonte" className="block text-xs font-medium text-slate-700 mb-1">Fonte</label>
+            <input id="config-fonte"
               type="text"
               placeholder="Sistema padrão"
               value={fonteExibicao}
@@ -183,8 +183,8 @@ export default function ConfiguracoesPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Formato de data/hora</label>
-            <select
+            <label htmlFor="config-formato-de-data-hora" className="block text-xs font-medium text-slate-700 mb-1">Formato de data/hora</label>
+            <select id="config-formato-de-data-hora"
               value={formatoDataHora}
               onChange={(e) => setFormatoDataHora(e.target.value)}
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
@@ -197,8 +197,8 @@ export default function ConfiguracoesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Excluir registros antigos (dias)</label>
-            <input
+            <label htmlFor="config-excluir-registros-antigos-dias" className="block text-xs font-medium text-slate-700 mb-1">Excluir registros antigos (dias)</label>
+            <input id="config-excluir-registros-antigos-dias"
               type="number"
               value={excluirRegistrosDias}
               onChange={(e) => setExcluirRegistrosDias(e.target.value === "" ? "" : Number(e.target.value))}

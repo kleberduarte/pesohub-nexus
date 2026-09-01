@@ -219,8 +219,8 @@ export function ImagemPanel() {
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
-                <input
+                <label htmlFor="imagem-nome" className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
+                <input id="imagem-nome"
                   type="text"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
@@ -229,8 +229,8 @@ export function ImagemPanel() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Largura (mm)</label>
-                  <input
+                  <label htmlFor="imagem-largura-mm" className="block text-sm font-medium text-slate-700 mb-1">Largura (mm)</label>
+                  <input id="imagem-largura-mm"
                     type="number"
                     min={1}
                     max={99}
@@ -240,8 +240,8 @@ export function ImagemPanel() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Altura (mm)</label>
-                  <input
+                  <label htmlFor="imagem-altura-mm" className="block text-sm font-medium text-slate-700 mb-1">Altura (mm)</label>
+                  <input id="imagem-altura-mm"
                     type="number"
                     min={1}
                     max={99}

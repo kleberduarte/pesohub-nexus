@@ -396,15 +396,13 @@ export default function EmpresasPage() {
 
           {activeCompany?.accessToken && (
             <div className="mb-6">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Link de acesso exclusivo da empresa
-              </label>
+              <label htmlFor="empresa-link-de-acesso-exclusivo-da-empresa" className="block text-sm font-medium text-slate-700 mb-1">Link de acesso exclusivo da empresa</label>
               <p className="text-xs text-slate-500 mb-2">
                 Compartilhe este link com os usuários desta empresa: a tela de login já mostra a marca deles antes
                 de entrar, sem precisar de sessão prévia.
               </p>
               <div className="flex gap-2">
-                <input
+                <input id="empresa-link-de-acesso-exclusivo-da-empresa"
                   readOnly
                   value={`${typeof window !== "undefined" ? window.location.origin : ""}/acesso/${activeCompany.accessToken}`}
                   className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600"
@@ -439,8 +437,8 @@ export default function EmpresasPage() {
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-slate-700">Identidade</h3>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nome da empresa *</label>
-                  <input
+                  <label htmlFor="empresa-nome-da-empresa" className="block text-sm font-medium text-slate-700 mb-1">Nome da empresa *</label>
+                  <input id="empresa-nome-da-empresa"
                     value={form.nome}
                     onChange={(e) => setForm({ ...form, nome: e.target.value })}
                     className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 ${
@@ -450,8 +448,8 @@ export default function EmpresasPage() {
                   {fieldErrors.nome && <p className="text-xs text-red-600 mt-1">{fieldErrors.nome}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Domínio de e-mail</label>
-                  <input
+                  <label htmlFor="empresa-dominio-de-e-mail" className="block text-sm font-medium text-slate-700 mb-1">Domínio de e-mail</label>
+                  <input id="empresa-dominio-de-e-mail"
                     value={form.dominio ?? ""}
                     onChange={(e) => setForm({ ...form, dominio: e.target.value })}
                     placeholder="empresa.com.br"
@@ -465,8 +463,8 @@ export default function EmpresasPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">URL do logo</label>
-                  <input
+                  <label htmlFor="empresa-url-do-logo" className="block text-sm font-medium text-slate-700 mb-1">URL do logo</label>
+                  <input id="empresa-url-do-logo"
                     value={form.logoUrl ?? ""}
                     onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
                     placeholder="https://..."
@@ -487,8 +485,8 @@ export default function EmpresasPage() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Mensagem de boas-vindas</label>
-                  <textarea
+                  <label htmlFor="empresa-mensagem-de-boas-vindas" className="block text-sm font-medium text-slate-700 mb-1">Mensagem de boas-vindas</label>
+                  <textarea id="empresa-mensagem-de-boas-vindas"
                     value={form.tagline ?? ""}
                     onChange={(e) => setForm({ ...form, tagline: e.target.value })}
                     rows={2}
@@ -535,8 +533,8 @@ export default function EmpresasPage() {
                 <h3 className="text-sm font-semibold text-slate-700">Comercial e suporte</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Chave PIX</label>
-                    <input
+                    <label htmlFor="empresa-chave-pix" className="block text-sm font-medium text-slate-700 mb-1">Chave PIX</label>
+                    <input id="empresa-chave-pix"
                       value={form.chavePix ?? ""}
                       onChange={(e) => setForm({ ...form, chavePix: e.target.value })}
                       maxLength={77}
@@ -548,8 +546,8 @@ export default function EmpresasPage() {
                     {fieldErrors.chavePix && <p className="text-xs text-red-600 mt-1">{fieldErrors.chavePix}</p>}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">E-mail suporte</label>
-                    <input
+                    <label htmlFor="empresa-e-mail-suporte" className="block text-sm font-medium text-slate-700 mb-1">E-mail suporte</label>
+                    <input id="empresa-e-mail-suporte"
                       type="email"
                       value={form.suporteEmail ?? ""}
                       onChange={(e) => setForm({ ...form, suporteEmail: e.target.value })}
@@ -562,8 +560,8 @@ export default function EmpresasPage() {
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">WhatsApp suporte</label>
-                    <input
+                    <label htmlFor="empresa-whatsapp-suporte" className="block text-sm font-medium text-slate-700 mb-1">WhatsApp suporte</label>
+                    <input id="empresa-whatsapp-suporte"
                       value={form.suporteWhatsapp ?? ""}
                       onChange={(e) => setForm({ ...form, suporteWhatsapp: e.target.value })}
                       maxLength={32}

@@ -636,8 +636,8 @@ export function FormatoImpressaoPanel() {
                     <p className="text-sm font-semibold text-slate-700">{TIPO_LABEL[selected.tipo]}</p>
                     {selected.tipo === "texto" && (
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Texto</label>
-                        <input
+                        <label htmlFor="formato-texto" className="block text-xs font-medium text-slate-500 mb-1">Texto</label>
+                        <input id="formato-texto"
                           type="text"
                           value={selected.texto ?? ""}
                           onChange={(e) => updateElemento(selected.id, { texto: e.target.value })}
@@ -647,8 +647,8 @@ export function FormatoImpressaoPanel() {
                     )}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">X (mm)</label>
-                        <input
+                        <label htmlFor="formato-x-mm" className="block text-xs font-medium text-slate-500 mb-1">X (mm)</label>
+                        <input id="formato-x-mm"
                           type="number"
                           value={Math.round(selected.x)}
                           onChange={(e) => updateElemento(selected.id, { x: Number(e.target.value) })}
@@ -656,8 +656,8 @@ export function FormatoImpressaoPanel() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Y (mm)</label>
-                        <input
+                        <label htmlFor="formato-y-mm" className="block text-xs font-medium text-slate-500 mb-1">Y (mm)</label>
+                        <input id="formato-y-mm"
                           type="number"
                           value={Math.round(selected.y)}
                           onChange={(e) => updateElemento(selected.id, { y: Number(e.target.value) })}
@@ -665,8 +665,8 @@ export function FormatoImpressaoPanel() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Largura (mm)</label>
-                        <input
+                        <label htmlFor="formato-largura-mm" className="block text-xs font-medium text-slate-500 mb-1">Largura (mm)</label>
+                        <input id="formato-largura-mm"
                           type="number"
                           value={Math.round(selected.largura)}
                           onChange={(e) => updateElemento(selected.id, { largura: Number(e.target.value) })}
@@ -674,8 +674,8 @@ export function FormatoImpressaoPanel() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Altura (mm)</label>
-                        <input
+                        <label htmlFor="formato-altura-mm" className="block text-xs font-medium text-slate-500 mb-1">Altura (mm)</label>
+                        <input id="formato-altura-mm"
                           type="number"
                           value={Math.round(selected.altura)}
                           onChange={(e) => updateElemento(selected.id, { altura: Number(e.target.value) })}
@@ -685,8 +685,8 @@ export function FormatoImpressaoPanel() {
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Rotação</label>
-                        <select
+                        <label htmlFor="formato-rotacao" className="block text-xs font-medium text-slate-500 mb-1">Rotação</label>
+                        <select id="formato-rotacao"
                           value={selected.angulo ?? 0}
                           onChange={(e) =>
                             updateElemento(selected.id, { angulo: Number(e.target.value) as 0 | 90 | 180 | 270 })
@@ -700,8 +700,8 @@ export function FormatoImpressaoPanel() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-500 mb-1">Alinhamento</label>
-                        <select
+                        <label htmlFor="formato-alinhamento" className="block text-xs font-medium text-slate-500 mb-1">Alinhamento</label>
+                        <select id="formato-alinhamento"
                           value={selected.alinhamento ?? 0}
                           onChange={(e) => updateElemento(selected.id, { alinhamento: Number(e.target.value) as 0 | 1 | 2 })}
                           className="w-full px-2 py-1.5 border border-slate-200 rounded text-sm"
@@ -715,8 +715,8 @@ export function FormatoImpressaoPanel() {
                       </div>
                       {selected.tipo === "borda" ? (
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Espessura</label>
-                          <input
+                          <label htmlFor="formato-espessura" className="block text-xs font-medium text-slate-500 mb-1">Espessura</label>
+                          <input id="formato-espessura"
                             type="number"
                             min={1}
                             max={15}
@@ -728,8 +728,8 @@ export function FormatoImpressaoPanel() {
                         </div>
                       ) : (
                         <div className="col-span-2">
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Fonte (tamanho)</label>
-                          <input
+                          <label htmlFor="formato-fonte-tamanho" className="block text-xs font-medium text-slate-500 mb-1">Fonte (tamanho)</label>
+                          <input id="formato-fonte-tamanho"
                             type="number"
                             min={0}
                             value={selected.fonte ?? 0}
