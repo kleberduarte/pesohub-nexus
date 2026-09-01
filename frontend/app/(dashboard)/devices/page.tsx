@@ -15,12 +15,9 @@ import {
   type ImportDevicesLojaResult,
   ApiError,
 } from "../../../lib/api";
+import { splitCsvLine } from "../../../lib/csv";
 
 const emptyForm = { nome: "", ip: "", porta: "33581" };
-
-function splitCsvLine(line: string): string[] {
-  return line.split(",").map((field) => field.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
-}
 
 function csvEscape(value: unknown): string {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
