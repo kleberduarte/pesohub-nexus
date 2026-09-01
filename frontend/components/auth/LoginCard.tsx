@@ -181,14 +181,12 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
               )}
 
               <div className="relative">
-                <label className="absolute -top-2.5 left-3 z-10 bg-white px-1 text-sm font-medium text-slate-500">
-                  E-mail
-                </label>
+                <label htmlFor="login-e-mail" className="absolute -top-2.5 left-3 z-10 bg-white px-1 text-sm font-medium text-slate-500">E-mail</label>
                 <div className="relative flex items-center">
                   <div className="absolute left-4 text-slate-400">
                     <Mail className="h-5 w-5" />
                   </div>
-                  <input
+                  <input id="login-e-mail"
                     type="email"
                     required
                     autoComplete="email"
@@ -201,14 +199,12 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
               </div>
 
               <div className="relative">
-                <label className="absolute -top-2.5 left-3 z-10 bg-white px-1 text-sm font-medium text-slate-500">
-                  Senha
-                </label>
+                <label htmlFor="login-senha" className="absolute -top-2.5 left-3 z-10 bg-white px-1 text-sm font-medium text-slate-500">Senha</label>
                 <div className="relative flex items-center">
                   <div className="absolute left-4 text-slate-400">
                     <Lock className="h-5 w-5" />
                   </div>
-                  <input
+                  <input id="login-senha"
                     type={showPassword ? "text" : "password"}
                     required
                     autoComplete="current-password"

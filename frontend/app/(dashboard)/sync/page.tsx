@@ -104,8 +104,8 @@ export default function SyncPage() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Selecionar Balanças</label>
-            <select
+            <label htmlFor="sync-selecionar-balancas" className="block text-sm font-medium text-slate-700 mb-1">Selecionar Balanças</label>
+            <select id="sync-selecionar-balancas"
               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
               value={selectedDeviceId}
               onChange={(e) => setSelectedDeviceId(e.target.value)}
@@ -119,10 +119,10 @@ export default function SyncPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo de Sincronização</label>
+            <label htmlFor="sync-tipo-de-sincronizacao" className="block text-sm font-medium text-slate-700 mb-1">Tipo de Sincronização</label>
             <div className="space-y-2">
               <label className="flex items-center">
-                <input
+                <input id="sync-tipo-de-sincronizacao"
                   type="radio"
                   name="sync-type"
                   className="border-slate-300 text-brand-600 focus:ring-brand-500"

@@ -179,8 +179,8 @@ export default function LojasPage() {
             </div>
             <form onSubmit={handleSave} className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
-                <input
+                <label htmlFor="loja-nome" className="block text-sm font-medium text-slate-700 mb-1">Nome</label>
+                <input id="loja-nome"
                   value={form.nome}
                   onChange={(e) => setForm({ ...form, nome: e.target.value })}
                   required
@@ -188,8 +188,8 @@ export default function LojasPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
-                <input
+                <label htmlFor="loja-endereco" className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
+                <input id="loja-endereco"
                   value={form.endereco}
                   onChange={(e) => setForm({ ...form, endereco: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -197,16 +197,16 @@ export default function LojasPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-                  <input
+                  <label htmlFor="loja-responsavel" className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
+                  <input id="loja-responsavel"
                     value={form.responsavel}
                     onChange={(e) => setForm({ ...form, responsavel: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
-                  <input
+                  <label htmlFor="loja-telefone" className="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+                  <input id="loja-telefone"
                     value={form.telefone}
                     onChange={(e) => setForm({ ...form, telefone: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -215,8 +215,8 @@ export default function LojasPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
-                  <input
+                  <label htmlFor="loja-e-mail" className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+                  <input id="loja-e-mail"
                     type="email"
                     value={form.email}
                     onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -224,8 +224,8 @@ export default function LojasPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
-                  <input
+                  <label htmlFor="loja-cnpj" className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
+                  <input id="loja-cnpj"
                     value={form.cnpj}
                     onChange={(e) => setForm({ ...form, cnpj: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"

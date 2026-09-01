@@ -199,8 +199,8 @@ export default function AssinaturaPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Valor mensal (R$)</label>
-            <input
+            <label htmlFor="assinatura-valor-mensal-r" className="block text-sm font-medium text-slate-700 mb-2">Valor mensal (R$)</label>
+            <input id="assinatura-valor-mensal-r"
               type="number"
               step="0.01"
               min="0.01"
@@ -212,8 +212,8 @@ export default function AssinaturaPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">CPF ou CNPJ</label>
-            <input
+            <label htmlFor="assinatura-cpf-ou-cnpj" className="block text-sm font-medium text-slate-700 mb-2">CPF ou CNPJ</label>
+            <input id="assinatura-cpf-ou-cnpj"
               type="text"
               value={cpfCnpj}
               onChange={(e) => setCpfCnpj(e.target.value)}

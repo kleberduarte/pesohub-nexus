@@ -169,8 +169,8 @@ export default function UsuariosPage() {
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
-            <input
+            <label htmlFor="usuario-e-mail" className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
+            <input id="usuario-e-mail"
               type="email"
               required
               value={email}
@@ -187,8 +187,8 @@ export default function UsuariosPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
-            <input
+            <label htmlFor="usuario-senha" className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+            <input id="usuario-senha"
               type="password"
               required
               minLength={6}
@@ -198,8 +198,8 @@ export default function UsuariosPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Perfil</label>
-            <select
+            <label htmlFor="usuario-perfil" className="block text-sm font-medium text-slate-700 mb-1">Perfil</label>
+            <select id="usuario-perfil"
               value={role}
               onChange={(e) => {
                 const novoRole = e.target.value as UserRole;
@@ -372,8 +372,8 @@ export default function UsuariosPage() {
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Perfil</label>
-                <select
+                <label htmlFor="usuario-perfil-2" className="block text-sm font-medium text-slate-700 mb-1">Perfil</label>
+                <select id="usuario-perfil-2"
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value as UserRole)}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -386,8 +386,8 @@ export default function UsuariosPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nova senha (opcional)</label>
-                <input
+                <label htmlFor="usuario-nova-senha-opcional" className="block text-sm font-medium text-slate-700 mb-1">Nova senha (opcional)</label>
+                <input id="usuario-nova-senha-opcional"
                   type="password"
                   minLength={6}
                   value={editSenha}

@@ -530,8 +530,8 @@ export default function DevicesPage() {
             </div>
             <form onSubmit={handleSaveDevice} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Balança</label>
-                <input
+                <label htmlFor="device-nome-da-balanca" className="block text-sm font-medium text-slate-700 mb-1">Nome da Balança</label>
+                <input id="device-nome-da-balanca"
                   type="text"
                   required
                   placeholder="Ex: Balança Frios 02"
@@ -541,8 +541,8 @@ export default function DevicesPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Endereço IP</label>
-                <input
+                <label htmlFor="device-endereco-ip" className="block text-sm font-medium text-slate-700 mb-1">Endereço IP</label>
+                <input id="device-endereco-ip"
                   type="text"
                   required
                   placeholder="Ex: 192.168.0.155"
@@ -552,8 +552,8 @@ export default function DevicesPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Porta</label>
-                <input
+                <label htmlFor="device-porta" className="block text-sm font-medium text-slate-700 mb-1">Porta</label>
+                <input id="device-porta"
                   type="text"
                   required
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 font-mono"
@@ -623,8 +623,8 @@ export default function DevicesPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Token do Agent Local</label>
-                <input
+                <label htmlFor="device-token-do-agent-local" className="block text-sm font-medium text-slate-700 mb-1">Token do Agent Local</label>
+                <input id="device-token-do-agent-local"
                   type="text"
                   placeholder="Cole aqui o AGENT_TOKEN"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-500"

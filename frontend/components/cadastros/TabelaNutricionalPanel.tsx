@@ -243,8 +243,8 @@ export function TabelaNutricionalPanel() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
-                <input
+                <label htmlFor="nutri-numero" className="block text-sm font-medium text-slate-700 mb-1">Número *</label>
+                <input id="nutri-numero"
                   type="number"
                   value={numero}
                   onChange={(e) => setNumero(Number(e.target.value))}
@@ -252,8 +252,8 @@ export function TabelaNutricionalPanel() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
-                <input
+                <label htmlFor="nutri-nome" className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
+                <input id="nutri-nome"
                   type="text"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
@@ -261,8 +261,8 @@ export function TabelaNutricionalPanel() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Porção</label>
-                <input
+                <label htmlFor="nutri-porcao" className="block text-sm font-medium text-slate-700 mb-1">Porção</label>
+                <input id="nutri-porcao"
                   type="text"
                   placeholder="Porção de 30g"
                   value={porcao}
@@ -271,8 +271,8 @@ export function TabelaNutricionalPanel() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Porções por embalagem</label>
-                <input
+                <label htmlFor="nutri-porcoes-por-embalagem" className="block text-sm font-medium text-slate-700 mb-1">Porções por embalagem</label>
+                <input id="nutri-porcoes-por-embalagem"
                   type="number"
                   value={porcoesPorEmbalagem ?? ""}
                   onChange={(e) =>
@@ -282,8 +282,8 @@ export function TabelaNutricionalPanel() {
                 />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Selos (Alto em...)</label>
-                <input
+                <label htmlFor="nutri-selos-alto-em" className="block text-sm font-medium text-slate-700 mb-1">Selos (Alto em...)</label>
+                <input id="nutri-selos-alto-em"
                   type="text"
                   placeholder="Açúcar adicionado, Gordura saturada, Sódio"
                   value={selosTexto}
@@ -293,8 +293,8 @@ export function TabelaNutricionalPanel() {
                 <p className="text-xs text-slate-400 mt-1">Separe múltiplos selos por vírgula.</p>
               </div>
               <div className="md:col-span-3">
-                <label className="block text-sm font-medium text-slate-700 mb-1">Ingredientes</label>
-                <textarea
+                <label htmlFor="nutri-ingredientes" className="block text-sm font-medium text-slate-700 mb-1">Ingredientes</label>
+                <textarea id="nutri-ingredientes"
                   rows={3}
                   placeholder="Água, açúcar, leite em pó..."
                   value={ingredientes}

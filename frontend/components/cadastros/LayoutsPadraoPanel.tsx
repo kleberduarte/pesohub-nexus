@@ -194,8 +194,8 @@ export function LayoutsPadraoPanel() {
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Nome</label>
-                <input
+                <label htmlFor="layout-nome" className="block text-xs font-medium text-slate-700 mb-1">Nome</label>
+                <input id="layout-nome"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm"

@@ -253,8 +253,8 @@ export function TeclaAcessoRapidoPanel() {
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome do modelo *</label>
-                <input
+                <label htmlFor="tecla-nome-do-modelo" className="block text-sm font-medium text-slate-700 mb-1">Nome do modelo *</label>
+                <input id="tecla-nome-do-modelo"
                   type="text"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
@@ -262,8 +262,8 @@ export function TeclaAcessoRapidoPanel() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
-                <select
+                <label htmlFor="tecla-modelo" className="block text-sm font-medium text-slate-700 mb-1">Modelo *</label>
+                <select id="tecla-modelo"
                   value={modelo}
                   onChange={(e) => setModelo(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
@@ -276,8 +276,8 @@ export function TeclaAcessoRapidoPanel() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Página *</label>
-                <select
+                <label htmlFor="tecla-pagina" className="block text-sm font-medium text-slate-700 mb-1">Página *</label>
+                <select id="tecla-pagina"
                   value={pagina}
                   onChange={(e) => setPagina(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"

@@ -192,8 +192,8 @@ export function EtiquetaPreview({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               {products.length > 1 && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Produto</label>
-                  <select
+                  <label htmlFor="preview-produto" className="block text-xs font-medium text-slate-700 mb-1">Produto</label>
+                  <select id="preview-produto"
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                     value={productId}
                     onChange={(e) => setProductId(e.target.value)}
@@ -207,8 +207,8 @@ export function EtiquetaPreview({
                 </div>
               )}
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Formato de Impressão</label>
-                <select
+                <label htmlFor="preview-formato-de-impressao" className="block text-xs font-medium text-slate-700 mb-1">Formato de Impressão</label>
+                <select id="preview-formato-de-impressao"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                   value={formatoId}
                   onChange={(e) => setFormatoId(e.target.value)}
