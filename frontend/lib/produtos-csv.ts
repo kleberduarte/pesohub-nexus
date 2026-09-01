@@ -1,4 +1,5 @@
 import type { CreateProductInput, Product } from "./api";
+import { splitCsvLine } from "./csv";
 
 /**
  * Importação e exportação de produtos em CSV.
@@ -21,46 +22,11 @@ export function toCsv(products: Product[]): string {
   return [header.join(","), ...rows].join("\r\n");
 }
 
-/**
- * Divide uma linha de CSV respeitando aspas.
- *
- * A vírgula só separa campos quando está FORA de aspas — um nome como
- * `"Queijo, meia cura"` é um campo só. A versão anterior fazia `line.split(",")`
- * e depois tirava as aspas, o que partia esse nome em dois e deslocava todas as
- * colunas seguintes. Como `toCsv` sempre envolve os campos em aspas, o defeito
- * aparecia ao exportar e reimportar o próprio arquivo.
- */
-function splitLine(line: string): string[] {
-  const campos: string[] = [];
-  let atual = "";
-  let dentroDeAspas = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') {
-      // Aspas duplicadas dentro de um campo citado são uma aspa literal.
-      if (dentroDeAspas && line[i + 1] === '"') {
-        atual += '"';
-        i++;
-      } else {
-        dentroDeAspas = !dentroDeAspas;
-      }
-    } else if (c === "," && !dentroDeAspas) {
-      campos.push(atual.trim());
-      atual = "";
-    } else {
-      atual += c;
-    }
-  }
-  campos.push(atual.trim());
-  return campos;
-}
-
 export function parseCsv(text: string): CreateProductInput[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length === 0) return [];
 
-  const header = splitLine(lines[0]).map((h) => h.toLowerCase());
+  const header = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
   const idx = {
     codigo: header.indexOf("codigo"),
     codigoBarras: header.indexOf("codigobarras"),
@@ -76,7 +42,7 @@ export function parseCsv(text: string): CreateProductInput[] {
   }
 
   return lines.slice(1).map((line) => {
-    const fields = splitLine(line);
+    const fields = splitCsvLine(line);
     return {
       codigo: fields[idx.codigo] ?? "",
       codigoBarras: fields[idx.codigoBarras] ?? "",
