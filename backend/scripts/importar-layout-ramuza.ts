@@ -281,6 +281,23 @@ export function converter(arquivo: ArquivoExportado, opcoes: { venda?: "peso" | 
 }
 
 /**
+ * Variante autoral: um modelo de fábrica mais elementos que ele não tem.
+ *
+ * A Ramuza só traz tabela nutricional nos modelos "com tabela" (60x120 e
+ * 60x170). A combinação que as lojas pedem — o 60x80 Padrão com tabela — não
+ * existe no ECS.mdb, e foi ela que imprimiu certo no hardware em 01/09. Em vez
+ * de editar o catálogo gerado à mão (que o próximo `--catalogo` sobrescreveria),
+ * as variantes ficam declaradas em `layouts-padrao-extras.json` e são aplicadas
+ * sobre a base a cada geração.
+ */
+interface VarianteExtra {
+  baseId: string;
+  id: string;
+  nome: string;
+  elementosExtras: Array<Record<string, unknown>>;
+}
+
+/**
  * Gera o catálogo estático que a aba "Layouts padrão" consome. Os modelos de
  * fábrica não mudam, e são iguais para todas as lojas: virar tabela no banco
  * custaria migração e seed para dados que nascem congelados no ECS.mdb. Como
@@ -295,7 +312,13 @@ function gerarCatalogo(diretorio: string, saida: string) {
     .filter((f) => f.endsWith(".json"))
     .sort();
 
-  const modelos = arquivos.map((f) => {
+  const modelos: Array<{
+    id: string;
+    nome: string;
+    larguraMm: number;
+    alturaMm: number;
+    elementos: Array<Record<string, unknown>>;
+  }> = arquivos.map((f) => {
     const bruto = fs.readFileSync(path.join(diretorio, f), "utf8").replace(/^﻿/, "");
     const convertido = converter(JSON.parse(bruto) as ArquivoExportado);
     return {
@@ -307,9 +330,35 @@ function gerarCatalogo(diretorio: string, saida: string) {
     };
   });
 
+  const arquivoExtras = path.join(__dirname, "layouts-padrao-extras.json");
+  if (fs.existsSync(arquivoExtras)) {
+    const extras = JSON.parse(
+      fs.readFileSync(arquivoExtras, "utf8").replace(/^﻿/, ""),
+    ) as VarianteExtra[];
+    for (const extra of extras) {
+      const base = modelos.find((m) => m.id === extra.baseId);
+      if (!base) {
+        // Sem a base, a variante sairia com geometria errada — melhor faltar no
+        // catálogo do que entrar torta.
+        console.warn(`variante ${extra.id}: base ${extra.baseId} não está no catálogo, ignorada`);
+        continue;
+      }
+      modelos.push({
+        id: extra.id,
+        nome: extra.nome,
+        larguraMm: base.larguraMm,
+        alturaMm: base.alturaMm,
+        elementos: [...base.elementos, ...extra.elementosExtras],
+      });
+    }
+  }
+
   const cabecalho = `// GERADO por backend/scripts/importar-layout-ramuza.ts --catalogo — não editar à mão.
 // Origem: tabelas Label/LabelItem do ECS.mdb do software oficial da Ramuza,
 // extraídas por backend/scripts/extrair-layouts-ramuza.ps1.
+// Os modelos com id \`pesohub-*\` são variantes declaradas em
+// backend/scripts/layouts-padrao-extras.json — combinações que as lojas pedem e
+// que não existem nos modelos de fábrica.
 
 export interface LayoutPadrao {
   id: string;
