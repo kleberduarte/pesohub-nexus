@@ -566,9 +566,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                     <h4 className="text-sm font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2">Informações Básicas</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Código do Produto</label>
+                        <label htmlFor="produto-codigo-do-produto" className="block text-xs font-medium text-slate-700 mb-1">Código do Produto</label>
                         <input
-                          type="text"
+ id="produto-codigo-do-produto"                          type="text"
                           required
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.codigo}
@@ -576,9 +576,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Código de Barras (EAN-13)</label>
+                        <label htmlFor="produto-codigo-de-barras-ean-13" className="block text-xs font-medium text-slate-700 mb-1">Código de Barras (EAN-13)</label>
                         <input
-                          type="text"
+ id="produto-codigo-de-barras-ean-13"                          type="text"
                           required
                           maxLength={13}
                           pattern="\d{13}"
@@ -590,18 +590,18 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div className="md:col-span-1">
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Categoria de Imposto</label>
+                        <label htmlFor="produto-categoria-de-imposto" className="block text-xs font-medium text-slate-700 mb-1">Categoria de Imposto</label>
                         <input
-                          type="text"
+ id="produto-categoria-de-imposto"                          type="text"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.categoriaImposto}
                           onChange={(e) => setForm({ ...form, categoriaImposto: e.target.value })}
                         />
                       </div>
                       <div className="md:col-span-1">
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Modo de Imposto</label>
+                        <label htmlFor="produto-modo-de-imposto" className="block text-xs font-medium text-slate-700 mb-1">Modo de Imposto</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-modo-de-imposto"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.taxType ?? 0}
                           onChange={(e) => setForm({ ...form, taxType: Number(e.target.value) })}
                         >
@@ -612,9 +612,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </select>
                       </div>
                       <div className="md:col-span-1">
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Alíquota (%)</label>
+                        <label htmlFor="produto-aliquota" className="block text-xs font-medium text-slate-700 mb-1">Alíquota (%)</label>
                         <input
-                          type="number"
+ id="produto-aliquota"                          type="number"
                           step="0.01"
                           min={0}
                           max={100}
@@ -627,9 +627,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div className="md:col-span-3">
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Nome do Produto</label>
+                        <label htmlFor="produto-nome-do-produto" className="block text-xs font-medium text-slate-700 mb-1">Nome do Produto</label>
                         <input
-                          type="text"
+ id="produto-nome-do-produto"                          type="text"
                           required
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.nome}
@@ -644,9 +644,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                     <h4 className="text-sm font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2">Preço</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Preço Unitário (R$)</label>
+                        <label htmlFor="produto-preco-unitario-r" className="block text-xs font-medium text-slate-700 mb-1">Preço Unitário (R$)</label>
                         <input
-                          type="text"
+ id="produto-preco-unitario-r"                          type="text"
                           inputMode="decimal"
                           required
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
@@ -664,9 +664,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Custo (R$)</label>
+                        <label htmlFor="produto-custo-r" className="block text-xs font-medium text-slate-700 mb-1">Custo (R$)</label>
                         <input
-                          type="text"
+ id="produto-custo-r"                          type="text"
                           inputMode="decimal"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={custoInput}
@@ -685,9 +685,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Ativo</label>
+                        <label htmlFor="produto-ativo" className="block text-xs font-medium text-slate-700 mb-1">Ativo</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-ativo"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.ativo ? "sim" : "nao"}
                           onChange={(e) => setForm({ ...form, ativo: e.target.value === "sim" })}
                         >
@@ -705,9 +705,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Lote</label>
+                        <label htmlFor="produto-lote" className="block text-xs font-medium text-slate-700 mb-1">Lote</label>
                         <input
-                          type="text"
+ id="produto-lote"                          type="text"
                           maxLength={12}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.lote ?? ""}
@@ -715,9 +715,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Unidade de Venda</label>
+                        <label htmlFor="produto-unidade-de-venda" className="block text-xs font-medium text-slate-700 mb-1">Unidade de Venda</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-unidade-de-venda"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.unidadeVenda ?? "PESO"}
                           onChange={(e) =>
                             setForm({ ...form, unidadeVenda: e.target.value as "PESO" | "PECA" })
@@ -728,9 +728,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Tara (kg)</label>
+                        <label htmlFor="produto-tara-kg" className="block text-xs font-medium text-slate-700 mb-1">Tara (kg)</label>
                         <input
-                          type="number"
+ id="produto-tara-kg"                          type="number"
                           step="0.001"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.tara ?? ""}
@@ -740,9 +740,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Desconto (preço promocional)</label>
+                        <label htmlFor="produto-desconto-preco-promocional" className="block text-xs font-medium text-slate-700 mb-1">Desconto (preço promocional)</label>
                         <input
-                          type="number"
+ id="produto-desconto-preco-promocional"                          type="number"
                           step="0.01"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.desconto ?? ""}
@@ -774,9 +774,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </label>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Modo especial</label>
+                        <label htmlFor="produto-modo-especial" className="block text-xs font-medium text-slate-700 mb-1">Modo especial</label>
                         <input
-                          type="number"
+ id="produto-modo-especial"                          type="number"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.modoEspecial ?? 0}
                           onChange={(e) => setForm({ ...form, modoEspecial: Number(e.target.value) })}
@@ -792,9 +792,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Sub-Setor</label>
+                        <label htmlFor="produto-sub-setor" className="block text-xs font-medium text-slate-700 mb-1">Sub-Setor</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-sub-setor"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.subSetorId ?? ""}
                           onChange={(e) => setForm({ ...form, subSetorId: e.target.value })}
                         >
@@ -807,9 +807,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Tabela Nutricional</label>
+                        <label htmlFor="produto-tabela-nutricional" className="block text-xs font-medium text-slate-700 mb-1">Tabela Nutricional</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-tabela-nutricional"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.tabelaNutricionalId ?? ""}
                           onChange={(e) => setForm({ ...form, tabelaNutricionalId: e.target.value })}
                         >
@@ -822,9 +822,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Fornecedor</label>
+                        <label htmlFor="produto-fornecedor" className="block text-xs font-medium text-slate-700 mb-1">Fornecedor</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-fornecedor"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.fornecedorId ?? ""}
                           onChange={(e) => setForm({ ...form, fornecedorId: e.target.value })}
                         >
@@ -837,9 +837,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Alérgicos</label>
+                        <label htmlFor="produto-alergicos" className="block text-xs font-medium text-slate-700 mb-1">Alérgicos</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-alergicos"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.alergicoId ?? ""}
                           onChange={(e) => setForm({ ...form, alergicoId: e.target.value })}
                         >
@@ -852,9 +852,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Imagem</label>
+                        <label htmlFor="produto-imagem" className="block text-xs font-medium text-slate-700 mb-1">Imagem</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-imagem"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.imagemId ?? ""}
                           onChange={(e) => setForm({ ...form, imagemId: e.target.value })}
                         >
@@ -867,9 +867,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Formato de Impressão</label>
+                        <label htmlFor="produto-formato-de-impressao" className="block text-xs font-medium text-slate-700 mb-1">Formato de Impressão</label>
                         <select
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
+ id="produto-formato-de-impressao"                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.formatoImpressaoId ?? ""}
                           onChange={(e) => setForm({ ...form, formatoImpressaoId: e.target.value })}
                         >
@@ -915,9 +915,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                     </h4>
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Dias de venda</label>
+                        <label htmlFor="produto-dias-de-venda" className="block text-xs font-medium text-slate-700 mb-1">Dias de venda</label>
                         <input
-                          type="number"
+ id="produto-dias-de-venda"                          type="number"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.diasDeVenda ?? ""}
                           onChange={(e) =>
@@ -929,9 +929,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Tempo de venda</label>
+                        <label htmlFor="produto-tempo-de-venda" className="block text-xs font-medium text-slate-700 mb-1">Tempo de venda</label>
                         <input
-                          type="number"
+ id="produto-tempo-de-venda"                          type="number"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.tempoDeVenda ?? ""}
                           onChange={(e) =>
@@ -943,9 +943,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Validade do pacote</label>
+                        <label htmlFor="produto-validade-do-pacote" className="block text-xs font-medium text-slate-700 mb-1">Validade do pacote</label>
                         <input
-                          type="number"
+ id="produto-validade-do-pacote"                          type="number"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.validadePacote ?? ""}
                           onChange={(e) =>
@@ -957,9 +957,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Val. em horas do pacote</label>
+                        <label htmlFor="produto-val-em-horas-do-pacote" className="block text-xs font-medium text-slate-700 mb-1">Val. em horas do pacote</label>
                         <input
-                          type="number"
+ id="produto-val-em-horas-do-pacote"                          type="number"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.validadePacoteHoras ?? ""}
                           onChange={(e) =>
@@ -971,9 +971,9 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-slate-700 mb-1">Validade em dias</label>
+                        <label htmlFor="produto-validade-em-dias" className="block text-xs font-medium text-slate-700 mb-1">Validade em dias</label>
                         <input
-                          type="number"
+ id="produto-validade-em-dias"                          type="number"
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-brand-500"
                           value={form.validadeDias ?? ""}
                           onChange={(e) =>
