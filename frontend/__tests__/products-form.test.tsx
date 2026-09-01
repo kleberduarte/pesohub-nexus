@@ -120,3 +120,34 @@ describe("Formulário de produto — salvar", () => {
     expect(campo(/nome do produto/i)).toBeInTheDocument(); // o formulário continua aberto
   });
 });
+
+/**
+ * Falha ao carregar as listas auxiliares (card #67).
+ *
+ * O padrão antigo era `catch(() => setX([]))`: o dropdown ficava vazio e a
+ * pessoa concluía "não há fornecedores cadastrados", cadastrando produto sem
+ * vínculo — e são esses vínculos que a etiqueta imprime.
+ *
+ * Ausência de dado não é dado. Mesma regra que vale para a balança.
+ */
+describe("Formulário de produto — listas auxiliares que não carregam", () => {
+  it("avisa quais listas falharam, em vez de fingir que estão vazias", async () => {
+    const { fornecedoresApi, alergicosApi } = jest.requireMock("../lib/api");
+    fornecedoresApi.list.mockRejectedValue(new Error("offline"));
+    alergicosApi.list.mockRejectedValue(new Error("offline"));
+
+    render(<ProductsPage />);
+
+    const aviso = await screen.findByText(/não foi possível carregar/i);
+    expect(aviso).toBeVisible();
+    expect(aviso).toHaveTextContent(/fornecedores/i);
+    expect(aviso).toHaveTextContent(/alérgicos/i);
+  });
+
+  it("não mostra aviso nenhum quando tudo carrega", async () => {
+    render(<ProductsPage />);
+    await screen.findByRole("button", { name: /novo produto|novo/i });
+
+    expect(screen.queryByText(/não foi possível carregar/i)).not.toBeInTheDocument();
+  });
+});

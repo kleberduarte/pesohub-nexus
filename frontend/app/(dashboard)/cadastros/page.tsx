@@ -29,12 +29,29 @@ export default function CadastrosPage() {
   const [tab, setTab] = useState<TabKey>("setor");
   const [setores, setSetores] = useState<Setor[]>([]);
 
+  /** Falha de leitura não pode virar lista vazia: o Sub-Setor depende de escolher
+   *  um Setor, e um select vazio pareceria "não há setores cadastrados"
+   *  (card #67). */
+  const [setoresFalharam, setSetoresFalharam] = useState(false);
+
   useEffect(() => {
-    setoresApi.list().then(setSetores).catch(() => setSetores([]));
+    setoresApi
+      .list()
+      .then((s) => {
+        setSetores(s);
+        setSetoresFalharam(false);
+      })
+      .catch(() => setSetoresFalharam(true));
   }, [tab]);
 
   return (
     <div>
+      {setoresFalharam && (
+        <div className="mb-4 p-3 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg">
+          Não foi possível carregar a lista de Setores. Onde ela aparecer vazia, é falha de
+          leitura — não significa que não há setores cadastrados. Recarregue a página.
+        </div>
+      )}
       <div className="flex gap-1 mb-6 border-b border-slate-200 overflow-x-auto">
         {TABS.map((t) => (
           <button

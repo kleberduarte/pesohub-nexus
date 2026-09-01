@@ -22,6 +22,7 @@ export default function UsuariosPage() {
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
   const [lojas, setLojas] = useState<Loja[]>([]);
+  const [lojasFalharam, setLojasFalharam] = useState(false);
 
   const [editTarget, setEditTarget] = useState<AppUser | null>(null);
   const [editRole, setEditRole] = useState<UserRole>("OPERADOR");
@@ -73,8 +74,14 @@ export default function UsuariosPage() {
       .catch(() => setIsDefaultCliente(false));
     lojasApi
       .list()
-      .then(setLojas)
-      .catch(() => setLojas([]));
+      .then((l) => {
+        setLojas(l);
+        setLojasFalharam(false);
+      })
+      // Lista vazia aqui define ESCOPO DE ACESSO: um usuário salvo sem loja
+      // por falha de leitura fica sem enxergar nada, e o sintoma vira "não
+      // consigo ver os produtos" (card #67).
+      .catch(() => setLojasFalharam(true));
   }, []);
 
   const restringeALoja = ROLES_RESTRINGIVEIS_A_LOJA.includes(role);
@@ -156,6 +163,13 @@ export default function UsuariosPage() {
         <p className="text-sm text-slate-500">Usuários vinculados à empresa atualmente selecionada.</p>
       </div>
 
+      {lojasFalharam && (
+        <div className="p-3 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg">
+          Não foi possível carregar a lista de Lojas. <strong>Não salve usuários agora</strong> —
+          a seleção de lojas aparece vazia por falha de leitura, e um usuário salvo assim fica sem
+          acesso a nenhuma loja. Recarregue a página.
+        </div>
+      )}
       {error && (
         <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>
       )}
