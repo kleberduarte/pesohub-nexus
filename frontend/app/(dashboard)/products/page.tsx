@@ -98,14 +98,35 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
   const [alergicos, setAlergicos] = useState<Alergico[]>([]);
   const [imagens, setImagens] = useState<Imagem[]>([]);
   const [formatosImpressao, setFormatosImpressao] = useState<FormatoImpressao[]>([]);
+  /** Listas auxiliares cuja leitura falhou — vazio aqui não significa "não há". */
+  const [listasComFalha, setListasComFalha] = useState<string[]>([]);
 
+  /**
+   * Listas auxiliares que alimentam os selects do formulário.
+   *
+   * Antes, cada falha virava `setX([])` em silêncio: o dropdown ficava vazio e
+   * a pessoa concluía "não há fornecedores cadastrados", cadastrando produto
+   * sem vínculo — e são esses vínculos que a etiqueta imprime. Ausência de dado
+   * não é dado (card #67); quando a leitura falha, a tela avisa.
+   */
   useEffect(() => {
-    subSetoresApi.list().then(setSubSetores).catch(() => setSubSetores([]));
-    tabelasNutricionaisApi.list().then(setTabelasNutricionais).catch(() => setTabelasNutricionais([]));
-    fornecedoresApi.list().then(setFornecedores).catch(() => setFornecedores([]));
-    alergicosApi.list().then(setAlergicos).catch(() => setAlergicos([]));
-    imagensApi.list().then(setImagens).catch(() => setImagens([]));
-    formatosImpressaoApi.list().then(setFormatosImpressao).catch(() => setFormatosImpressao([]));
+    const carregar = <T,>(
+      nome: string,
+      buscar: () => Promise<T[]>,
+      guardar: (v: T[]) => void,
+    ) => buscar().then(guardar).catch(() => nome);
+
+    void Promise.all([
+      carregar("Sub-Setores", subSetoresApi.list, setSubSetores),
+      carregar("Tabelas Nutricionais", tabelasNutricionaisApi.list, setTabelasNutricionais),
+      carregar("Fornecedores", fornecedoresApi.list, setFornecedores),
+      carregar("Alérgicos", alergicosApi.list, setAlergicos),
+      carregar("Imagens", imagensApi.list, setImagens),
+      carregar("Formatos de Impressão", formatosImpressaoApi.list, setFormatosImpressao),
+    ]).then((resultados) => {
+      const falharam = resultados.filter((r): r is string => typeof r === "string");
+      if (falharam.length > 0) setListasComFalha(falharam);
+    });
   }, []);
 
   /** Busca e filtro de status vão para o banco — a página nunca carrega o
@@ -429,6 +450,16 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
         </div>
       </div>
 
+      {/* Aviso separado do `error` de propósito: não é falha da ação que a pessoa
+          acabou de fazer, é uma lista que não carregou. Sem isso, o select vazio
+          seria indistinguível de "não há nada cadastrado" (card #67). */}
+      {listasComFalha.length > 0 && (
+        <div className="p-3 text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg">
+          Não foi possível carregar: <strong>{listasComFalha.join(", ")}</strong>. Os campos
+          correspondentes aparecem vazios por falha de leitura, não por estarem sem cadastro —
+          recarregue a página antes de salvar.
+        </div>
+      )}
       {error && (
         <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>
       )}
