@@ -84,7 +84,7 @@ const PRINT_POR_PECA = 3;
  */
 function mapearTipo(
   item: ItemRamuza,
-): { tipo: ElementoTipo; textoDoCabecalho?: number; espessura?: number } | null {
+): { tipo: ElementoTipo; textoDoCabecalho?: number; textoLiteral?: string; espessura?: number } | null {
   switch (item.Flag1) {
     case 0:
       return { tipo: "codigoBarras" };
@@ -126,9 +126,16 @@ function mapearTipo(
           return { tipo: "peso" };
         case 8:
           return { tipo: "preco" };
+        // As unidades são rótulos fixos e o editor não tem tipo próprio para
+        // elas: viram texto livre, que na gravação ocupa um dos 32 slots de
+        // texto constante do cabeçalho LAB. Sem isso a etiqueta importada sai
+        // com o preço e o peso soltos, sem "R$" nem "kg" ao lado.
+        case 12:
+          return { tipo: "texto", textoLiteral: "kg" };
+        case 16:
+          return { tipo: "texto", textoLiteral: "R$" };
         default:
-          // Nome da loja e unidades (12/16) são rótulos fixos; viram texto
-          // livre, mas sem conteúdo conhecido aqui.
+          // Nome da loja (0) depende da loja de destino, não do template.
           return null;
       }
 
@@ -252,6 +259,7 @@ export function converter(arquivo: ArquivoExportado, opcoes: { venda?: "peso" | 
     if (mapeado.textoDoCabecalho != null) {
       elemento.texto = textosDoCabecalho[mapeado.textoDoCabecalho] ?? "";
     }
+    if (mapeado.textoLiteral != null) elemento.texto = mapeado.textoLiteral;
 
     elementos.push(elemento);
   }
