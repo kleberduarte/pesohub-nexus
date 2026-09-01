@@ -1,0 +1,308 @@
+/**
+ * Converte um layout de etiqueta do software oficial da Ramuza para o formato
+ * do PesoHub (card #52).
+ *
+ * Os 62 modelos de fábrica vivem em `ECS.mdb` (tabelas `Label` e `LabelItem`).
+ * O valor deles não é a quantidade: são layouts que comprovadamente imprimem no
+ * hardware. O dicionário de flags lista campos que os modelos de fábrica NÃO
+ * usam — data e validade têm entradas em "Item" que não imprimem nada, e o
+ * template oficial usa `7/3/2` e `7/3/3`. Copiar o template é copiar as
+ * combinações que funcionam, em vez de descobri-las na tentativa e erro.
+ *
+ * Como o Node não lê `.mdb`, a extração é feita à parte (PowerShell + driver
+ * ACE, senha `showmethemoney`) e este script consome o JSON resultante:
+ *
+ *   npx ts-node scripts/importar-layout-ramuza.ts <arquivo.json> [--numero N] [--gravar]
+ *
+ * Sem `--gravar` ele só imprime o resultado e o relatório de conversão — que é
+ * o modo que interessa enquanto o mapeamento não estiver validado contra
+ * impressão real.
+ */
+import { PrismaClient } from "@prisma/client";
+
+/** Pontos de impressão por milímetro (203 dpi). */
+const PONTOS_POR_MM = 8;
+
+type ElementoTipo =
+  | "nome"
+  | "preco"
+  | "precoUnitario"
+  | "peso"
+  | "tara"
+  | "validade"
+  | "dataEmbalagem"
+  | "pesoBrutoLiquido"
+  | "lote"
+  | "textoExtra5"
+  | "textoExtra7"
+  | "codigoBarras"
+  | "texto"
+  | "imagem"
+  | "tabelaNutricional"
+  | "selos"
+  | "ingredientes";
+
+interface ItemRamuza {
+  SubID: number;
+  Left: number;
+  Top: number;
+  Width: number;
+  Height: number;
+  Font: number;
+  Align: number;
+  Angle: number;
+  Flag1: number;
+  Flag2: number;
+  Flag3: number;
+  Print: number;
+}
+
+interface ArquivoExportado {
+  label: Record<string, unknown> & { LabelID: number; Name: string; Width: number; Height: number };
+  items: ItemRamuza[];
+}
+
+/**
+ * Traduz o trio Flag1/Flag2/Flag3 para o tipo de elemento do PesoHub.
+ *
+ * Devolve `null` quando o elemento não tem equivalente — hoje isso acontece com
+ * Borda (Flag1=4) e Divisória (Flag1=5), que somam 302 dos 1.908 elementos dos
+ * modelos de fábrica. São as linhas e molduras que dão forma à etiqueta: até
+ * existirem no editor, todo layout importado abre desmontado.
+ */
+function mapearTipo(item: ItemRamuza): { tipo: ElementoTipo; textoDoCabecalho?: number } | null {
+  switch (item.Flag1) {
+    case 0:
+      return { tipo: "codigoBarras" };
+
+    // "Item": Flag3 escolhe o campo do PLU.
+    case 1:
+      switch (item.Flag3) {
+        case 0:
+          return { tipo: "nome" };
+        case 1:
+          return { tipo: "peso" };
+        case 2:
+          return { tipo: "tara" };
+        case 4:
+        case 25:
+          return { tipo: "precoUnitario" };
+        case 5:
+          return { tipo: "preco" };
+        case 13:
+          return { tipo: "dataEmbalagem" };
+        case 15:
+          return { tipo: "validade" };
+        // Ingredientes chegam à balança pelo Texto extra 4 do PLU — não pelo
+        // campo "Ingredientes" do NU3, que persiste mas nada renderiza.
+        case 19:
+          return { tipo: "ingredientes" };
+        case 21:
+          return { tipo: "lote" };
+        case 23:
+          return { tipo: "pesoBrutoLiquido" };
+        default:
+          return null;
+      }
+
+    // "Informação de venda": Flag2 escolhe o campo.
+    case 2:
+      switch (item.Flag2) {
+        case 7:
+          return { tipo: "peso" };
+        case 8:
+          return { tipo: "preco" };
+        default:
+          // Nome da loja e unidades (12/16) são rótulos fixos; viram texto
+          // livre, mas sem conteúdo conhecido aqui.
+          return null;
+      }
+
+    // Textos constantes: Flag2 é o índice do Text1..Text32 do cabeçalho.
+    case 3:
+      return { tipo: "texto", textoDoCabecalho: item.Flag2 };
+
+    case 6:
+      return { tipo: "imagem" };
+
+    // "Impressão customizada".
+    case 7:
+      if (item.Flag2 === 0) return { tipo: "tabelaNutricional" };
+      if (item.Flag2 === 2) return { tipo: "selos" };
+      if (item.Flag2 === 3) {
+        if (item.Flag3 === 2) return { tipo: "dataEmbalagem" };
+        if (item.Flag3 === 3) return { tipo: "validade" };
+        if (item.Flag3 === 4) return { tipo: "ingredientes" };
+      }
+      return null;
+
+    // 4 = Borda, 5 = Divisória — sem equivalente no editor do PesoHub.
+    default:
+      return null;
+  }
+}
+
+const NOME_FLAG1: Record<number, string> = {
+  0: "Código de barras",
+  1: "Item",
+  2: "Informação de venda",
+  3: "Texto constante",
+  4: "Borda",
+  5: "Divisória",
+  6: "Imagem",
+  7: "Impressão customizada",
+};
+
+/** Pontos -> milímetros, com 2 casas (o editor trabalha em passos de 0,25mm). */
+function paraMm(pontos: number): number {
+  return Math.round((pontos / PONTOS_POR_MM) * 100) / 100;
+}
+
+function alinhamentoPesoHub(align: number): 0 | 1 | 2 {
+  // O `Align` da Ramuza tem mais variações do que o editor expõe; o que
+  // interessa é a horizontal.
+  if (align === 1 || align === 4 || align === 7) return 2;
+  if (align === 2 || align === 5 || align === 8) return 1;
+  return 0;
+}
+
+function anguloPesoHub(angle: number): 0 | 90 | 180 | 270 {
+  return (([0, 90, 180, 270] as const)[angle] ?? 0) as 0 | 90 | 180 | 270;
+}
+
+export function converter(arquivo: ArquivoExportado) {
+  const { label, items } = arquivo;
+  const textosDoCabecalho: Record<number, string> = {};
+  for (let i = 1; i <= 32; i++) {
+    const valor = label[`Text${i}`];
+    if (typeof valor === "string" && valor.trim().length > 0) textosDoCabecalho[i - 1] = valor;
+  }
+
+  const elementos: Record<string, unknown>[] = [];
+  const ignorados: { subId: number; motivo: string }[] = [];
+
+  for (const item of items) {
+    const mapeado = mapearTipo(item);
+    if (!mapeado) {
+      ignorados.push({
+        subId: item.SubID,
+        motivo: `${NOME_FLAG1[item.Flag1] ?? `Flag1=${item.Flag1}`} (${item.Flag1}/${item.Flag2}/${item.Flag3})`,
+      });
+      continue;
+    }
+
+    const elemento: Record<string, unknown> = {
+      id: `${mapeado.tipo}-ramuza${label.LabelID}-${item.SubID}`,
+      tipo: mapeado.tipo,
+      x: paraMm(item.Left),
+      y: paraMm(item.Top),
+      largura: paraMm(item.Width),
+      altura: paraMm(item.Height),
+    };
+
+    if (item.Angle) elemento.angulo = anguloPesoHub(item.Angle);
+    if (item.Align) elemento.alinhamento = alinhamentoPesoHub(item.Align);
+    if (item.Font) elemento.fonte = item.Font;
+    if (mapeado.textoDoCabecalho != null) {
+      elemento.texto = textosDoCabecalho[mapeado.textoDoCabecalho] ?? "";
+    }
+
+    elementos.push(elemento);
+  }
+
+  return {
+    nome: label.Name,
+    larguraMm: Math.round(label.Width / PONTOS_POR_MM),
+    alturaMm: Math.round(label.Height / PONTOS_POR_MM),
+    layout: { elementos },
+    relatorio: {
+      total: items.length,
+      convertidos: elementos.length,
+      ignorados,
+    },
+  };
+}
+
+async function main() {
+  const [caminho, ...resto] = process.argv.slice(2);
+  if (!caminho) {
+    console.error("uso: importar-layout-ramuza.ts <arquivo.json> [--numero N] [--gravar]");
+    process.exit(1);
+  }
+
+  const gravar = resto.includes("--gravar");
+  const idxNumero = resto.indexOf("--numero");
+  const numero = idxNumero >= 0 ? Number(resto[idxNumero + 1]) : null;
+
+  // O `Out-File -Encoding utf8` do PowerShell 5.1 grava com BOM, que o
+  // JSON.parse não engole.
+  const bruto = (require("fs").readFileSync(caminho, "utf8") as string).replace(/^﻿/, "");
+  const arquivo = JSON.parse(bruto) as ArquivoExportado;
+  const resultado = converter(arquivo);
+
+  console.log(`\nLayout: ${resultado.nome} (${resultado.larguraMm}mm x ${resultado.alturaMm}mm)`);
+  console.log(`Elementos: ${resultado.relatorio.convertidos} de ${resultado.relatorio.total} convertidos`);
+
+  if (resultado.relatorio.ignorados.length > 0) {
+    const porMotivo = new Map<string, number>();
+    for (const i of resultado.relatorio.ignorados) {
+      const chave = i.motivo.split(" (")[0];
+      porMotivo.set(chave, (porMotivo.get(chave) ?? 0) + 1);
+    }
+    console.log("\nIgnorados (sem equivalente no editor):");
+    for (const [motivo, qtd] of porMotivo) console.log(`  ${qtd}x ${motivo}`);
+  }
+
+  if (!gravar) {
+    console.log("\n--- layout convertido ---");
+    console.log(JSON.stringify(resultado.layout, null, 2));
+    console.log("\n(dry-run; use --gravar --numero N para persistir)");
+    return;
+  }
+
+  if (numero == null || Number.isNaN(numero)) {
+    console.error("--gravar exige --numero N (o slot do formato na loja)");
+    process.exit(1);
+  }
+
+  const prisma = new PrismaClient();
+  try {
+    // A loja é obrigatória: o formato é por-Loja, e escolher "a primeira" grava
+    // silenciosamente na loja errada — foi o que aconteceu no primeiro teste.
+    const idxLoja = resto.indexOf("--loja");
+    const lojaId = idxLoja >= 0 ? resto[idxLoja + 1] : null;
+    if (!lojaId) {
+      const lojas = await prisma.loja.findMany({ select: { id: true, nome: true }, orderBy: { createdAt: "asc" } });
+      console.error("--gravar exige --loja <id>. Lojas disponíveis:");
+      for (const l of lojas) console.error(`  ${l.id}  ${l.nome}`);
+      process.exit(1);
+    }
+
+    const loja = await prisma.loja.findUnique({ where: { id: lojaId } });
+    if (!loja) throw new Error(`Loja ${lojaId} não encontrada`);
+
+    const criado = await prisma.formatoImpressao.upsert({
+      where: { lojaId_numero: { lojaId: loja.id, numero } },
+      update: { nome: resultado.nome, larguraMm: resultado.larguraMm, alturaMm: resultado.alturaMm, layout: resultado.layout },
+      create: {
+        clienteId: loja.clienteId,
+        lojaId: loja.id,
+        numero,
+        nome: resultado.nome,
+        larguraMm: resultado.larguraMm,
+        alturaMm: resultado.alturaMm,
+        layout: resultado.layout,
+      },
+    });
+    console.log(`\nGravado: formato ${criado.numero} "${criado.nome}" na loja ${loja.nome}`);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
