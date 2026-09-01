@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { CloudUpload, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
+import { CloudUpload, CheckCircle2, XCircle, Clock, Loader2, ChevronRight } from "lucide-react";
 import { devicesApi, syncApi, type Device, type SyncJob, ApiError } from "../../../lib/api";
 
 interface HistoryEntry extends SyncJob {
@@ -17,6 +17,16 @@ export default function SyncPage() {
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+  /** Jobs com o motivo do erro aberto. Só na memória da tela — reabrir a
+   * página recomeça do zero, que é o comportamento esperado de um detalhe. */
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+
+  const alternarExpandido = (jobId: string) =>
+    setExpandidos((atual) => {
+      const proximo = new Set(atual);
+      if (!proximo.delete(jobId)) proximo.add(jobId);
+      return proximo;
+    });
 
   const loadHistory = useCallback(async (deviceList: Device[]) => {
     setLoadingHistory(true);
@@ -32,6 +42,12 @@ export default function SyncPage() {
         .sort((a, b) => (b.iniciadoEm ?? "").localeCompare(a.iniciadoEm ?? ""))
         .slice(0, 30);
       setHistory(merged);
+      // O erro mais recente já vem aberto: o caso comum é "sincronizei, deu
+      // errado, quero saber por quê" — cobrar um clique justo aí seria atrito
+      // no único momento em que a pessoa precisa da informação. Os antigos
+      // ficam recolhidos, que é o que mantém a tabela limpa.
+      const ultimoErro = merged.find((j) => j.status === "ERROR" && j.erro);
+      setExpandidos(ultimoErro ? new Set([ultimoErro.id]) : new Set());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível carregar o histórico de sincronização.");
     } finally {
@@ -165,11 +181,45 @@ export default function SyncPage() {
               {!loadingHistory &&
                 history.map((job) => {
                   const dt = job.iniciadoEm ? new Date(job.iniciadoEm) : null;
+                  const temMotivo = job.status === "ERROR" && !!job.erro;
+                  const aberto = temMotivo && expandidos.has(job.id);
                   return (
                     <Fragment key={job.id}>
-                    <tr className="hover:bg-slate-50/50 transition-colors">
+                    <tr
+                      className={`transition-colors ${
+                        temMotivo ? "cursor-pointer hover:bg-red-50/60" : "hover:bg-slate-50/50"
+                      }`}
+                      // A linha inteira é o alvo, não só o chevron: em toque um
+                      // ícone de 16px é difícil de acertar.
+                      onClick={temMotivo ? () => alternarExpandido(job.id) : undefined}
+                      onKeyDown={
+                        temMotivo
+                          ? (e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                alternarExpandido(job.id);
+                              }
+                            }
+                          : undefined
+                      }
+                      tabIndex={temMotivo ? 0 : undefined}
+                      role={temMotivo ? "button" : undefined}
+                      aria-expanded={temMotivo ? aberto : undefined}
+                    >
                       <td className="px-6 py-4 text-slate-600">
                         <div className="flex items-center">
+                          {/* O chevron é o que avisa que existe motivo pra ler.
+                              Sem ele voltaríamos ao problema do tooltip: a
+                              informação existe e ninguém sabe que existe. */}
+                          {temMotivo ? (
+                            <ChevronRight
+                              className={`w-4 h-4 text-red-500 mr-1 shrink-0 transition-transform ${
+                                aberto ? "rotate-90" : ""
+                              }`}
+                            />
+                          ) : (
+                            <span className="w-4 mr-1 shrink-0" aria-hidden="true" />
+                          )}
                           <CloudUpload className="w-4 h-4 text-brand-500 mr-2" />
                           <span className="font-medium text-slate-700">{job.deviceNome}</span>
                         </div>
@@ -210,16 +260,14 @@ export default function SyncPage() {
                         )}
                       </td>
                     </tr>
-                    {/* O motivo em texto, na própria tabela. Antes ele vivia só
-                        num `title`, que exige passar o mouse sobre o badge e
-                        some no toque — na prática, ninguém lia. As mensagens
-                        dizem o que fazer ("escolha outro número", "feche o
-                        software da Ramuza"); escondê-las desperdiça o que as
-                        verificações descobriram. */}
-                    {job.status === "ERROR" && job.erro && (
+                    {/* O motivo, revelado por clique. Nunca por hover: era assim
+                        que ele vivia antes (atributo `title`) e ninguém lia —
+                        hover não existe em toque e nada sinaliza que há algo
+                        ali. O chevron na linha faz esse aviso. */}
+                    {aberto && (
                       <tr className="bg-red-50/40">
                         <td colSpan={4} className="px-6 pb-4 pt-0">
-                          <p className="text-xs text-red-800 leading-relaxed">{job.erro}</p>
+                          <p className="text-xs text-red-800 leading-relaxed pl-9">{job.erro}</p>
                         </td>
                       </tr>
                     )}
