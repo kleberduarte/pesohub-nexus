@@ -74,6 +74,30 @@ export class DevicesController {
     return discovered.filter((d) => !registeredIps.has(d.ip));
   }
 
+  /**
+   * Slots de etiqueta já ocupados nas balanças da loja (card #55).
+   *
+   * O cadastro de Formato de Impressão usa isto para parar de pedir um número
+   * de 1 a 99 no escuro. Cair num slot ocupado por modelo de fábrica faz a
+   * balança aceitar e descartar em silêncio — e não existe faixa fixa que
+   * sirva, porque varia por equipamento.
+   *
+   * Rota declarada ANTES de `@Get(":id")`: o Nest casa na ordem, e "slots-etiqueta"
+   * seria capturado como um id.
+   */
+  @Get("slots-etiqueta")
+  async findSlotsEtiqueta(@Req() req: Request) {
+    const lojaId = this.lojaId(req);
+    if (!lojaId) return { slots: [], livres: [] };
+
+    const slots = await this.devices.findSlotsEtiquetaOcupados(lojaId);
+    const ocupados = new Set(slots.map((s) => s.numero));
+    const livres: number[] = [];
+    for (let n = 1; n <= 99; n++) if (!ocupados.has(n)) livres.push(n);
+
+    return { slots, livres };
+  }
+
   @Get(":id")
   findOne(@Param("id") id: string, @Req() req: Request) {
     return this.devices.findById(id, this.requireLojaId(req));

@@ -4,6 +4,7 @@ import { useMemo, useRef, useState, useEffect } from "react";
 import { Pencil, Plus, Trash2, LayoutTemplate, Tag, X } from "lucide-react";
 import {
   formatosImpressaoApi,
+  devicesApi,
   productsApi,
   imagensApi,
   tabelasNutricionaisApi,
@@ -12,6 +13,7 @@ import {
   type Product,
   type Imagem,
   type TabelaNutricional,
+  type SlotsEtiquetaResponse,
 } from "../../lib/api";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EtiquetaPreview } from "../products/EtiquetaPreview";
@@ -151,6 +153,12 @@ export function FormatoImpressaoPanel() {
   const [tabelasNutricionais, setTabelasNutricionais] = useState<TabelaNutricional[]>([]);
   const [previewFormato, setPreviewFormato] = useState<FormatoImpressao | null>(null);
 
+  // Mapa de slots lidos das balanças da loja (card #55). Sem ele o usuário
+  // escolhe o número no escuro: cair num slot ocupado por modelo de fábrica faz
+  // a balança aceitar e descartar em silêncio, e a etiqueta sai com o layout
+  // errado sem nenhum aviso.
+  const [slots, setSlots] = useState<SlotsEtiquetaResponse | null>(null);
+
   const load = () => {
     setLoading(true);
     formatosImpressaoApi
@@ -165,11 +173,16 @@ export function FormatoImpressaoPanel() {
     productsApi.listForPicker().then(setProducts).catch(() => setProducts([]));
     imagensApi.list().then(setImagens).catch(() => setImagens([]));
     tabelasNutricionaisApi.list().then(setTabelasNutricionais).catch(() => setTabelasNutricionais([]));
+    // Falha aqui não bloqueia o cadastro: sem o mapa a tela volta a ser o que
+    // era, só não consegue avisar sobre slot ocupado.
+    devicesApi.slotsEtiqueta().then(setSlots).catch(() => setSlots(null));
   }, []);
 
   const openCreate = () => {
     setEditing(null);
-    setNumero(0);
+    // Sugere o primeiro número que as balanças da loja reportaram como livre.
+    // Sem mapa, mantém o 0 de antes em vez de chutar um número.
+    setNumero(slots?.livres[0] ?? 0);
     setNome("");
     setLarguraMm(56);
     setAlturaMm(90);
@@ -185,6 +198,21 @@ export function FormatoImpressaoPanel() {
     setModalOpen(true);
   };
 
+
+  /**
+   * O slot escolhido já está ocupado em alguma balança da loja?
+   *
+   * Editar o próprio formato não conta como conflito — ele ocupa o slot dele
+   * mesmo. Sem mapa lido, devolve null: a tela não afirma nada, porque não
+   * saber é diferente de estar livre.
+   */
+  const conflitoDeSlot = (() => {
+    if (!slots) return null;
+    const ocupado = slots.slots.find((s) => s.numero === numero);
+    if (!ocupado) return null;
+    if (editing && editing.numero === numero && ocupado.nome === editing.nome) return null;
+    return ocupado;
+  })();
 
   const descreverSync = (sinc?: { balancas: number; produtos: number }) => {
     if (!sinc || sinc.balancas === 0) {
@@ -442,8 +470,38 @@ export function FormatoImpressaoPanel() {
                   type="number"
                   value={numero}
                   onChange={(e) => setNumero(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 ${
+                    conflitoDeSlot
+                      ? "border-amber-400 focus:ring-amber-500"
+                      : "border-slate-200 focus:ring-brand-500"
+                  }`}
                 />
+                {conflitoDeSlot ? (
+                  <p className="mt-1 text-xs text-amber-700">
+                    O número {conflitoDeSlot.numero} já está ocupado em{" "}
+                    <strong>{conflitoDeSlot.deviceNome}</strong> por &quot;{conflitoDeSlot.nome}&quot;. Se for um
+                    modelo de fábrica, a balança aceita o envio e descarta em silêncio — a etiqueta sai com o
+                    layout errado.
+                    {slots && slots.livres.length > 0 ? (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          onClick={() => setNumero(slots.livres[0])}
+                          className="underline font-medium"
+                        >
+                          Usar {slots.livres[0]}, que está livre
+                        </button>
+                        .
+                      </>
+                    ) : null}
+                  </p>
+                ) : slots == null ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    Não foi possível ler os números já usados nas balanças desta loja — confira o número antes de
+                    salvar.
+                  </p>
+                ) : null}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>

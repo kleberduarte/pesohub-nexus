@@ -869,6 +869,95 @@ export async function verificarFormatosGravados(
   return { ok: true, divergentes };
 }
 
+/** Um slot de etiqueta ocupado na balança. */
+export interface SlotEtiqueta {
+  numero: number;
+  nome: string;
+}
+
+/**
+ * Conserta nome que na verdade é UTF-8 lido como latin1 ("PadrÃ£o" -> "Padrão").
+ *
+ * Falamos latin1 com a balança, mas os modelos de fábrica foram gravados pelo
+ * software oficial em UTF-8. Só afeta EXIBIÇÃO: a comparação de
+ * `verificarFormatosGravados` continua em latin1 puro, que é o que garante o
+ * round-trip do que nós mesmos escrevemos.
+ */
+function repararAcentuacao(nome: string): string {
+  // Sem bytes altos não há o que consertar — evita mexer em nome já correto.
+  if (!/[\u0080-\u00ff]/.test(nome)) return nome;
+  try {
+    const decodificado = Buffer.from(nome, "latin1").toString("utf8");
+    // Byte inválido em UTF-8 vira U+FFFD: sinal de que não era UTF-8.
+    return decodificado.includes("\ufffd") ? nome : decodificado;
+  } catch {
+    return nome;
+  }
+}
+
+/**
+ * Lista todos os slots `LAB` ocupados na balança.
+ *
+ * É o que permite ao cadastro de Formato de Impressão parar de pedir um número
+ * no escuro (card #55): quem sabe quais slots estão tomados é o equipamento, e
+ * isso varia de balança para balança conforme o que veio de fábrica e o que a
+ * loja já gravou. Não existe faixa fixa que sirva — os slots 22 e 23 estão na
+ * região "de fábrica" e gravam normalmente.
+ *
+ * Falha de leitura devolve erro, nunca lista vazia. Tratar vazio como "nada
+ * ocupado" faria o cadastro liberar justamente os slots que descartam em
+ * silêncio — o inverso do objetivo.
+ */
+export function listarSlotsEtiqueta(
+  ip: string,
+  port: number,
+): Promise<{ ok: true; slots: SlotEtiqueta[] } | { ok: false; erro: string }> {
+  return new Promise((resolve) => {
+    const socket = new Socket();
+    socket.setTimeout(15_000);
+    socket.setEncoding("latin1");
+    let buffer = "";
+    let done = false;
+
+    const finish = (r: { ok: true; slots: SlotEtiqueta[] } | { ok: false; erro: string }) => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      resolve(r);
+    };
+
+    socket.connect(port, ip, () => socket.write("UPL\tLAB\t\r\n", "latin1"));
+
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
+      if (!buffer.includes("END\tLAB")) return;
+      const slots = buffer
+        .split("\r\n")
+        .filter((l) => l.startsWith("LAB\t"))
+        .map((l) => l.split("\t"))
+        .filter((f) => f[1] != null && f[1] !== "")
+        .map((f) => ({ numero: Number(f[1]), nome: repararAcentuacao(f[2] ?? "") }))
+        .filter((s) => Number.isFinite(s.numero));
+      finish({ ok: true, slots });
+    });
+
+    socket.on("timeout", () =>
+      finish({ ok: false, erro: `Timeout ao listar os slots de etiqueta de ${ip}:${port}.` }),
+    );
+    socket.on("error", (err) =>
+      finish({
+        ok: false,
+        erro: err.message.includes("ECONNRESET")
+          ? `A balança ${ip}:${port} recusou a conexão (ECONNRESET) — provavelmente o software da Ramuza está aberto e segurando a sessão.`
+          : `Falha ao listar os slots de etiqueta: ${err.message}`,
+      }),
+    );
+    socket.on("close", () =>
+      finish({ ok: false, erro: "Conexão encerrada antes de listar os slots de etiqueta." }),
+    );
+  });
+}
+
 /** Lê um slot `LAB` e devolve o nome gravado (`null` se o slot estiver vazio). */
 function lerSlotLab(
   ip: string,

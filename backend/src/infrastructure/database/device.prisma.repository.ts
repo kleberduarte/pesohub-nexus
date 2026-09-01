@@ -1,11 +1,41 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "./prisma.service";
 import { Device } from "../../domain/entities/device.entity";
-import { DeviceRepository, DeviceStats, PaginatedResult } from "../../domain/repositories/device.repository";
+import {
+  DeviceRepository,
+  DeviceStats,
+  PaginatedResult,
+  SlotEtiquetaOcupado,
+} from "../../domain/repositories/device.repository";
 
 @Injectable()
 export class DevicePrismaRepository implements DeviceRepository {
   constructor(private readonly prisma: PrismaService) {}
+
+  async findSlotsEtiquetaOcupados(lojaId: string): Promise<SlotEtiquetaOcupado[]> {
+    const devices = await this.prisma.device.findMany({
+      where: { lojaId, slotsEtiquetaLidosEm: { not: null } },
+      select: { id: true, nome: true, slotsEtiqueta: true, slotsEtiquetaLidosEm: true },
+    });
+
+    const ocupados: SlotEtiquetaOcupado[] = [];
+    for (const device of devices) {
+      // Coluna Json: veio do agente já validada, mas o banco não garante forma
+      // — um registro torto não pode derrubar a listagem inteira.
+      const slots = Array.isArray(device.slotsEtiqueta) ? device.slotsEtiqueta : [];
+      for (const slot of slots as { numero?: unknown; nome?: unknown }[]) {
+        if (!Number.isInteger(slot?.numero)) continue;
+        ocupados.push({
+          numero: slot.numero as number,
+          nome: String(slot.nome ?? ""),
+          deviceId: device.id,
+          deviceNome: device.nome,
+          lidosEm: device.slotsEtiquetaLidosEm as Date,
+        });
+      }
+    }
+    return ocupados;
+  }
 
   findAll(lojaId: string): Promise<Device[]> {
     return this.prisma.device.findMany({ where: { lojaId } });

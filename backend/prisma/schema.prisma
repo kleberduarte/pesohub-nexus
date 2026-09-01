@@ -217,23 +217,32 @@ model Fatura {
 }
 
 model Device {
-  id           String       @id @default(cuid())
-  clienteId    String
-  cliente      Cliente      @relation(fields: [clienteId], references: [id])
-  lojaId       String
-  loja         Loja         @relation(fields: [lojaId], references: [id])
-  nome         String
-  ip           String
-  porta        Int          @default(33581)
-  grupoId      String?
-  grupo        DeviceGroup? @relation(fields: [grupoId], references: [id])
-  status       DeviceStatus @default(OFFLINE)
-  ultimoAcesso DateTime?
-  agentId      String?
-  agent        Agent?       @relation(fields: [agentId], references: [id])
-  syncJobs     SyncJob[]
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  id                   String       @id @default(cuid())
+  clienteId            String
+  cliente              Cliente      @relation(fields: [clienteId], references: [id])
+  lojaId               String
+  loja                 Loja         @relation(fields: [lojaId], references: [id])
+  nome                 String
+  ip                   String
+  porta                Int          @default(33581)
+  grupoId              String?
+  grupo                DeviceGroup? @relation(fields: [grupoId], references: [id])
+  status               DeviceStatus @default(OFFLINE)
+  ultimoAcesso         DateTime?
+  agentId              String?
+  agent                Agent?       @relation(fields: [agentId], references: [id])
+  syncJobs             SyncJob[]
+  /// Slots de etiqueta (`LAB`) ocupados nesta balança, como [{numero, nome}].
+  /// Alimentado pelo Agent Local, que lê o equipamento — é a única fonte que
+  /// enxerga o estado real. Serve pro cadastro de Formato de Impressão avisar
+  /// que um número já está tomado (tipicamente por modelo de fábrica, que a
+  /// balança grava em silêncio e descarta). Ver card #55.
+  slotsEtiqueta        Json?
+  /// Quando o mapa acima foi lido. `null` = nunca lido. Um mapa velho é melhor
+  /// que nenhum, mas a tela precisa dizer a idade em vez de fingir certeza.
+  slotsEtiquetaLidosEm DateTime?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
 
   @@unique([lojaId, ip])
   @@index([clienteId])
@@ -622,17 +631,17 @@ model SyncJobItem {
 }
 
 model User {
-  id              String   @id @default(cuid())
-  clienteId       String?
-  cliente         Cliente? @relation(fields: [clienteId], references: [id])
+  id        String   @id @default(cuid())
+  clienteId String?
+  cliente   Cliente? @relation(fields: [clienteId], references: [id])
   /// Perfil configurável que define a quais Lojas este usuário tem acesso
   /// (dentro do Cliente). Nulo para SUPERADMIN, que não precisa de escopo de loja.
-  perfilId        String?
-  perfil          Perfil?  @relation(fields: [perfilId], references: [id])
-  email           String   @unique
-  senha           String
-  role            UserRole @default(OPERADOR)
-  createdAt       DateTime @default(now())
+  perfilId  String?
+  perfil    Perfil?  @relation(fields: [perfilId], references: [id])
+  email     String   @unique
+  senha     String
+  role      UserRole @default(OPERADOR)
+  createdAt DateTime @default(now())
 
   /// --- Política de acesso (card #48) ---
   /// A empresa/loja ativa NÃO mora mais aqui: virou estado de sessão (o `jti`

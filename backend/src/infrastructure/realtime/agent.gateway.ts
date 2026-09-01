@@ -170,6 +170,48 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
+   * Mapa de slots de etiqueta lidos da balança pelo Agent Local (card #55).
+   *
+   * Persiste no Device em vez de ficar em memória: o cadastro de Formato de
+   * Impressão consulta isso, e um backend recém-reiniciado não pode voltar
+   * dizendo que todo slot está livre — seria pior que não ter o recurso.
+   *
+   * O agente só emite quando a leitura deu certo; leitura falha não chega
+   * aqui. Assim o mapa envelhece em vez de zerar, e `slotsEtiquetaLidosEm`
+   * deixa a idade visível pra tela.
+   */
+  @SubscribeMessage("devices:slots")
+  async onDevicesSlots(
+    @ConnectedSocket() socket: Socket,
+    @MessageBody() body: { ip: string; port: number; slots: { numero: number; nome: string }[] },
+  ): Promise<void> {
+    const agentId = socket.data?.agentId as string | undefined;
+    if (!agentId || !body?.ip || !Array.isArray(body.slots)) return;
+
+    // Escopado pelo agentId: um agent só descreve as balanças que são dele,
+    // nunca as de outro cliente conectado ao mesmo backend.
+    const device = await this.prisma.device.findFirst({
+      where: { agentId, ip: body.ip },
+    });
+    if (!device) return;
+
+    const slots = body.slots
+      .filter((s) => Number.isInteger(s?.numero))
+      .map((s) => ({ numero: s.numero, nome: String(s.nome ?? "") }));
+
+    try {
+      await this.prisma.device.update({
+        where: { id: device.id },
+        data: { slotsEtiqueta: slots, slotsEtiquetaLidosEm: new Date() },
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Falha ao salvar slots de etiqueta do device ${device.id}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  /**
    * O IP da balança é DHCP e pode mudar a qualquer momento — quando isso
    * acontece, o `Device.ip` cadastrado fica desatualizado e todo sync passa a
    * falhar com timeout até alguém perceber e corrigir manualmente. Quando o

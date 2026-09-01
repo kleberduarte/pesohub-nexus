@@ -3,7 +3,12 @@ dotenv.config();
 
 import * as dgram from "dgram";
 import { io } from "socket.io-client";
-import { FormatoImpressaoPayload, ScaleSyncPayload, sendProductsToScale } from "./scale-client";
+import {
+  FormatoImpressaoPayload,
+  listarSlotsEtiqueta,
+  ScaleSyncPayload,
+  sendProductsToScale,
+} from "./scale-client";
 
 const BACKEND_URL = process.env.AGENT_BACKEND_URL ?? "http://localhost:3000";
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
@@ -107,6 +112,46 @@ discoverySocket.bind(DISCOVERY_PORT, () => {
 
 setInterval(reportDiscovered, 15_000);
 
+/**
+ * Relatório do mapa de slots de etiqueta (card #55).
+ *
+ * O cadastro de Formato de Impressão pede um número de 1 a 99 sem dizer quais
+ * já estão tomados. Cair num slot ocupado por modelo de fábrica faz a balança
+ * aceitar e descartar em silêncio — foi o que tirou a tabela nutricional de uma
+ * etiqueta em produção. Quem sabe a verdade é o equipamento, e só o agente
+ * alcança o equipamento.
+ *
+ * Intervalo generoso de propósito: a balança atende UM cliente por vez, então
+ * consultar de minuto em minuto disputaria sessão com a sincronização e com o
+ * software da Ramuza aberto na loja.
+ */
+const SLOTS_REPORT_INTERVAL_MS = 10 * 60_000;
+
+/** Balanças ocupadas por uma sincronização em andamento — não consultar. */
+const sincronizando = new Set<string>();
+
+async function reportSlots() {
+  if (!socket.connected) return;
+
+  for (const { ip, port } of discovered.values()) {
+    if (sincronizando.has(ip)) continue;
+
+    const r = await listarSlotsEtiqueta(ip, port);
+    if (!r.ok) {
+      // Não emitimos nada: sem relatório o backend mantém o último mapa lido,
+      // que é honesto ("está velho"). Emitir lista vazia seria pior — o
+      // cadastro passaria a liberar todo slot como se estivesse livre.
+      console.warn(`[slots] não foi possível ler ${ip}:${port} — ${r.erro}`);
+      continue;
+    }
+    socket.emit("devices:slots", { ip, port, slots: r.slots });
+  }
+}
+
+setInterval(() => {
+  void reportSlots();
+}, SLOTS_REPORT_INTERVAL_MS);
+
 socket.on("sync:command", async (command: SyncCommand) => {
   console.log(
     `[sync:command] device=${command.deviceId} ip=${command.deviceIp}:${command.devicePort} ` +
@@ -131,12 +176,18 @@ socket.on("sync:command", async (command: SyncCommand) => {
   // testada ANTES do fix real ser encontrado, nunca reverificada com o fix
   // aplicado, e uma sincronização real em produção via esse caminho não
   // persistiu no hardware apesar do ACK — ver [[project_scale_protocol_field_gap]].
-  const outcome = await sendProductsToScale(
-    command.deviceIp,
-    command.devicePort,
-    command.products,
-    command.formatosImpressao ?? [],
-  );
+  sincronizando.add(command.deviceIp);
+  let outcome;
+  try {
+    outcome = await sendProductsToScale(
+      command.deviceIp,
+      command.devicePort,
+      command.products,
+      command.formatosImpressao ?? [],
+    );
+  } finally {
+    sincronizando.delete(command.deviceIp);
+  }
 
   socket.emit("sync:result", {
     correlationId: command.correlationId,
@@ -144,4 +195,15 @@ socket.on("sync:command", async (command: SyncCommand) => {
     erro: outcome.erro,
     itensProcessados: outcome.itensProcessados,
   });
+
+  // A sincronização acabou de mudar os slots — é o melhor momento pra
+  // atualizar o mapa, e a sessão já está livre.
+  const slots = await listarSlotsEtiqueta(command.deviceIp, command.devicePort);
+  if (slots.ok) {
+    socket.emit("devices:slots", {
+      ip: command.deviceIp,
+      port: command.devicePort,
+      slots: slots.slots,
+    });
+  }
 });
