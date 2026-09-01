@@ -23,7 +23,9 @@ type ElementoTipo =
   | "imagem"
   | "tabelaNutricional"
   | "selos"
-  | "ingredientes";
+  | "ingredientes"
+  | "borda"
+  | "divisoria";
 
 interface LayoutElemento {
   id: string;
@@ -53,6 +55,8 @@ const TIPO_LABEL: Record<ElementoTipo, string> = {
   tabelaNutricional: "Tabela Nutricional",
   selos: "Selos (Alto em...)",
   ingredientes: "Ingredientes",
+  borda: "Borda / Moldura",
+  divisoria: "Linha divisória",
 };
 
 /** Peso/tara não existem no cadastro (vêm da pesagem na balança) — o preview
@@ -224,12 +228,25 @@ export function EtiquetaPreview({
                   {elementos.map((el) => (
                     <div
                       key={el.id}
-                      className="absolute flex items-center justify-center overflow-hidden text-center leading-tight"
+                      className={`absolute flex items-center justify-center overflow-hidden text-center leading-tight ${
+                        // Borda desenha a moldura; divisória é o próprio
+                        // traço. Sem isso a pré-visualização mostraria a
+                        // etiqueta sem nenhuma das linhas que a balança imprime.
+                        el.tipo === "borda"
+                          ? "border border-slate-900"
+                          : el.tipo === "divisoria"
+                            ? "bg-slate-900"
+                            : ""
+                      }`}
                       style={{
                         left: el.x * PX_PER_MM,
                         top: el.y * PX_PER_MM,
                         width: el.largura * PX_PER_MM,
-                        height: el.altura * PX_PER_MM,
+                        // Um traço de 0,5mm arredondaria para 0 e sumiria.
+                        height: Math.max(
+                          el.altura * PX_PER_MM,
+                          el.tipo === "borda" || el.tipo === "divisoria" ? 1 : 0,
+                        ),
                       }}
                     >
                       {el.tipo === "nome" && (

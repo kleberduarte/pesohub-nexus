@@ -40,7 +40,9 @@ type ElementoTipo =
   | "imagem"
   | "tabelaNutricional"
   | "selos"
-  | "ingredientes";
+  | "ingredientes"
+  | "borda"
+  | "divisoria";
 
 interface ItemRamuza {
   SubID: number;
@@ -63,14 +65,26 @@ interface ArquivoExportado {
 }
 
 /**
+ * Condição de impressão (`Print` do `LabelItem`).
+ *
+ * NÃO é liga/desliga: a Ramuza empilha elementos alternativos NA MESMA
+ * coordenada e usa este campo para escolher qual sai. No `60x80 Padrão`,
+ * "Peso:"/"Preço/kg:" (2) e "Peças:"/"Preço/pç:" (3) ocupam exatamente o mesmo
+ * lugar. Importar os dois deixa os textos sobrepostos e ilegíveis no editor —
+ * foi o que aconteceu na primeira importação.
+ */
+const PRINT_SEMPRE = 1;
+const PRINT_POR_PESO = 2;
+const PRINT_POR_PECA = 3;
+
+/**
  * Traduz o trio Flag1/Flag2/Flag3 para o tipo de elemento do PesoHub.
  *
- * Devolve `null` quando o elemento não tem equivalente — hoje isso acontece com
- * Borda (Flag1=4) e Divisória (Flag1=5), que somam 302 dos 1.908 elementos dos
- * modelos de fábrica. São as linhas e molduras que dão forma à etiqueta: até
- * existirem no editor, todo layout importado abre desmontado.
+ * Devolve `null` quando o elemento não tem equivalente no editor.
  */
-function mapearTipo(item: ItemRamuza): { tipo: ElementoTipo; textoDoCabecalho?: number } | null {
+function mapearTipo(
+  item: ItemRamuza,
+): { tipo: ElementoTipo; textoDoCabecalho?: number; espessura?: number } | null {
   switch (item.Flag1) {
     case 0:
       return { tipo: "codigoBarras" };
@@ -130,13 +144,26 @@ function mapearTipo(item: ItemRamuza): { tipo: ElementoTipo; textoDoCabecalho?: 
       if (item.Flag2 === 0) return { tipo: "tabelaNutricional" };
       if (item.Flag2 === 2) return { tipo: "selos" };
       if (item.Flag2 === 3) {
+        // "Tare or Not (B/L)" — o "B" que aparece ao lado do peso.
+        if (item.Flag3 === 1) return { tipo: "pesoBrutoLiquido" };
         if (item.Flag3 === 2) return { tipo: "dataEmbalagem" };
         if (item.Flag3 === 3) return { tipo: "validade" };
         if (item.Flag3 === 4) return { tipo: "ingredientes" };
       }
       return null;
 
-    // 4 = Borda, 5 = Divisória — sem equivalente no editor do PesoHub.
+    // Borda: o Flag2 É a espessura (1..15), conforme o LabelItem.xml oficial.
+    case 4:
+      return { tipo: "borda", espessura: item.Flag2 };
+
+    // Divisória: o Flag2 escolhe o comportamento. Só "Imprimir linha" (2)
+    // desenha algo — "Flag da área" (0) é marcador de região invisível e
+    // "Imprimir página" (1) é controle de paginação. Importar os invisíveis
+    // encheria o editor de caixas que não imprimem nada; 121 dos 137 dos
+    // modelos de fábrica são justamente esses.
+    case 5:
+      return item.Flag2 === 2 ? { tipo: "divisoria" } : null;
+
     default:
       return null;
   }
@@ -170,8 +197,10 @@ function anguloPesoHub(angle: number): 0 | 90 | 180 | 270 {
   return (([0, 90, 180, 270] as const)[angle] ?? 0) as 0 | 90 | 180 | 270;
 }
 
-export function converter(arquivo: ArquivoExportado) {
+export function converter(arquivo: ArquivoExportado, opcoes: { venda?: "peso" | "peca" } = {}) {
   const { label, items } = arquivo;
+  const venda = opcoes.venda ?? "peso";
+  const printDoRamoOposto = venda === "peso" ? PRINT_POR_PECA : PRINT_POR_PESO;
   const textosDoCabecalho: Record<number, string> = {};
   for (let i = 1; i <= 32; i++) {
     const valor = label[`Text${i}`];
@@ -181,7 +210,23 @@ export function converter(arquivo: ArquivoExportado) {
   const elementos: Record<string, unknown>[] = [];
   const ignorados: { subId: number; motivo: string }[] = [];
 
+  const condicionaisDescartados: number[] = [];
+  const printDesconhecidos = new Map<number, number>();
+
   for (const item of items) {
+    // O ramo oposto ocupa as mesmas coordenadas do escolhido; trazer os dois
+    // sobrepõe os textos.
+    if (item.Print === printDoRamoOposto) {
+      condicionaisDescartados.push(item.SubID);
+      continue;
+    }
+    if (item.Print !== PRINT_SEMPRE && item.Print !== PRINT_POR_PESO && item.Print !== PRINT_POR_PECA) {
+      // Print 9 e 30 aparecem nos modelos de fábrica e ainda não sabemos o que
+      // condicionam. Entram, mas ficam registrados no relatório: descartar
+      // conteúdo que talvez seja válido é pior do que sinalizar a dúvida.
+      printDesconhecidos.set(item.Print, (printDesconhecidos.get(item.Print) ?? 0) + 1);
+    }
+
     const mapeado = mapearTipo(item);
     if (!mapeado) {
       ignorados.push({
@@ -200,6 +245,7 @@ export function converter(arquivo: ArquivoExportado) {
       altura: paraMm(item.Height),
     };
 
+    if (mapeado.espessura != null) elemento.espessura = mapeado.espessura;
     if (item.Angle) elemento.angulo = anguloPesoHub(item.Angle);
     if (item.Align) elemento.alinhamento = alinhamentoPesoHub(item.Align);
     if (item.Font) elemento.fonte = item.Font;
@@ -219,6 +265,9 @@ export function converter(arquivo: ArquivoExportado) {
       total: items.length,
       convertidos: elementos.length,
       ignorados,
+      venda,
+      condicionaisDescartados,
+      printDesconhecidos: [...printDesconhecidos.entries()].map(([print, qtd]) => ({ print, qtd })),
     },
   };
 }
@@ -226,11 +275,15 @@ export function converter(arquivo: ArquivoExportado) {
 async function main() {
   const [caminho, ...resto] = process.argv.slice(2);
   if (!caminho) {
-    console.error("uso: importar-layout-ramuza.ts <arquivo.json> [--numero N] [--gravar]");
+    console.error(
+      "uso: importar-layout-ramuza.ts <arquivo.json> [--venda peso|peca] [--gravar --numero N --loja <id>]",
+    );
     process.exit(1);
   }
 
   const gravar = resto.includes("--gravar");
+  const idxVenda = resto.indexOf("--venda");
+  const venda = (idxVenda >= 0 ? resto[idxVenda + 1] : "peso") as "peso" | "peca";
   const idxNumero = resto.indexOf("--numero");
   const numero = idxNumero >= 0 ? Number(resto[idxNumero + 1]) : null;
 
@@ -238,10 +291,19 @@ async function main() {
   // JSON.parse não engole.
   const bruto = (require("fs").readFileSync(caminho, "utf8") as string).replace(/^﻿/, "");
   const arquivo = JSON.parse(bruto) as ArquivoExportado;
-  const resultado = converter(arquivo);
+  const resultado = converter(arquivo, { venda });
 
   console.log(`\nLayout: ${resultado.nome} (${resultado.larguraMm}mm x ${resultado.alturaMm}mm)`);
   console.log(`Elementos: ${resultado.relatorio.convertidos} de ${resultado.relatorio.total} convertidos`);
+  console.log(`Ramo de venda: ${resultado.relatorio.venda}`);
+  if (resultado.relatorio.condicionaisDescartados.length > 0) {
+    console.log(
+      `Descartados por serem do ramo oposto: ${resultado.relatorio.condicionaisDescartados.length} (alternativos na mesma posição)`,
+    );
+  }
+  for (const { print, qtd } of resultado.relatorio.printDesconhecidos) {
+    console.log(`  atenção: ${qtd}x com Print=${print}, condição desconhecida — importados assim mesmo`);
+  }
 
   if (resultado.relatorio.ignorados.length > 0) {
     const porMotivo = new Map<string, number>();

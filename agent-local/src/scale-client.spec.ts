@@ -74,3 +74,60 @@ describe("buildPluRow e os ingredientes", () => {
     expect(campo(linha, IDX_TEXTO_EXTRA_4)).toBe("Consumir gelado");
   });
 });
+
+/**
+ * Borda e Divisória chegaram ao editor para permitir importar os modelos de
+ * fábrica da Ramuza (card #52) — 181 dos elementos daqueles layouts são linhas
+ * e molduras, que antes simplesmente sumiam.
+ *
+ * O `Config/pt-BR/LabelItem.xml` oficial documenta que o Flag2 significa
+ * coisas DIFERENTES nos dois: em Borda é a espessura (1..15), em Divisória é
+ * o comportamento (0=Flag da área, 1=Imprimir página, 2=Imprimir linha).
+ * Tratar os dois igual transforma uma linha visível num marcador invisível.
+ */
+describe("buildSyncBody — Borda e Divisória", () => {
+  const { buildSyncBody } = require("./scale-client");
+
+  const comElementos = (elementos: unknown[]) =>
+    [
+      {
+        codigo: "700",
+        codigoBarras: "1234567890123",
+        nome: "IOGURTE",
+        preco: 9.9,
+        formatoImpressao: { numero: 22, nome: "TESTE", larguraMm: 58, alturaMm: 79, elementos },
+      },
+    ] as any;
+
+  const linhasLas = (corpo: string) =>
+    corpo
+      .split("\r\n")
+      .filter((l) => l.startsWith("LAS\t"))
+      .map((l) => l.split("\t"));
+
+  it("emite Borda como Flag1=4 com a espessura no Flag2", () => {
+    const corpo = buildSyncBody(
+      comElementos([{ tipo: "borda", x: 1, y: 5, largura: 55, altura: 0.5, espessura: 15 }]),
+    );
+    const [las] = linhasLas(corpo);
+    expect(las[2]).toBe("4"); // Flag1
+    expect(las[3]).toBe("15"); // Flag2 = espessura
+  });
+
+  it("usa a espessura padrão quando o elemento não define uma", () => {
+    const corpo = buildSyncBody(comElementos([{ tipo: "borda", x: 1, y: 5, largura: 55, altura: 0.5 }]));
+    expect(linhasLas(corpo)[0][3]).toBe("2");
+  });
+
+  // A regressão que este teste trava: a primeira versão deixava `espessura`
+  // sobrescrever o Flag2 também na Divisória, o que trocaria "Imprimir linha"
+  // (2) por outro comportamento — provavelmente o marcador invisível.
+  it("mantém a Divisória em Imprimir linha mesmo com espessura definida", () => {
+    const corpo = buildSyncBody(
+      comElementos([{ tipo: "divisoria", x: 1, y: 5, largura: 55, altura: 0.5, espessura: 15 }]),
+    );
+    const [las] = linhasLas(corpo);
+    expect(las[2]).toBe("5"); // Flag1
+    expect(las[3]).toBe("2"); // Flag2 = Imprimir linha, NÃO a espessura
+  });
+});
