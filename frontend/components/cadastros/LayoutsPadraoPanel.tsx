@@ -176,10 +176,11 @@ export function LayoutsPadraoPanel() {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="layout-padrao-numero" className="block text-xs font-medium text-slate-700 mb-1">
                   Número ({NUMERO_MIN} a {NUMERO_MAX})
                 </label>
                 <input
+                  id="layout-padrao-numero"
                   type="number"
                   min={NUMERO_MIN}
                   max={NUMERO_MAX}

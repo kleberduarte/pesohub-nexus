@@ -608,11 +608,12 @@ const DELETE_ALL_CONFIRMATION = "EXCLUIR TODOS";
                 desfeita.
               </p>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label htmlFor="produto-confirmar-exclusao" className="block text-xs font-medium text-slate-700 mb-1">
                   Digite <span className="font-mono font-semibold">{DELETE_ALL_CONFIRMATION}</span> para
                   confirmar
                 </label>
                 <input
+                  id="produto-confirmar-exclusao"
                   type="text"
                   autoFocus
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500"

@@ -230,10 +230,11 @@ export default function UsuariosPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
+            <label htmlFor="usuario-loja" className="block text-sm font-medium text-slate-700 mb-1">
               Loja {restringeALoja ? "" : <span className="text-slate-400 font-normal">(opcional)</span>}
             </label>
             <select
+              id="usuario-loja"
               value={lojaId}
               onChange={(e) => setLojaId(e.target.value)}
               disabled={!restringeALoja}
