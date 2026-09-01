@@ -24,6 +24,7 @@ import { CreateUserDto } from "../../../application/dtos/create-user.dto";
 import { UpdateUserDto } from "../../../application/dtos/update-user.dto";
 import { acrescentarAoHistorico, validarComplexidade } from "../../../domain/services/password-policy";
 import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
+import { validarDominioDeEmail } from "../../../domain/services/email-domain-policy";
 
 interface AuthenticatedRequest extends Request {
   user: { sub: string; role: string; clienteId: string | null };
@@ -125,6 +126,19 @@ export class UsersController {
         throw new ForbiddenException("O perfil SUPERADMIN só é permitido na empresa padrão");
       }
       clienteIdParaUsuario = null;
+    }
+
+    // Mesmo critério de domínio que já valia para o SUPERADMIN, agora para
+    // todo mundo: a conta tem que viver no domínio da empresa, que é quem
+    // pode revogá-la quando a pessoa sair. Vale só no cadastro — contas
+    // antigas fora da regra seguem funcionando até serem aposentadas à mão,
+    // para ninguém ser trancado para fora sem aviso.
+    if (dto.role !== "SUPERADMIN") {
+      const empresa = await this.prisma.cliente.findUnique({ where: { id: clienteId } });
+      const erroDominio = validarDominioDeEmail(dto.email, empresa?.dominio ?? null, empresa?.nome ?? "esta empresa");
+      if (erroDominio) {
+        throw new BadRequestException(erroDominio);
+      }
     }
 
     // Restringe o novo usuário a uma única Loja: reaproveita o mecanismo de
