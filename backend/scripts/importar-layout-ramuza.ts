@@ -18,7 +18,7 @@
  * o modo que interessa enquanto o mapeamento não estiver validado contra
  * impressão real.
  */
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 
 /** Pontos de impressão por milímetro (203 dpi). */
 const PONTOS_POR_MM = 8;
@@ -343,9 +343,13 @@ async function main() {
     const loja = await prisma.loja.findUnique({ where: { id: lojaId } });
     if (!loja) throw new Error(`Loja ${lojaId} não encontrada`);
 
+    // O layout é um objeto com array dentro; o tipo gerado do Prisma para Json
+    // não aceita Record<string, unknown>[] sem esta ponte.
+    const layoutJson = resultado.layout as unknown as Prisma.InputJsonObject;
+
     const criado = await prisma.formatoImpressao.upsert({
       where: { lojaId_numero: { lojaId: loja.id, numero } },
-      update: { nome: resultado.nome, larguraMm: resultado.larguraMm, alturaMm: resultado.alturaMm, layout: resultado.layout },
+      update: { nome: resultado.nome, larguraMm: resultado.larguraMm, alturaMm: resultado.alturaMm, layout: layoutJson },
       create: {
         clienteId: loja.clienteId,
         lojaId: loja.id,
@@ -353,7 +357,7 @@ async function main() {
         nome: resultado.nome,
         larguraMm: resultado.larguraMm,
         alturaMm: resultado.alturaMm,
-        layout: resultado.layout,
+        layout: layoutJson,
       },
     });
     console.log(`\nGravado: formato ${criado.numero} "${criado.nome}" na loja ${loja.nome}`);
