@@ -1,4 +1,4 @@
-import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
+import { sendProductsToScale, ScaleSyncPayload } from "../src/scale-client";
 
 /**
  * Reteste da hipótese de sessão única: agora com certeza de que nenhum

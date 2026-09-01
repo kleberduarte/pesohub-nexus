@@ -1,5 +1,5 @@
 import { Socket } from "net";
-import { buildNu3Row, TabelaNutricionalPayload } from "./scale-client";
+import { buildNu3Row, TabelaNutricionalPayload } from "../src/scale-client";
 
 /**
  * Nova hipótese, vinda da captura Wireshark+Procmon simultânea de uma escrita

@@ -1036,15 +1036,19 @@ export function descreverFormatosDivergentes(divergentes: FormatoDivergente[]): 
  * Ethernet: envia o bloco DWL/PLU/END com os produtos, pede sincronismo de hora
  * (UPL TIM) e fecha a sessão com UPL END. Ver [[ramuza-scale-protocol]].
  *
- * ATENÇÃO — 2026-08-27: esta função abre e fecha uma conexão nova a cada
- * chamada. Uma captura Wireshark real (`captura06.json`, ver
- * [[project_scale_protocol_field_gap]]) mostrou que a única escrita `DWL/NU3`
- * confirmada como persistida veio de uma conexão que ficou aberta ~28 minutos,
- * com bastante atividade real antes da escrita do NU3 — uma conexão nova e
- * efêmera como esta NUNCA conseguiu persistir o conteúdo do NU3 em nenhum dos
- * 22+ testes feitos. Pra produção, usar `ScaleConnection`
- * (scale-connection.ts), que mantém uma conexão persistente por dispositivo.
- * Esta função continua existindo pra compat com os scripts `probe-*.ts`.
+ * Esta é a função que roda em produção — `index.ts` chama daqui.
+ *
+ * Ela abre e fecha uma conexão nova a cada chamada, e isso está certo. Em
+ * 2026-08-27 uma captura Wireshark sugeriu que o `DWL/NU3` só persistia numa
+ * conexão longa, e `ScaleConnection` (scale-connection.ts) nasceu dessa
+ * hipótese. **A hipótese estava errada**: o NU3 não persistia porque a linha
+ * saía com 57 campos e a balança exige 58 (tentativa 28, ver
+ * [[project_scale_protocol_field_gap]]). Com o campo corrigido, a conexão
+ * efêmera funciona — foi verificada contra o hardware.
+ *
+ * `ScaleConnection` continua no repositório como registro da hipótese
+ * descartada, mas **não é usada por ninguém e não deve ser adotada** sem uma
+ * nova medição que a justifique.
  */
 export async function sendProductsToScale(
   ip: string,

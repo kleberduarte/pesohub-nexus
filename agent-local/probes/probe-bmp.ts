@@ -4,7 +4,7 @@
  * Uso: SCALE_IP=192.168.15.7 BMP_ID=1 npx ts-node --transpile-only src/probe-bmp.ts
  */
 import { Socket } from "net";
-import { buildBmpBlock, type BitmapMonocromatico } from "./bitmap-wire";
+import { buildBmpBlock, type BitmapMonocromatico } from "../src/bitmap-wire";
 
 const ip = process.env.SCALE_IP ?? "192.168.15.7";
 const port = Number(process.env.SCALE_PORT ?? 33581);

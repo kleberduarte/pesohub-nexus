@@ -1,5 +1,5 @@
 import { Socket } from "net";
-import { buildNu3Row, buildPluRow, ScaleSyncPayload } from "./scale-client";
+import { buildNu3Row, buildPluRow, ScaleSyncPayload } from "../src/scale-client";
 
 /**
  * Testa a ordem real observada em captura06.json (ver

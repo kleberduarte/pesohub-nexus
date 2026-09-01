@@ -1,4 +1,4 @@
-import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
+import { sendProductsToScale, ScaleSyncPayload } from "../src/scale-client";
 
 /**
  * Teste do bloco DWL/LAB (formato de etiqueta) — confirmado persistindo no

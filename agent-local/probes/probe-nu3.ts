@@ -1,4 +1,4 @@
-import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
+import { sendProductsToScale, ScaleSyncPayload } from "../src/scale-client";
 
 /**
  * Testa o vínculo PLU -> tabela nutricional (DWL/NU3 + campo 59 do PLU) contra

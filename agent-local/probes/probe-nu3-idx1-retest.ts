@@ -1,4 +1,4 @@
-import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
+import { sendProductsToScale, ScaleSyncPayload } from "../src/scale-client";
 
 /**
  * Reteste do bug de persistência do NU3, agora reaproveitando o índice 1

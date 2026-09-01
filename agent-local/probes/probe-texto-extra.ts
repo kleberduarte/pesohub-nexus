@@ -1,4 +1,4 @@
-import { sendProductsToScale, ScaleSyncPayload } from "./scale-client";
+import { sendProductsToScale, ScaleSyncPayload } from "../src/scale-client";
 
 /**
  * Teste dos textos extras 2-7 (idx17-22 do PLU) recém-wired.
