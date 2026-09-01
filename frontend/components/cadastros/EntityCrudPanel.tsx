@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { ApiError } from "../../lib/api";
+import { splitCsvLine } from "../../lib/csv";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 
 export type FieldType = "text" | "number" | "textarea" | "checkbox" | "select";
@@ -42,10 +43,6 @@ interface EntityCrudPanelProps<T extends { id: string }> {
 
 function csvEscape(value: unknown): string {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
-}
-
-function splitCsvLine(line: string): string[] {
-  return line.split(",").map((field) => field.trim().replace(/^"|"$/g, "").replace(/""/g, '"'));
 }
 
 export function EntityCrudPanel<T extends { id: string }>({
