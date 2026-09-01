@@ -280,11 +280,72 @@ export function converter(arquivo: ArquivoExportado, opcoes: { venda?: "peso" | 
   };
 }
 
+/**
+ * Gera o catálogo estático que a aba "Layouts padrão" consome. Os modelos de
+ * fábrica não mudam, e são iguais para todas as lojas: virar tabela no banco
+ * custaria migração e seed para dados que nascem congelados no ECS.mdb. Como
+ * arquivo, a aba é somente-leitura por construção — não há o que estragar.
+ */
+function gerarCatalogo(diretorio: string, saida: string) {
+  const fs = require("fs") as typeof import("fs");
+  const path = require("path") as typeof import("path");
+
+  const arquivos = fs
+    .readdirSync(diretorio)
+    .filter((f) => f.endsWith(".json"))
+    .sort();
+
+  const modelos = arquivos.map((f) => {
+    const bruto = fs.readFileSync(path.join(diretorio, f), "utf8").replace(/^﻿/, "");
+    const convertido = converter(JSON.parse(bruto) as ArquivoExportado);
+    return {
+      id: `ramuza-${path.basename(f, ".json").replace(/^ramuza-label-/, "")}`,
+      nome: convertido.nome,
+      larguraMm: convertido.larguraMm,
+      alturaMm: convertido.alturaMm,
+      elementos: convertido.layout.elementos,
+    };
+  });
+
+  const cabecalho = `// GERADO por backend/scripts/importar-layout-ramuza.ts --catalogo — não editar à mão.
+// Origem: tabelas Label/LabelItem do ECS.mdb do software oficial da Ramuza,
+// extraídas por backend/scripts/extrair-layouts-ramuza.ps1.
+
+export interface LayoutPadrao {
+  id: string;
+  nome: string;
+  larguraMm: number;
+  alturaMm: number;
+  elementos: Array<Record<string, unknown>>;
+}
+
+export const LAYOUTS_PADRAO: LayoutPadrao[] = `;
+
+  fs.writeFileSync(saida, cabecalho + JSON.stringify(modelos, null, 2) + ";\n", "utf8");
+  console.log(`${modelos.length} layouts -> ${saida}`);
+  for (const m of modelos) {
+    console.log(`  ${m.nome} (${m.larguraMm}x${m.alturaMm}mm, ${m.elementos.length} elementos)`);
+  }
+}
+
 async function main() {
-  const [caminho, ...resto] = process.argv.slice(2);
+  const argv = process.argv.slice(2);
+  const idxCatalogo = argv.indexOf("--catalogo");
+  if (idxCatalogo >= 0) {
+    const idxSaida = argv.indexOf("--saida");
+    if (idxSaida < 0) {
+      console.error("--catalogo <dir> exige --saida <arquivo.ts>");
+      process.exit(1);
+    }
+    gerarCatalogo(argv[idxCatalogo + 1], argv[idxSaida + 1]);
+    return;
+  }
+
+  const [caminho, ...resto] = argv;
   if (!caminho) {
     console.error(
-      "uso: importar-layout-ramuza.ts <arquivo.json> [--venda peso|peca] [--gravar --numero N --loja <id>]",
+      "uso: importar-layout-ramuza.ts <arquivo.json> [--venda peso|peca] [--gravar --numero N --loja <id>]\n" +
+        "     importar-layout-ramuza.ts --catalogo <dir-com-jsons> --saida <arquivo.ts>",
     );
     process.exit(1);
   }

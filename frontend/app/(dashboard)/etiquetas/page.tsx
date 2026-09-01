@@ -4,10 +4,12 @@ import { useState } from "react";
 import { EntityCrudPanel } from "../../../components/cadastros/EntityCrudPanel";
 import { TeclaAcessoRapidoPanel } from "../../../components/cadastros/TeclaAcessoRapidoPanel";
 import { FormatoImpressaoPanel } from "../../../components/cadastros/FormatoImpressaoPanel";
+import { LayoutsPadraoPanel } from "../../../components/cadastros/LayoutsPadraoPanel";
 import { codigosBarrasFormatoApi, textosGlobaisApi } from "../../../lib/api";
 
 const TABS = [
   { key: "formato", label: "Formato de Impressão" },
+  { key: "padrao", label: "Layouts padrão" },
   { key: "codigo", label: "Código de Barras" },
   { key: "texto", label: "Texto Global" },
   { key: "tecla", label: "Tecla de Acesso Rápido" },
@@ -37,6 +39,8 @@ export default function EtiquetasPage() {
       </div>
 
       {tab === "formato" && <FormatoImpressaoPanel />}
+
+      {tab === "padrao" && <LayoutsPadraoPanel />}
 
       {tab === "codigo" && (
         <EntityCrudPanel
