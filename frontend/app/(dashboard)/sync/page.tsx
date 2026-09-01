@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { CloudUpload, CheckCircle2, XCircle, Clock, Loader2 } from "lucide-react";
 import { devicesApi, syncApi, type Device, type SyncJob, ApiError } from "../../../lib/api";
 
@@ -166,7 +166,8 @@ export default function SyncPage() {
                 history.map((job) => {
                   const dt = job.iniciadoEm ? new Date(job.iniciadoEm) : null;
                   return (
-                    <tr key={job.id} className="hover:bg-slate-50/50 transition-colors">
+                    <Fragment key={job.id}>
+                    <tr className="hover:bg-slate-50/50 transition-colors">
                       <td className="px-6 py-4 text-slate-600">
                         <div className="flex items-center">
                           <CloudUpload className="w-4 h-4 text-brand-500 mr-2" />
@@ -189,13 +190,16 @@ export default function SyncPage() {
                             Concluído
                           </span>
                         )}
+                        {/* Só "Erro". O rótulo antigo prometia "retry automático",
+                            mas as falhas mais comuns aqui não têm retry que
+                            resolva — pacote vazio lança UnrecoverableError, e
+                            regravar um formato no mesmo slot de fábrica dá no
+                            mesmo. Prometer conserto automático faz a pessoa
+                            esperar em vez de agir. */}
                         {job.status === "ERROR" && (
-                          <span
-                            className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700"
-                            title={job.erro ?? undefined}
-                          >
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700">
                             <XCircle className="w-3 h-3 mr-1.5" />
-                            Erro (retry automático)
+                            Erro
                           </span>
                         )}
                         {(job.status === "PENDING" || job.status === "IN_PROGRESS") && (
@@ -206,6 +210,20 @@ export default function SyncPage() {
                         )}
                       </td>
                     </tr>
+                    {/* O motivo em texto, na própria tabela. Antes ele vivia só
+                        num `title`, que exige passar o mouse sobre o badge e
+                        some no toque — na prática, ninguém lia. As mensagens
+                        dizem o que fazer ("escolha outro número", "feche o
+                        software da Ramuza"); escondê-las desperdiça o que as
+                        verificações descobriram. */}
+                    {job.status === "ERROR" && job.erro && (
+                      <tr className="bg-red-50/40">
+                        <td colSpan={4} className="px-6 pb-4 pt-0">
+                          <p className="text-xs text-red-800 leading-relaxed">{job.erro}</p>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               {!loadingHistory && history.length === 0 && (
