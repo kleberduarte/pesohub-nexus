@@ -712,7 +712,15 @@ function buildAlergicoRow(numero: number, selos: string[]): string {
  * (probes, compat) quanto pela conexão persistente (`ScaleConnection`, ver
  * scale-connection.ts) usada em produção pelo agent-local.
  */
-export function buildSyncBody(products: ScaleSyncPayload[]): string {
+export function buildSyncBody(
+  products: ScaleSyncPayload[],
+  /**
+   * Formatos a enviar mesmo sem produto que os use. Sem isso o bloco LAB só
+   * existe como efeito colateral dos produtos do pacote, e um formato recém
+   * editado que nenhum produto referencia nunca teria como chegar à balança.
+   */
+  formatosAvulsos: FormatoImpressaoPayload[] = [],
+): string {
   const pluNumbers = products.map((p, i) => resolvePluNumber(p.codigo, i));
 
   // Mesmo dedupe do NU3/LAB: vários produtos podem compartilhar o mesmo Setor.
@@ -777,6 +785,11 @@ export function buildSyncBody(products: ScaleSyncPayload[]): string {
       entrada.bmpSelosId = bmpSelosId;
     }
   }
+  // Os avulsos não sobrescrevem um formato que já veio por produto: aquele
+  // carrega o vínculo com o bitmap de selos.
+  for (const formato of formatosAvulsos) {
+    if (!formatosImpressao.has(formato.numero)) formatosImpressao.set(formato.numero, { formato });
+  }
 
   const labBlock =
     formatosImpressao.size > 0
@@ -834,6 +847,7 @@ export async function sendProductsToScale(
   ip: string,
   port: number,
   products: ScaleSyncPayload[],
+  formatosAvulsos: FormatoImpressaoPayload[] = [],
 ): Promise<ScaleSyncOutcome> {
   return new Promise((resolve) => {
     const socket = new Socket();
@@ -851,7 +865,7 @@ export async function sendProductsToScale(
     };
 
     socket.connect(port, ip, () => {
-      socket.write(buildSyncBody(products), "latin1");
+      socket.write(buildSyncBody(products, formatosAvulsos), "latin1");
     });
 
     socket.on("data", (chunk: string) => {

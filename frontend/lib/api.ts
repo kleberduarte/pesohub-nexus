@@ -717,9 +717,15 @@ export interface FormatoImpressao {
   larguraMm: number;
   alturaMm: number;
   layout?: Record<string, unknown> | null;
+  /**
+   * Só vem em create/update: quantas balanças o backend acionou ao salvar, e
+   * quantos produtos entraram no pacote. Serve para a tela dizer que o envio
+   * foi disparado — antes o layout ficava só no banco, em silêncio.
+   */
+  sincronizacao?: { balancas: number; produtos: number };
 }
 
-export type CreateFormatoImpressaoInput = Omit<FormatoImpressao, "id">;
+export type CreateFormatoImpressaoInput = Omit<FormatoImpressao, "id" | "sincronizacao">;
 export type UpdateFormatoImpressaoInput = Partial<CreateFormatoImpressaoInput>;
 
 export const formatosImpressaoApi = {

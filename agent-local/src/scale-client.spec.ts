@@ -131,3 +131,47 @@ describe("buildSyncBody — Borda e Divisória", () => {
     expect(las[3]).toBe("2"); // Flag2 = Imprimir linha, NÃO a espessura
   });
 });
+
+describe("buildSyncBody — formatos avulsos", () => {
+  const { buildSyncBody } = require("./scale-client");
+
+  const formato = (numero: number, nome: string) => ({
+    numero,
+    nome,
+    larguraMm: 56,
+    alturaMm: 40,
+    elementos: [{ tipo: "nome", x: 1, y: 1, largura: 50, altura: 4 }],
+  });
+
+  const linhasLab = (corpo: string) =>
+    corpo.split("\r\n").filter((l) => l.startsWith("LAB\t"));
+
+  // A regressão que este teste trava: o bloco LAB só existia como efeito
+  // colateral dos produtos do pacote, então um layout que nenhum produto usa
+  // nunca chegava à balança — e a sincronização mesmo assim dizia sucesso.
+  it("grava o layout mesmo sem nenhum produto no pacote", () => {
+    const corpo = buildSyncBody([], [formato(23, "SO O LAYOUT")]);
+    const labs = linhasLab(corpo);
+    expect(labs).toHaveLength(1);
+    expect(labs[0].split("\t")[1]).toBe("23");
+    expect(corpo).toContain("DWL\tLAB");
+    expect(corpo).toContain("END\tLAB");
+  });
+
+  it("não duplica um formato que já veio pelo produto", () => {
+    const produtos = [
+      {
+        codigo: "700",
+        codigoBarras: "1234567890123",
+        nome: "IOGURTE",
+        preco: 9.9,
+        formatoImpressao: formato(22, "PELO PRODUTO"),
+      },
+    ] as any;
+    const corpo = buildSyncBody(produtos, [formato(22, "AVULSO")]);
+    const labs = linhasLab(corpo);
+    expect(labs).toHaveLength(1);
+    // O do produto vence: é ele que carrega o vínculo com o bitmap de selos.
+    expect(labs[0]).toContain("PELO PRODUTO");
+  });
+});

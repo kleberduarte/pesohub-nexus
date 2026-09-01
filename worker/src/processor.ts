@@ -1,3 +1,4 @@
+import { UnrecoverableError } from "bullmq";
 import { prisma } from "./prisma";
 import { AgentBridge, SyncCommandPayload } from "./agent-bridge";
 
@@ -49,11 +50,16 @@ export interface SyncJobData {
   deviceId: string;
   tipo: "TOTAL" | "INCREMENTAL";
   productIds?: string[];
+  /**
+   * Formatos de etiqueta a enviar mesmo sem produto que os use — preenchido
+   * quando o disparo veio de "salvar layout".
+   */
+  formatoIds?: string[];
 }
 
 export function createSyncProcessor(agentBridge: AgentBridge) {
   return async function processSyncJob(job: { data: SyncJobData }) {
-    const { deviceId, tipo, productIds } = job.data;
+    const { deviceId, tipo, productIds, formatoIds } = job.data;
 
     const device = await prisma.device.findUniqueOrThrow({ where: { id: deviceId } });
 
@@ -79,6 +85,29 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
             where: { id: { in: productIds ?? [] }, lojaId: device.lojaId },
             include: productInclude,
           });
+
+    const formatosAvulsos =
+      formatoIds != null && formatoIds.length > 0
+        ? await prisma.formatoImpressao.findMany({
+            where: { id: { in: formatoIds }, lojaId: device.lojaId },
+          })
+        : [];
+
+    // Um pacote sem produto e sem formato não grava nada na balança, mas era
+    // ACK'd e virava SUCCESS — o "sucesso que mente". Falha cedo, com o motivo.
+    if (products.length === 0 && formatosAvulsos.length === 0) {
+      const erro =
+        tipo === "TOTAL"
+          ? "Nenhum produto ativo nesta loja — não há o que sincronizar."
+          : "A sincronização incremental não casou nenhum produto nem formato de etiqueta: nada seria enviado à balança.";
+      // Registra o job mesmo assim: sem isso a falha só existiria no log do
+      // worker, e a tela de Sincronização continuaria sem explicar o que houve.
+      await prisma.syncJob.create({
+        data: { deviceId, tipo, status: "ERROR", iniciadoEm: new Date(), concluidoEm: new Date(), erro },
+      });
+      // Não há retry que resolva um pacote vazio.
+      throw new UnrecoverableError(erro);
+    }
 
     const syncJob = await prisma.syncJob.create({
       data: {
@@ -158,6 +187,24 @@ export function createSyncProcessor(agentBridge: AgentBridge) {
               })),
             }
           : undefined,
+      })),
+      formatosImpressao: formatosAvulsos.map((f) => ({
+        numero: f.numero,
+        nome: f.nome,
+        larguraMm: f.larguraMm,
+        alturaMm: f.alturaMm,
+        elementos: getLayoutElementos(f.layout).map((el) => ({
+          tipo: el.tipo,
+          texto: el.texto,
+          imagemNumero: el.imagemNumero,
+          x: el.x,
+          y: el.y,
+          largura: el.largura,
+          altura: el.altura,
+          angulo: el.angulo,
+          alinhamento: el.alinhamento,
+          fonte: el.fonte,
+        })),
       })),
     };
 

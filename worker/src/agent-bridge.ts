@@ -79,6 +79,12 @@ export interface SyncCommandPayload {
     tabelaNutricional?: TabelaNutricionalPayload;
     setor?: ClassePayload;
   }>;
+  /**
+   * Formatos de etiqueta a gravar mesmo que nenhum produto do lote os use —
+   * é o que permite editar um layout e vê-lo chegar à balança sem depender de
+   * haver produto vinculado a ele.
+   */
+  formatosImpressao?: FormatoImpressaoPayload[];
 }
 
 export interface SyncCommandResult {

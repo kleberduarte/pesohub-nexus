@@ -124,6 +124,9 @@ export function FormatoImpressaoPanel() {
   const [formatos, setFormatos] = useState<FormatoImpressao[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Salvar dispara a sincronização no backend; sem dizer isso na tela a pessoa
+  // não tem como saber se a balança recebeu o layout novo.
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<FormatoImpressao | null>(null);
@@ -182,16 +185,25 @@ export function FormatoImpressaoPanel() {
     setModalOpen(true);
   };
 
+
+  const descreverSync = (sinc?: { balancas: number; produtos: number }) => {
+    if (!sinc || sinc.balancas === 0) {
+      return "Layout salvo. Nenhuma balança com Agent Local vinculado nesta loja — nada foi enviado.";
+    }
+    const b = sinc.balancas === 1 ? "1 balança" : `${sinc.balancas} balanças`;
+    return `Layout salvo e enviado para ${b}. Acompanhe em Sincronização.`;
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
+    setAviso(null);
     try {
       const payload = { numero, nome, tipo: 1, larguraMm, alturaMm };
-      if (editing) {
-        await formatosImpressaoApi.update(editing.id, payload);
-      } else {
-        await formatosImpressaoApi.create({ ...payload, layout: {} });
-      }
+      const salvo = editing
+        ? await formatosImpressaoApi.update(editing.id, payload)
+        : await formatosImpressaoApi.create({ ...payload, layout: {} });
+      setAviso(descreverSync(salvo.sincronizacao));
       setModalOpen(false);
       load();
     } catch (err) {
@@ -299,8 +311,10 @@ export function FormatoImpressaoPanel() {
     if (!layoutEditing) return;
     setSavingLayout(true);
     setError(null);
+    setAviso(null);
     try {
-      await formatosImpressaoApi.update(layoutEditing.id, { layout: { elementos } });
+      const salvo = await formatosImpressaoApi.update(layoutEditing.id, { layout: { elementos } });
+      setAviso(descreverSync(salvo.sincronizacao));
       closeLayout();
       load();
     } catch (err) {
@@ -331,6 +345,15 @@ export function FormatoImpressaoPanel() {
 
       {error && (
         <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+      )}
+
+      {aviso && (
+        <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 text-blue-800 rounded-lg text-sm flex items-start justify-between gap-3">
+          <span>{aviso}</span>
+          <button onClick={() => setAviso(null)} className="text-blue-500 hover:text-blue-700 shrink-0">
+            Fechar
+          </button>
+        </div>
       )}
 
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
