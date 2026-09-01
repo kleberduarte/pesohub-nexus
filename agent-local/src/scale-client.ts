@@ -827,6 +827,113 @@ export function buildSyncBody(
   );
 }
 
+/** Um formato que foi enviado mas não está gravado na balança. */
+export interface FormatoDivergente {
+  numero: number;
+  esperado: string;
+  /** `null` = o slot voltou vazio; string = o slot tem OUTRO layout (tipicamente
+   * um modelo de fábrica, que é o caso em que a balança descarta a escrita). */
+  encontrado: string | null;
+}
+
+/**
+ * Lê de volta os formatos recém-enviados e confere se colaram.
+ *
+ * Existe porque ACK não é prova: a balança responde normalmente e descarta a
+ * gravação de um `LAB` cujo número caia num slot ocupado por modelo de fábrica
+ * (ver card #54 — o slot 1 é "PF-1" e engole qualquer escrita). O produto passa
+ * a imprimir com o layout da Ramuza, e nada no protocolo denuncia.
+ *
+ * Retorna erro APENAS quando a leitura em si falhou. Isso é deliberado: uma
+ * leitura que falha devolve resposta vazia, e tratar vazio como "não há nada
+ * gravado" produz alarme falso de balança zerada — aconteceu em 2026-09-01.
+ * Falha de leitura e slot vazio são coisas diferentes.
+ */
+export async function verificarFormatosGravados(
+  ip: string,
+  port: number,
+  formatos: FormatoImpressaoPayload[],
+): Promise<{ ok: true; divergentes: FormatoDivergente[] } | { ok: false; erro: string }> {
+  const divergentes: FormatoDivergente[] = [];
+
+  for (const formato of formatos) {
+    const resposta = await lerSlotLab(ip, port, formato.numero);
+    if (!resposta.ok) return { ok: false, erro: resposta.erro };
+
+    const esperado = sanitizeField(formato.nome);
+    if (resposta.nome !== esperado) {
+      divergentes.push({ numero: formato.numero, esperado, encontrado: resposta.nome });
+    }
+  }
+
+  return { ok: true, divergentes };
+}
+
+/** Lê um slot `LAB` e devolve o nome gravado (`null` se o slot estiver vazio). */
+function lerSlotLab(
+  ip: string,
+  port: number,
+  numero: number,
+): Promise<{ ok: true; nome: string | null } | { ok: false; erro: string }> {
+  return new Promise((resolve) => {
+    const socket = new Socket();
+    socket.setTimeout(10_000);
+    socket.setEncoding("latin1");
+    let buffer = "";
+    let done = false;
+
+    const finish = (r: { ok: true; nome: string | null } | { ok: false; erro: string }) => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      resolve(r);
+    };
+
+    socket.connect(port, ip, () => socket.write(`UPL\tLAB\t${numero}\t\r\n`, "latin1"));
+
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
+      if (!buffer.includes("END\tLAB")) return;
+      const linha = buffer.split("\r\n").find((l) => l.startsWith(`LAB\t${numero}\t`));
+      finish({ ok: true, nome: linha != null ? (linha.split("\t")[2] ?? null) : null });
+    });
+
+    socket.on("timeout", () =>
+      finish({ ok: false, erro: `Timeout ao reler o formato ${numero} da balança ${ip}:${port}.` }),
+    );
+    socket.on("error", (err) =>
+      finish({
+        ok: false,
+        erro:
+          err.message.includes("ECONNRESET")
+            ? // A balança atende um cliente por vez; quem costuma estar segurando
+              // a sessão é o software oficial aberto na máquina da loja.
+              `A balança ${ip}:${port} recusou a conexão (ECONNRESET). Feche o software da Ramuza, que mantém a sessão ocupada, e sincronize de novo.`
+            : `Falha ao reler o formato ${numero} da balança: ${err.message}`,
+      }),
+    );
+    socket.on("close", () =>
+      finish({ ok: false, erro: `Conexão encerrada antes de reler o formato ${numero}.` }),
+    );
+  });
+}
+
+/** Mensagem de erro para formatos que não colaram, com o motivo provável. */
+export function descreverFormatosDivergentes(divergentes: FormatoDivergente[]): string {
+  const detalhes = divergentes
+    .map((d) =>
+      d.encontrado == null
+        ? `formato ${d.numero} ("${d.esperado}") não foi gravado — o slot está vazio`
+        : `formato ${d.numero} ("${d.esperado}") não foi gravado — o slot ainda contém "${d.encontrado}"`,
+    )
+    .join("; ");
+  return (
+    `${detalhes}. A balança aceitou o envio e descartou em silêncio, o que acontece quando o ` +
+    `número do formato cai num slot ocupado por um modelo de fábrica. Escolha outro número ` +
+    `para o formato de impressão e sincronize de novo.`
+  );
+}
+
 /**
  * Cliente TCP real para a balança Ramuza/Atena (protocolo TXT-MODE, porta 33581).
  * Handshake replicado do que o software oficial faz ao clicar "Download" na tela
@@ -848,6 +955,40 @@ export async function sendProductsToScale(
   port: number,
   products: ScaleSyncPayload[],
   formatosAvulsos: FormatoImpressaoPayload[] = [],
+): Promise<ScaleSyncOutcome> {
+  const outcome = await escreverNaBalanca(ip, port, products, formatosAvulsos);
+  if (!outcome.ok) return outcome;
+
+  // Escrita aceita não é escrita gravada (card #54). Confere os formatos que
+  // saíram neste lote relendo cada slot; sem isso, um layout descartado vira
+  // "sincronizado com sucesso" e o problema só aparece no papel, na loja.
+  const formatosEnviados = [
+    ...new Map(
+      [...products.map((p) => p.formatoImpressao), ...formatosAvulsos]
+        .filter((f): f is FormatoImpressaoPayload => f != null)
+        .map((f) => [f.numero, f]),
+    ).values(),
+  ];
+  if (formatosEnviados.length === 0) return outcome;
+
+  const conferencia = await verificarFormatosGravados(ip, port, formatosEnviados);
+  if (!conferencia.ok) {
+    // Não dá pra afirmar que gravou nem que falhou — dizer isso é melhor do que
+    // escolher um dos dois e mentir.
+    return { ok: false, erro: `Envio aceito, mas não foi possível confirmar: ${conferencia.erro}` };
+  }
+  if (conferencia.divergentes.length > 0) {
+    return { ok: false, erro: descreverFormatosDivergentes(conferencia.divergentes) };
+  }
+
+  return outcome;
+}
+
+function escreverNaBalanca(
+  ip: string,
+  port: number,
+  products: ScaleSyncPayload[],
+  formatosAvulsos: FormatoImpressaoPayload[],
 ): Promise<ScaleSyncOutcome> {
   return new Promise((resolve) => {
     const socket = new Socket();
