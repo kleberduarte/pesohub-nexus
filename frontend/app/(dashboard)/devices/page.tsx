@@ -269,7 +269,14 @@ export default function DevicesPage() {
   const handleCreateAgent = async () => {
     const lojaId = getCurrentUser()?.lojaId;
     if (!lojaId) {
-      setError("Nenhuma loja ativa selecionada. Troque de loja antes de gerar um Agent Local.");
+      // "Troque de loja" mandava fazer algo impossível para quem tem uma loja
+      // só — e era o caso mais provável de cair aqui, antes da adoção
+      // automática da primeira loja (ver layout.tsx). A mensagem agora diz o
+      // que de fato resolve.
+      setError(
+        "Nenhuma loja ativa nesta sessão. Recarregue a página; se o problema continuar, " +
+          "cadastre uma loja em Lojas antes de gerar o Agent Local.",
+      );
       return;
     }
     setCreatingAgent(true);
