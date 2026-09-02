@@ -82,7 +82,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       });
     lojasApi
       .list()
-      .then(setLojas)
+      .then(async (lista) => {
+        setLojas(lista);
+        // Adota a primeira loja quando a sessão ainda não tem nenhuma ativa.
+        //
+        // Sem isso, quem cadastra a PRIMEIRA loja fica travado: o escopo da aba
+        // segue com `lojaId: null`, o select exibe a loja (é a primeira opção)
+        // mas o valor real é "", e escolher a opção já exibida NÃO dispara o
+        // onChange — não há como corrigir pela interface. A tela ainda pedia
+        // "troque de loja", impossível havendo só uma.
+        if (!getCurrentUser()?.lojaId && lista.length > 0) {
+          try {
+            const { user: atualizado } = await authApi.switchLoja(lista[0].id);
+            setUser(atualizado);
+          } catch {
+            // Sem loja ativa a tela segue utilizável em modo leitura; as ações
+            // que exigem loja avisam por conta própria.
+          }
+        }
+      })
       .catch(() => {
         // sem empresa ativa ainda, ou usuário SUPERADMIN sem cliente selecionado
       });
@@ -187,6 +205,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }}
                 className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
               >
+                {/* Enquanto não houver loja ativa, o select precisa DIZER isso.
+                    Mostrar a primeira loja como se estivesse selecionada era
+                    mentira — e ainda impedia a correção, porque escolher a
+                    opção já exibida não dispara o onChange. */}
+                {!user?.lojaId && (
+                  <option value="" disabled>
+                    Selecione uma loja
+                  </option>
+                )}
                 {lojas.map((loja) => (
                   <option key={loja.id} value={loja.id}>
                     {loja.nome}
