@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateTabelaNutricionalDto } from "../../../application/dtos/create-tabela-nutricional.dto";
@@ -7,10 +7,8 @@ import {
   TABELA_NUTRICIONAL_REPOSITORY,
   TabelaNutricionalRepository,
 } from "../../../domain/repositories/tabela-nutricional.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("tabelas-nutricionais")
-@UseGuards(JwtAuthGuard)
 @Controller("tabelas-nutricionais")
 export class TabelasNutricionaisController {
   constructor(

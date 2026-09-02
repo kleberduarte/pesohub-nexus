@@ -32,6 +32,7 @@ import { ConfiguracaoAvancadaModule } from "./presentation/routes/configuracao-a
 import { BillingModule } from "./presentation/routes/billing/billing.module";
 import { LojasModule } from "./presentation/routes/lojas/lojas.module";
 import { PerfisModule } from "./presentation/routes/perfis/perfis.module";
+import { JwtAuthGuard } from "./presentation/middleware/jwt-auth.guard";
 
 @Module({
   imports: [
@@ -79,6 +80,18 @@ import { PerfisModule } from "./presentation/routes/perfis/perfis.module";
     LojasModule,
     PerfisModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  // Ordem importa: o throttler roda antes da autenticação, para que uma
+  // enxurrada de requisições anônimas seja barrada sem custar uma verificação
+  // de JWT nem uma consulta ao banco por tentativa.
+  //
+  // O JwtAuthGuard aqui é o que faz toda rota nascer fechada. Antes ele era
+  // declarado controller a controller, e a segurança dependia de ninguém
+  // esquecer o `@UseGuards` ao criar um controller novo — um esquecimento que
+  // falha para o lado aberto e em silêncio. Agora o esquecimento falha para o
+  // lado seguro: rota sem `@Public()` exige sessão.
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}

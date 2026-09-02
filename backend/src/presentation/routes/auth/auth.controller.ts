@@ -8,7 +8,7 @@ import { LoginDto } from "../../../application/dtos/login.dto";
 import { SwitchCompanyDto } from "../../../application/dtos/switch-company.dto";
 import { SwitchLojaDto } from "../../../application/dtos/switch-loja.dto";
 import { TrocarSenhaDto } from "../../../application/dtos/trocar-senha.dto";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
+import { Public } from "../../middleware/public.decorator";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { SessionRevocationService } from "../../../infrastructure/auth/session-revocation.service";
@@ -36,6 +36,8 @@ export class AuthController {
     private readonly auditLog: AuditLogService,
   ) {}
 
+  // Pública por definição: é aqui que a sessão nasce.
+  @Public()
   @Post("login")
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
@@ -54,7 +56,6 @@ export class AuthController {
    * usando o sistema; parar de chamar é o que deixa a sessão expirar.
    */
   @Post("refresh")
-  @UseGuards(JwtAuthGuard)
   async refresh(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response) {
     const { accessToken, user } = await this.auth.refresh(req.user);
     setAuthCookie(res, accessToken);
@@ -62,7 +63,6 @@ export class AuthController {
   }
 
   @Post("trocar-senha")
-  @UseGuards(JwtAuthGuard)
   async trocarSenha(
     @Req() req: AuthenticatedRequest,
     @Body() dto: TrocarSenhaDto,
@@ -75,7 +75,7 @@ export class AuthController {
   }
 
   @Post("switch-company")
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles("SUPERADMIN")
   async switchCompany(@Req() req: AuthenticatedRequest, @Body() dto: SwitchCompanyDto) {
     // Sem cookie novo: a empresa ativa é escopo desta aba, e reemitir o cookie
@@ -87,7 +87,6 @@ export class AuthController {
   }
 
   @Post("switch-loja")
-  @UseGuards(JwtAuthGuard)
   async switchLoja(@Req() req: AuthenticatedRequest, @Body() dto: SwitchLojaDto) {
     const { user } = await this.auth.switchLoja(req.user, dto.lojaId);
     await this.auditLog.record(req, "auth.switch_loja", { lojaId: dto.lojaId });
@@ -95,7 +94,6 @@ export class AuthController {
   }
 
   @Post("logout")
-  @UseGuards(JwtAuthGuard)
   async logout(@Req() req: AuthenticatedRequest, @Res({ passthrough: true }) res: Response) {
     // Apagar o cookie não basta: quem já tiver uma cópia do token continuaria
     // autenticado até ele expirar. A revogação encerra a sessão de verdade.
@@ -106,7 +104,6 @@ export class AuthController {
   }
 
   @Get("me")
-  @UseGuards(JwtAuthGuard)
   me(@Req() req: AuthenticatedRequest) {
     return req.user;
   }

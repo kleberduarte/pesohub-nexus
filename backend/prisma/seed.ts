@@ -1,13 +1,18 @@
 import { PrismaClient } from "@prisma/client";
+import { randomBytes } from "crypto";
 import * as bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
+
+/** Mesmo gerador usado ao criar empresa pela API — ver clientes.controller.ts. */
+const novoAccessToken = () => randomBytes(32).toString("base64url");
 
 async function main() {
   const padrao = await prisma.cliente.upsert({
     where: { id: "cliente-default" },
     update: { isDefault: true, dominio: "pesohub.com.br" },
     create: {
+      accessToken: novoAccessToken(),
       id: "cliente-default",
       nome: "PesoHub",
       tagline: "Conectando dados, pesando o futuro",
@@ -25,6 +30,7 @@ async function main() {
     where: { id: "cliente-ramuza" },
     update: { isDefault: false, dominio: "ramuza.com.br" },
     create: {
+      accessToken: novoAccessToken(),
       id: "cliente-ramuza",
       nome: "Ramuza",
       corPrimaria: "#E30613",
@@ -38,6 +44,7 @@ async function main() {
     where: { id: "cliente-acme" },
     update: {},
     create: {
+      accessToken: novoAccessToken(),
       id: "cliente-acme",
       nome: "Acme Distribuidora",
       corPrimaria: "#0EA5E9",

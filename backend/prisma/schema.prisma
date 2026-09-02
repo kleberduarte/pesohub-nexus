@@ -78,7 +78,11 @@ enum StatusFatura {
 
 model Cliente {
   id                    String                 @id @default(cuid())
-  accessToken           String                 @unique @default(cuid())
+  /// Segredo do link público /acesso/:token. NÃO tem default: cuid() é um
+  /// contador monotônico com fingerprint de máquina, adivinhável o bastante
+  /// para enumerar empresas por um endpoint público. Quem cria um Cliente é
+  /// obrigado a gerar o valor com randomBytes(32).toString("base64url").
+  accessToken           String                 @unique
   nome                  String
   logoUrl               String?
   corPrimaria           String?

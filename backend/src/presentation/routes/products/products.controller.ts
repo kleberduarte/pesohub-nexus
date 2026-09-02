@@ -20,13 +20,11 @@ import { UpdateProductUseCase } from "../../../application/usecases/update-produ
 import { CreateProductDto } from "../../../application/dtos/create-product.dto";
 import { UpdateProductDto } from "../../../application/dtos/update-product.dto";
 import { PRODUCT_REPOSITORY, ProductRepository } from "../../../domain/repositories/product.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 
 @ApiTags("products")
-@UseGuards(JwtAuthGuard)
 @Controller("products")
 export class ProductsController {
   constructor(
