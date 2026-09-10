@@ -1,3 +1,5 @@
+import { clearCachedBranding } from "./branding";
+
 // Sem NEXT_PUBLIC_API_URL definido, usa o mesmo host que serviu a página
 // (nunca hardcoda "localhost": nesta máquina de dev a resolução de
 // "localhost" para portas publicadas pelo Docker é intermitente — ex:
@@ -235,6 +237,8 @@ export const authApi = {
     });
     setCurrentUser(data.user);
     setSessionScope({ clienteId: data.user.clienteId, lojaId: data.user.lojaId });
+    // A marca guardada é da empresa anterior; o próximo carregamento busca a nova.
+    clearCachedBranding();
     return data;
   },
   switchLoja: async (lojaId: string) => {
