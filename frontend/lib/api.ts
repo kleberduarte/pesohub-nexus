@@ -295,6 +295,10 @@ export interface Device {
   status: DeviceStatus;
   ultimoAcesso?: string | null;
   agentId?: string | null;
+  /** MAC lido pelo Agent Local; é por ele que o IP se corrige sozinho. */
+  mac?: string | null;
+  /** Última vez que o IP foi corrigido automaticamente. */
+  ipAtualizadoEm?: string | null;
 }
 
 export interface CreateDeviceInput {

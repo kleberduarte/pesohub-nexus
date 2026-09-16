@@ -245,10 +245,17 @@ model Device {
   /// Quando o mapa acima foi lido. `null` = nunca lido. Um mapa velho é melhor
   /// que nenhum, mas a tela precisa dizer a idade em vez de fingir certeza.
   slotsEtiquetaLidosEm DateTime?
+  /// MAC da placa de rede, lido pelo Agent Local na tabela ARP. É o que
+  /// identifica a balança quando o DHCP troca o IP ao religar (card #79).
+  mac                  String?
+  /// Última vez que o IP foi corrigido sozinho pelo MAC. A tela mostra, para
+  /// ninguém estranhar um IP que mudou sem ter sido editado.
+  ipAtualizadoEm       DateTime?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
   @@unique([lojaId, ip])
+  @@unique([lojaId, mac])
   @@index([clienteId])
   @@index([agentId])
   @@index([grupoId])
