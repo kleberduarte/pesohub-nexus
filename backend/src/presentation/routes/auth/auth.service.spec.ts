@@ -122,7 +122,8 @@ describe("AuthService", () => {
 
     const { user } = await service.login("admin@empresa.com.br", "senha123");
 
-    expect(sessions.registrarSessaoAtiva).toHaveBeenCalledWith("u1", user.jti, expect.any(Number));
+    // Sem motivo/tolerância: o login revoga a anterior na hora, como outro_dispositivo.
+    expect(sessions.registrarSessaoAtiva).toHaveBeenCalledWith("u1", user.jti, expect.any(Number), undefined, undefined);
   });
 
   it("conta o erro de senha e tranca a conta ao atingir o limite", async () => {
@@ -163,5 +164,26 @@ describe("AuthService", () => {
     await expect(service.login("naoexiste@empresa.com.br", "seja-la-o-que-for")).rejects.toThrow(
       "Credenciais inválidas",
     );
+  });
+
+  describe("refresh (card #78)", () => {
+    it("rotaciona com tolerância e nunca revoga a sessão irmã como outro_dispositivo", async () => {
+      const { service, sessions } = makeService(contaBase());
+      const exp = Math.floor(Date.now() / 1000) + 600;
+      await service.refresh({
+        sub: "u1",
+        email: "admin@empresa.com.br",
+        role: "ADMIN",
+        clienteId: "c1",
+        lojaId: "l1",
+        jti: "jti-antigo",
+        exp,
+      });
+
+      expect(sessions.revoke).toHaveBeenCalledWith("jti-antigo", exp, "troca_de_escopo", expect.any(Number));
+      const [, , , motivo, tolerancia] = sessions.registrarSessaoAtiva.mock.calls[0];
+      expect(motivo).toBe("troca_de_escopo");
+      expect(tolerancia).toBeGreaterThan(0);
+    });
   });
 });

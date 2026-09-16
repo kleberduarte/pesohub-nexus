@@ -37,26 +37,75 @@ const EVENTOS_DE_ATIVIDADE = ["mousedown", "keydown", "scroll", "touchstart"];
  */
 const INTERVALO_CHECAGEM_MS = 30 * 1000;
 
+/**
+ * Canal e trava compartilhados entre as abas. Abas do mesmo navegador dividem o
+ * cookie: se cada uma renova por conta própria, a rotação de uma derruba a
+ * outra (card #78). A trava garante um refresh por vez no navegador inteiro, e
+ * o canal avisa as demais abas do `jti` novo — sem isso elas achariam que a
+ * sessão foi tomada por outra pessoa.
+ */
+const CANAL_SESSAO = "pesohub-sessao";
+const TRAVA_REFRESH = "pesohub-refresh";
+
+function abrirCanal(): BroadcastChannel | null {
+  return typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(CANAL_SESSAO);
+}
+
+/** Roda `fn` com a trava entre abas; se outra aba já está renovando, desiste. */
+async function comTravaEntreAbas(fn: () => Promise<void>): Promise<void> {
+  const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+  if (!locks) return fn();
+  await locks.request(TRAVA_REFRESH, { ifAvailable: true }, async (trava) => {
+    if (trava) await fn();
+  });
+}
+
 export default function SessionKeepAlive() {
   const [segundosRestantes, setSegundosRestantes] = useState<number | null>(null);
   const [sessaoSubstituida, setSessaoSubstituida] = useState(false);
   const ultimaAtividade = useRef(Date.now());
   const ultimaRenovacao = useRef(Date.now());
+  const renovacaoEmCurso = useRef<Promise<void> | null>(null);
+  const canal = useRef<BroadcastChannel | null>(null);
 
-  const renovar = useCallback(async () => {
-    try {
-      await authApi.refresh();
-      ultimaRenovacao.current = Date.now();
+  const renovar = useCallback(() => {
+    // Uma rajada de eventos de atividade chegava aqui várias vezes antes do
+    // primeiro POST voltar, e cada refresh paralelo revogava o anterior. Marcar
+    // a renovação antes do await e reaproveitar a promise em curso fecha isso.
+    if (renovacaoEmCurso.current) return renovacaoEmCurso.current;
+    ultimaRenovacao.current = Date.now();
+    renovacaoEmCurso.current = comTravaEntreAbas(async () => {
+      const data = await authApi.refresh();
       ultimaAtividade.current = Date.now();
       setSegundosRestantes(null);
       setSessaoSubstituida(false);
-    } catch {
-      // 401 aqui já é tratado pelo interceptor do api.ts, que redireciona
-      // para o login com a mensagem do motivo.
-    }
+      canal.current?.postMessage({ tipo: "renovada", jti: data.user.jti ?? null });
+    })
+      .catch(() => {
+        // 401 aqui já é tratado pelo interceptor do api.ts, que redireciona
+        // para o login com a mensagem do motivo.
+      })
+      .finally(() => {
+        renovacaoEmCurso.current = null;
+      });
+    return renovacaoEmCurso.current;
   }, []);
 
   useEffect(() => {
+    canal.current = abrirCanal();
+    if (canal.current) {
+      canal.current.onmessage = (evento: MessageEvent<{ tipo: string; jti: string | null }>) => {
+        if (evento.data?.tipo !== "renovada") return;
+        // Renovação feita por outra aba deste navegador: a sessão continua
+        // nossa, só o jti mudou.
+        setLastSessionId(evento.data.jti);
+        ultimaRenovacao.current = Date.now();
+        ultimaAtividade.current = Date.now();
+        setSegundosRestantes(null);
+        setSessaoSubstituida(false);
+      };
+    }
+
     const registrarAtividade = () => {
       ultimaAtividade.current = Date.now();
       // Só renova de fato de tempos em tempos; o resto é contabilidade local.
@@ -91,6 +140,8 @@ export default function SessionKeepAlive() {
       EVENTOS_DE_ATIVIDADE.forEach((evento) => window.removeEventListener(evento, registrarAtividade));
       clearInterval(timer);
       clearInterval(checagem);
+      canal.current?.close();
+      canal.current = null;
     };
   }, [renovar]);
 
