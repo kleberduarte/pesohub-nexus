@@ -1,13 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateTextoGlobalDto } from "../../../application/dtos/create-texto-global.dto";
 import { UpdateTextoGlobalDto } from "../../../application/dtos/update-texto-global.dto";
 import { TEXTO_GLOBAL_REPOSITORY, TextoGlobalRepository } from "../../../domain/repositories/texto-global.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("textos-globais")
-@UseGuards(JwtAuthGuard)
 @Controller("textos-globais")
 export class TextosGlobaisController {
   constructor(@Inject(TEXTO_GLOBAL_REPOSITORY) private readonly textos: TextoGlobalRepository) {}

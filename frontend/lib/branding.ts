@@ -44,12 +44,59 @@ export interface Branding {
   tagline?: string | null;
 }
 
-export function applyBranding(branding: Pick<Branding, "corPrimaria">) {
-  if (typeof document === "undefined" || !branding.corPrimaria) return;
-  const scale = shadeScale(branding.corPrimaria);
-  const root = document.documentElement.style;
-  for (const step of SHADE_STEPS) {
-    root.setProperty(`--color-brand-${step}`, scale[step]);
+// Última marca resolvida, guardada para o recarregamento já nascer com ela.
+// Sem isso o HTML do servidor (sempre PesoHub) aparece até /clientes/me/branding
+// responder, e o usuário vê a empresa padrão piscar antes da empresa ativa.
+// É por aba (sessionStorage) porque o escopo de empresa também é por aba.
+export const BRANDING_CACHE_KEY = "pesohub.branding";
+
+interface CachedBranding extends Branding {
+  // Tons já calculados, para o script inline do <head> só aplicar.
+  cssVars?: Record<string, string>;
+}
+
+export function applyBranding(branding: Branding) {
+  if (typeof document === "undefined") return;
+  let cssVars: Record<string, string> | undefined;
+  if (branding.corPrimaria) {
+    const scale = shadeScale(branding.corPrimaria);
+    cssVars = {};
+    const root = document.documentElement.style;
+    for (const step of SHADE_STEPS) {
+      cssVars[`--color-brand-${step}`] = scale[step];
+      root.setProperty(`--color-brand-${step}`, scale[step]);
+    }
+  }
+  const cached: CachedBranding = {
+    nome: branding.nome,
+    logoUrl: branding.logoUrl,
+    corPrimaria: branding.corPrimaria,
+    corSecundaria: branding.corSecundaria,
+    tagline: branding.tagline,
+    cssVars,
+  };
+  try {
+    sessionStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify(cached));
+  } catch {
+    // storage indisponível — só perde o pré-carregamento
+  }
+}
+
+export function readCachedBranding(): Branding | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(BRANDING_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Branding) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearCachedBranding() {
+  try {
+    sessionStorage.removeItem(BRANDING_CACHE_KEY);
+  } catch {
+    // nada a limpar
   }
 }
 
@@ -59,4 +106,10 @@ export function resetBranding() {
   for (const step of SHADE_STEPS) {
     root.removeProperty(`--color-brand-${step}`);
   }
+  clearCachedBranding();
 }
+
+// Roda no <head>, antes da primeira pintura: aplica as cores guardadas.
+export const brandingBootScript = `try{var b=JSON.parse(sessionStorage.getItem(${JSON.stringify(
+  BRANDING_CACHE_KEY,
+)})||"null");if(b&&b.cssVars){for(var k in b.cssVars)document.documentElement.style.setProperty(k,b.cssVars[k])}}catch(e){}`;

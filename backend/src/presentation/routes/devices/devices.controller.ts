@@ -24,13 +24,11 @@ import { LinkAgentDto } from "../../../application/dtos/link-agent.dto";
 import { ImportDevicesDto } from "../../../application/dtos/import-devices.dto";
 import { DEVICE_REPOSITORY, DeviceRepository } from "../../../domain/repositories/device.repository";
 import { AgentGateway } from "../../../infrastructure/realtime/agent.gateway";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 
 @ApiTags("devices")
-@UseGuards(JwtAuthGuard)
 @Controller("devices")
 export class DevicesController {
   constructor(

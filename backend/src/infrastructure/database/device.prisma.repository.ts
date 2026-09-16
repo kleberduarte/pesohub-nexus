@@ -79,6 +79,12 @@ export class DevicePrismaRepository implements DeviceRepository {
   }
 
   async update(id: string, lojaId: string, data: Partial<Device>): Promise<Device> {
+    // IP editado à mão pode apontar para outra balança: o MAC antigo puxaria o
+    // cadastro de volta para a balança anterior. Esquece e reaprende no IP novo.
+    const atual = data.ip ? await this.prisma.device.findFirst({ where: { id, lojaId }, select: { ip: true } }) : null;
+    if (atual && atual.ip !== data.ip) {
+      data = { ...data, mac: null, ipAtualizadoEm: null };
+    }
     const result = await this.prisma.device.updateMany({ where: { id, lojaId }, data });
     if (result.count === 0) {
       throw new NotFoundException("Balança não encontrada.");

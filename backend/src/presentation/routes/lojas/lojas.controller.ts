@@ -4,12 +4,10 @@ import { Request } from "express";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { CreateLojaDto } from "../../../application/dtos/create-loja.dto";
 import { UpdateLojaDto } from "../../../application/dtos/update-loja.dto";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 
 @ApiTags("lojas")
-@UseGuards(JwtAuthGuard)
 @Controller("lojas")
 export class LojasController {
   constructor(private readonly prisma: PrismaService) {}

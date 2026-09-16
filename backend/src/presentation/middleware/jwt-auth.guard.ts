@@ -4,6 +4,7 @@ import { Reflector } from "@nestjs/core";
 import { AUTH_COOKIE_NAME } from "../routes/auth/auth-cookie";
 import { PrismaService } from "../../infrastructure/database/prisma.service";
 import { SKIP_BILLING_CHECK_KEY } from "./skip-billing-check.decorator";
+import { IS_PUBLIC_KEY } from "./public.decorator";
 import {
   MENSAGEM_POR_MOTIVO,
   SessionRevocationService,
@@ -21,6 +22,16 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // O guard é global, então ele roda inclusive nas poucas rotas que precisam
+    // ser públicas. `@Public()` é a única saída, e ela é explícita por design.
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
     const request = context.switchToHttp().getRequest();
     const token: string | undefined = request.cookies?.[AUTH_COOKIE_NAME];
 

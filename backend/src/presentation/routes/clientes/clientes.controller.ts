@@ -16,7 +16,6 @@ import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { randomBytes } from "crypto";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { CreateClienteDto } from "../../../application/dtos/create-cliente.dto";
@@ -42,7 +41,6 @@ const CLIENTE_SELECT = {
 };
 
 @ApiTags("clientes")
-@UseGuards(JwtAuthGuard)
 @Controller("clientes")
 export class ClientesController {
   constructor(private readonly prisma: PrismaService) {}

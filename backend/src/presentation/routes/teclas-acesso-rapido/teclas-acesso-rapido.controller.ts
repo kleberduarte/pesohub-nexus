@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateTeclaAcessoRapidoDto } from "../../../application/dtos/create-tecla-acesso-rapido.dto";
@@ -7,10 +7,8 @@ import {
   TECLA_ACESSO_RAPIDO_REPOSITORY,
   TeclaAcessoRapidoRepository,
 } from "../../../domain/repositories/tecla-acesso-rapido.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("teclas-acesso-rapido")
-@UseGuards(JwtAuthGuard)
 @Controller("teclas-acesso-rapido")
 export class TeclasAcessoRapidoController {
   constructor(

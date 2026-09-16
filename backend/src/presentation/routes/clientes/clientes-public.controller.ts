@@ -2,9 +2,11 @@ import { Controller, Get, NotFoundException, Param } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
+import { Public } from "../../middleware/public.decorator";
 
 @ApiTags("clientes-public")
 @Controller("clientes")
+@Public()
 export class ClientesPublicController {
   constructor(private readonly prisma: PrismaService) {}
 

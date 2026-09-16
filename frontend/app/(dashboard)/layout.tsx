@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -32,7 +32,7 @@ import {
   type DecodedUser,
   type Loja,
 } from "../../lib/api";
-import { applyBranding } from "../../lib/branding";
+import { applyBranding, readCachedBranding } from "../../lib/branding";
 import SessionKeepAlive from "../../components/auth/SessionKeepAlive";
 
 const baseNavigation = [
@@ -62,9 +62,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const router = useRouter();
   const [branding, setBranding] = useState<ClienteBranding | null>(null);
+  // Enquanto a marca não é conhecida, o cabeçalho fica vazio — mostrar
+  // "PesoHub" ali fazia a empresa padrão piscar a cada recarregamento.
+  const [brandingResolved, setBrandingResolved] = useState(false);
   const [user, setUser] = useState<DecodedUser | null>(null);
   const [lojas, setLojas] = useState<Loja[]>([]);
   const [switchingLoja, setSwitchingLoja] = useState(false);
+
+  useLayoutEffect(() => {
+    const cached = readCachedBranding();
+    if (cached) {
+      setBranding(cached as ClienteBranding);
+      setBrandingResolved(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (!getCurrentUser()) {
@@ -113,7 +124,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       })
       .catch(() => {
         // sem tenant resolvido ainda (ex: token expirado) — mantém identidade padrão PesoHub
-      });
+      })
+      .finally(() => setBrandingResolved(true));
   }, []);
 
   const isAdmin = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
@@ -136,14 +148,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <div className="w-64 bg-brand-50 border-r border-brand-100 flex flex-col h-screen overflow-y-auto">
         <div className="h-16 flex items-center px-6 border-b border-brand-100 shrink-0 sticky top-0 bg-brand-50 z-10">
-          <img
-            src={branding?.logoUrl ?? "/pesohub-icon.png"}
-            alt={branding?.nome ?? "PesoHub"}
-            className="w-8 h-8 mr-2 object-contain"
-          />
-          <span className="text-2xl font-bold tracking-tight text-brand-950">
-            {(branding?.nome ?? "PesoHub").toLowerCase()}
-          </span>
+          {brandingResolved ? (
+            <>
+              <img
+                src={branding?.logoUrl ?? "/pesohub-icon.png"}
+                alt={branding?.nome ?? "PesoHub"}
+                className="w-8 h-8 mr-2 object-contain"
+              />
+              <span className="text-2xl font-bold tracking-tight text-brand-950">
+                {(branding?.nome ?? "PesoHub").toLowerCase()}
+              </span>
+            </>
+          ) : (
+            <div className="w-8 h-8 mr-2" aria-hidden />
+          )}
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-1">

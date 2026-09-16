@@ -5,7 +5,7 @@ import { Request } from "express";
 import { createHash, timingSafeEqual } from "crypto";
 import { BillingService } from "./billing.service";
 import { CreateAssinaturaDto } from "../../../application/dtos/create-assinatura.dto";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
+import { Public } from "../../middleware/public.decorator";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { SkipBillingCheck } from "../../middleware/skip-billing-check.decorator";
@@ -27,25 +27,27 @@ export class BillingController {
   ) {}
 
   @Post("subscribe")
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles("ADMIN", "SUPERADMIN")
   subscribe(@Body() dto: CreateAssinaturaDto, @Req() req: Request) {
     return this.billing.subscribe(this.clienteId(req), dto);
   }
 
   @Get("status")
-  @UseGuards(JwtAuthGuard)
   status(@Req() req: Request) {
     return this.billing.status(this.clienteId(req));
   }
 
   @Post("cancel")
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(RolesGuard)
   @Roles("ADMIN", "SUPERADMIN")
   cancel(@Req() req: Request) {
     return this.billing.cancel(this.clienteId(req));
   }
 
+  // Chamado pelo Asaas, que não tem sessão: autentica por token compartilhado
+  // no header, verificado abaixo.
+  @Public()
   @Post("webhook")
   async webhook(@Body() body: { event: string; payment: Record<string, any> }, @Headers("asaas-access-token") token: string) {
     // Falha fechada: sem ASAAS_WEBHOOK_TOKEN configurado o endpoint fica

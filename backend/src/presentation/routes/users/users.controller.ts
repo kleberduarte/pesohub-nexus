@@ -17,7 +17,6 @@ import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import * as bcrypt from "bcrypt";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { CreateUserDto } from "../../../application/dtos/create-user.dto";
@@ -31,7 +30,6 @@ interface AuthenticatedRequest extends Request {
 }
 
 @ApiTags("users")
-@UseGuards(JwtAuthGuard)
 @Controller("users")
 export class UsersController {
   constructor(

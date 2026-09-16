@@ -11,4 +11,8 @@ export class Device {
   status!: DeviceStatus;
   ultimoAcesso?: Date | null;
   agentId?: string | null;
+  /** MAC lido pelo Agent Local; identifica a balança quando o DHCP troca o IP. */
+  mac?: string | null;
+  /** Última correção automática do IP pelo MAC. */
+  ipAtualizadoEm?: Date | null;
 }

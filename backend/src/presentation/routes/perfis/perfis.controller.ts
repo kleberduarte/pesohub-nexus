@@ -4,12 +4,11 @@ import { Request } from "express";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { CreatePerfilDto } from "../../../application/dtos/create-perfil.dto";
 import { UpdatePerfilDto } from "../../../application/dtos/update-perfil.dto";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 
 @ApiTags("perfis")
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(RolesGuard)
 @Roles("ADMIN", "SUPERADMIN")
 @Controller("perfis")
 export class PerfisController {

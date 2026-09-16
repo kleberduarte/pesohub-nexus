@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateCodigoBarrasFormatoDto } from "../../../application/dtos/create-codigo-barras-formato.dto";
@@ -7,10 +7,8 @@ import {
   CODIGO_BARRAS_FORMATO_REPOSITORY,
   CodigoBarrasFormatoRepository,
 } from "../../../domain/repositories/codigo-barras-formato.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("codigos-barras-formato")
-@UseGuards(JwtAuthGuard)
 @Controller("codigos-barras-formato")
 export class CodigosBarrasFormatoController {
   constructor(

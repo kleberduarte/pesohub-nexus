@@ -4,6 +4,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { RedisThrottlerStorageService } from "./infrastructure/throttler/redis-throttler-storage.service";
 import { LoggerModule } from "nestjs-pino";
+import { criarOpcoesHttpLogger } from "./infrastructure/logging/http-logger.config";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
 import { AuditLogModule } from "./infrastructure/audit/audit-log.module";
 import { SessionRevocationModule } from "./infrastructure/auth/session-revocation.module";
@@ -32,6 +33,7 @@ import { ConfiguracaoAvancadaModule } from "./presentation/routes/configuracao-a
 import { BillingModule } from "./presentation/routes/billing/billing.module";
 import { LojasModule } from "./presentation/routes/lojas/lojas.module";
 import { PerfisModule } from "./presentation/routes/perfis/perfis.module";
+import { JwtAuthGuard } from "./presentation/middleware/jwt-auth.guard";
 
 @Module({
   imports: [
@@ -43,12 +45,7 @@ import { PerfisModule } from "./presentation/routes/perfis/perfis.module";
       }),
     }),
     LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.LOG_LEVEL ?? "info",
-        transport: process.env.NODE_ENV === "production" ? undefined : { target: "pino-pretty" },
-        redact: ["req.headers.authorization"],
-        autoLogging: { ignore: (req) => req.url === "/api/v1/health" },
-      },
+      pinoHttp: criarOpcoesHttpLogger(),
     }),
     PrismaModule,
     SessionRevocationModule,
@@ -79,6 +76,18 @@ import { PerfisModule } from "./presentation/routes/perfis/perfis.module";
     LojasModule,
     PerfisModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  // Ordem importa: o throttler roda antes da autenticação, para que uma
+  // enxurrada de requisições anônimas seja barrada sem custar uma verificação
+  // de JWT nem uma consulta ao banco por tentativa.
+  //
+  // O JwtAuthGuard aqui é o que faz toda rota nascer fechada. Antes ele era
+  // declarado controller a controller, e a segurança dependia de ninguém
+  // esquecer o `@UseGuards` ao criar um controller novo — um esquecimento que
+  // falha para o lado aberto e em silêncio. Agora o esquecimento falha para o
+  // lado seguro: rota sem `@Public()` exige sessão.
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: JwtAuthGuard },
+  ],
 })
 export class AppModule {}

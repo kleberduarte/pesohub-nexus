@@ -13,6 +13,7 @@ import { Server, Socket } from "socket.io";
 import Redis from "ioredis";
 import { PrismaService } from "../database/prisma.service";
 import { getRedisUrl } from "../queue/redis-connection";
+import { BalancaDescoberta, planejarReconciliacao } from "./reconciliar-ip-balanca";
 import { hashAgentToken } from "../../domain/services/agent-token";
 
 /**
@@ -197,12 +198,14 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage("devices:discovered")
   async onDevicesDiscovered(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() body: { devices: { ip: string; port: number }[] },
+    @MessageBody() body: { devices: BalancaDescoberta[] },
   ): Promise<void> {
     const agentId = socket.data?.agentId as string | undefined;
     if (!agentId) return;
-    const devices = body.devices ?? [];
-    this.discoveredByAgent.set(agentId, devices);
+    const devices = (Array.isArray(body?.devices) ? body.devices : []).filter(
+      (d) => typeof d?.ip === "string" && Number.isInteger(d?.port),
+    );
+    this.discoveredByAgent.set(agentId, devices.map(({ ip, port }) => ({ ip, port })));
     await this.reconcileDriftedIp(agentId, devices);
   }
 
@@ -251,39 +254,51 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   /**
-   * O IP da balança é DHCP e pode mudar a qualquer momento — quando isso
-   * acontece, o `Device.ip` cadastrado fica desatualizado e todo sync passa a
-   * falhar com timeout até alguém perceber e corrigir manualmente. Quando o
-   * agent só tem UMA balança vinculada e o broadcast de descoberta reporta
-   * exatamente uma balança na mesma porta com um IP diferente do cadastrado,
-   * é seguro assumir que é a mesma balança e atualizar sozinho. Ambíguo
-   * (múltiplas balanças no mesmo agent, ou múltiplas descobertas na mesma
-   * porta) não mexe em nada — fica pro fluxo manual de sempre.
+   * O IP da balança é DHCP e muda quando ela é religada; sem correção, todo
+   * sync vai para o endereço antigo até alguém editar o cadastro na mão.
+   * A decisão fica em `planejarReconciliacao` (reconhece a balança pelo MAC);
+   * aqui só se aplica o plano, sempre escopado aos Devices deste agent.
    */
-  private async reconcileDriftedIp(
-    agentId: string,
-    devices: { ip: string; port: number }[],
-  ): Promise<void> {
-    const registered = await this.prisma.device.findMany({ where: { agentId } });
-    if (registered.length !== 1) return;
+  private async reconcileDriftedIp(agentId: string, devices: BalancaDescoberta[]): Promise<void> {
+    const registrados = await this.prisma.device.findMany({
+      where: { agentId },
+      select: { id: true, nome: true, ip: true, porta: true, mac: true },
+    });
+    if (registrados.length === 0) return;
 
-    const [device] = registered;
-    const candidates = devices.filter((d) => d.port === device.porta && d.ip !== device.ip);
-    if (candidates.length !== 1) return;
+    const plano = planejarReconciliacao(registrados, devices);
+    for (const motivo of plano.ignorados) {
+      this.logger.warn(`IP de balança não atualizado (agent ${agentId}): ${motivo}`);
+    }
 
-    const [candidate] = candidates;
+    for (const aprendido of plano.macsAprendidos) {
+      try {
+        await this.prisma.device.update({ where: { id: aprendido.deviceId }, data: { mac: aprendido.mac } });
+        this.logger.log(`Balança "${aprendido.nome}" identificada pelo MAC ${aprendido.mac}`);
+      } catch (err) {
+        // @@unique([lojaId, mac]): o MAC já está em outro Device da loja.
+        this.logger.warn(`Falha ao gravar MAC do device ${aprendido.deviceId}: ${(err as Error).message}`);
+      }
+    }
+
+    if (plano.novosIps.length === 0) return;
+    const agora = new Date();
     try {
-      await this.prisma.device.update({
-        where: { id: device.id },
-        data: { ip: candidate.ip },
-      });
-      this.logger.log(
-        `IP da balança "${device.nome}" (agent ${agentId}) atualizado automaticamente: ${device.ip} -> ${candidate.ip}`,
-      );
+      // Em dois passos, dentro de uma transação: quando duas balanças trocam de
+      // IP entre si, gravar direto colidiria no @@unique([lojaId, ip]).
+      await this.prisma.$transaction([
+        ...plano.novosIps.map((n) =>
+          this.prisma.device.update({ where: { id: n.deviceId }, data: { ip: `trocando:${n.deviceId}` } }),
+        ),
+        ...plano.novosIps.map((n) =>
+          this.prisma.device.update({ where: { id: n.deviceId }, data: { ip: n.para, ipAtualizadoEm: agora } }),
+        ),
+      ]);
+      for (const n of plano.novosIps) {
+        this.logger.log(`IP da balança "${n.nome}" (agent ${agentId}) atualizado automaticamente: ${n.de} -> ${n.para}`);
+      }
     } catch (err) {
-      // Provavelmente colidiu com o @@unique([lojaId, ip]) de outro device já
-      // cadastrado nesse IP — não é fatal, só deixa pro fluxo manual.
-      this.logger.warn(`Falha ao auto-corrigir IP do device ${device.id}: ${(err as Error).message}`);
+      this.logger.warn(`Falha ao atualizar IP de balança (agent ${agentId}): ${(err as Error).message}`);
     }
   }
 

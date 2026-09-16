@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Put, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Put, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { UpsertSpecParametroDto } from "../../../application/dtos/upsert-spec-parametro.dto";
@@ -6,10 +6,8 @@ import {
   SPEC_PARAMETRO_REPOSITORY,
   SpecParametroRepository,
 } from "../../../domain/repositories/spec-parametro.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("spec-parametros")
-@UseGuards(JwtAuthGuard)
 @Controller("spec-parametros")
 export class SpecParametrosController {
   constructor(
