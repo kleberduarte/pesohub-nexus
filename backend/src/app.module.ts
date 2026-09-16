@@ -4,6 +4,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ThrottlerModule, ThrottlerGuard } from "@nestjs/throttler";
 import { RedisThrottlerStorageService } from "./infrastructure/throttler/redis-throttler-storage.service";
 import { LoggerModule } from "nestjs-pino";
+import { criarOpcoesHttpLogger } from "./infrastructure/logging/http-logger.config";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
 import { AuditLogModule } from "./infrastructure/audit/audit-log.module";
 import { SessionRevocationModule } from "./infrastructure/auth/session-revocation.module";
@@ -44,12 +45,7 @@ import { JwtAuthGuard } from "./presentation/middleware/jwt-auth.guard";
       }),
     }),
     LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.LOG_LEVEL ?? "info",
-        transport: process.env.NODE_ENV === "production" ? undefined : { target: "pino-pretty" },
-        redact: ["req.headers.authorization"],
-        autoLogging: { ignore: (req) => req.url === "/api/v1/health" },
-      },
+      pinoHttp: criarOpcoesHttpLogger(),
     }),
     PrismaModule,
     SessionRevocationModule,
