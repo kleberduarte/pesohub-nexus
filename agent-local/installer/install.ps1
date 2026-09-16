@@ -84,6 +84,16 @@ Write-Host "Registrando servico do Windows ($ServiceName)..."
 & $nssm set $ServiceName DisplayName "PesoHub Agent Local"
 & $nssm set $ServiceName Description "Ponte entre as balancas da loja e o PesoHub. Nao remover."
 
+# ---- firewall: liberar o anuncio UDP das balancas ----
+# Servico do Windows nao mostra o aviso "permitir acesso" do firewall: sem esta
+# regra o broadcast da balanca e descartado em silencio e o agente nao encontra
+# nenhuma balanca (nem consegue corrigir o IP quando o DHCP troca).
+$FirewallRule = "PesoHub Agent Local - descoberta de balancas"
+Remove-NetFirewallRule -DisplayName $FirewallRule -ErrorAction SilentlyContinue
+New-NetFirewallRule -DisplayName $FirewallRule -Direction Inbound -Action Allow -Protocol UDP `
+    -LocalPort $DiscoveryPort -Program $exe -Profile Any | Out-Null
+Write-Host "Firewall liberado para UDP $DiscoveryPort (descoberta de balancas)."
+
 Write-Host "Iniciando servico..."
 & $nssm start $ServiceName | Out-Null
 Start-Sleep -Seconds 2
