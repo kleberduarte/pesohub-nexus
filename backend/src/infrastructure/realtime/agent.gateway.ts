@@ -131,6 +131,16 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return;
     }
 
+    // Um agente que reconecta antes de o servidor notar a queda da conexão
+    // antiga fica com duas abertas; a nova vence. A antiga NÃO é derrubada
+    // daqui: o socket.io cliente não reconecta sozinho após "io server
+    // disconnect", então um segundo processo com o mesmo token ficaria parado
+    // para sempre. Ela morre pelo ping timeout, e o handleDisconnect reconhece
+    // que já não é a atual (card #82).
+    const anterior = this.sockets.get(agent.id);
+    if (anterior && anterior !== socket) {
+      this.logger.warn(`Agent Local ${agent.id} reconectou com a conexão ${anterior.id} ainda aberta; a nova passa a valer`);
+    }
     this.sockets.set(agent.id, socket);
     this.clienteIdByAgent.set(agent.id, agent.clienteId);
     socket.data.agentId = agent.id;
@@ -148,17 +158,24 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleDisconnect(socket: Socket): Promise<void> {
     const agentId = socket.data?.agentId as string | undefined;
-    if (agentId) {
-      this.sockets.delete(agentId);
-      this.clienteIdByAgent.delete(agentId);
-      this.discoveredByAgent.delete(agentId);
-      this.lastDeviceTouch.delete(agentId);
-      await this.prisma.device.updateMany({
-        where: { agentId },
-        data: { status: "OFFLINE" },
-      });
-      this.logger.log(`Agent Local desconectado: ${agentId}`);
+    if (!agentId) return;
+    // A queda de uma conexão que já foi substituída não diz nada sobre o
+    // agente: ele segue conectado pela nova. Limpar aqui apagaria o socket
+    // válido (sync falhando com "não está conectado") e marcaria as balanças
+    // OFFLINE com o agente online (card #82).
+    if (this.sockets.get(agentId) !== socket) {
+      this.logger.log(`Conexão substituída do Agent Local ${agentId} encerrada (socket ${socket.id})`);
+      return;
     }
+    this.sockets.delete(agentId);
+    this.clienteIdByAgent.delete(agentId);
+    this.discoveredByAgent.delete(agentId);
+    this.lastDeviceTouch.delete(agentId);
+    await this.prisma.device.updateMany({
+      where: { agentId },
+      data: { status: "OFFLINE" },
+    });
+    this.logger.log(`Agent Local desconectado: ${agentId}`);
   }
 
   @SubscribeMessage("heartbeat")
