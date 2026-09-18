@@ -211,7 +211,9 @@ export function TabelaNutricionalPanel() {
                   <td className="px-4 py-3">{t.numero}</td>
                   <td className="px-4 py-3">{t.nome}</td>
                   <td className="px-4 py-3">{t.porcao ?? "-"}</td>
-                  <td className="px-4 py-3">{t.itens.length}</td>
+                  <td className="px-4 py-3 max-w-xs truncate" title={t.ingredientes ?? undefined}>
+                    {t.ingredientes || "-"}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
                       <button
