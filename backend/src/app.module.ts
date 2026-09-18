@@ -6,6 +6,7 @@ import { RedisThrottlerStorageService } from "./infrastructure/throttler/redis-t
 import { LoggerModule } from "nestjs-pino";
 import { criarOpcoesHttpLogger } from "./infrastructure/logging/http-logger.config";
 import { PrismaModule } from "./infrastructure/database/prisma.module";
+import { EmailModule } from "./infrastructure/email/email.module";
 import { AuditLogModule } from "./infrastructure/audit/audit-log.module";
 import { SessionRevocationModule } from "./infrastructure/auth/session-revocation.module";
 import { HealthModule } from "./presentation/routes/health/health.module";
@@ -48,6 +49,7 @@ import { JwtAuthGuard } from "./presentation/middleware/jwt-auth.guard";
       pinoHttp: criarOpcoesHttpLogger(),
     }),
     PrismaModule,
+    EmailModule,
     SessionRevocationModule,
     HealthModule,
     AuditLogModule,
