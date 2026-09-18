@@ -98,7 +98,7 @@ export function ProdutoFormModal({
                 <h4 className="text-sm font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2">Informações Básicas</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label htmlFor="produto-codigo-do-produto" className="block text-xs font-medium text-slate-700 mb-1">Código do Produto</label>
+                    <label htmlFor="produto-codigo-do-produto" className="block text-xs font-medium text-slate-700 mb-1">Código do Produto <span className="text-red-500" aria-hidden="true">*</span></label>
                     <input
  id="produto-codigo-do-produto"                          type="text"
                       required
@@ -108,7 +108,7 @@ export function ProdutoFormModal({
                     />
                   </div>
                   <div>
-                    <label htmlFor="produto-codigo-de-barras-ean-13" className="block text-xs font-medium text-slate-700 mb-1">Código de Barras (EAN-13)</label>
+                    <label htmlFor="produto-codigo-de-barras-ean-13" className="block text-xs font-medium text-slate-700 mb-1">Código de Barras (EAN-13) <span className="text-red-500" aria-hidden="true">*</span></label>
                     <input
  id="produto-codigo-de-barras-ean-13"                          type="text"
                       required
@@ -159,7 +159,7 @@ export function ProdutoFormModal({
                     />
                   </div>
                   <div className="md:col-span-3">
-                    <label htmlFor="produto-nome-do-produto" className="block text-xs font-medium text-slate-700 mb-1">Nome do Produto</label>
+                    <label htmlFor="produto-nome-do-produto" className="block text-xs font-medium text-slate-700 mb-1">Nome do Produto <span className="text-red-500" aria-hidden="true">*</span></label>
                     <input
  id="produto-nome-do-produto"                          type="text"
                       required
@@ -176,7 +176,7 @@ export function ProdutoFormModal({
                 <h4 className="text-sm font-semibold text-slate-800 mb-4 border-b border-slate-100 pb-2">Preço</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label htmlFor="produto-preco-unitario-r" className="block text-xs font-medium text-slate-700 mb-1">Preço Unitário (R$)</label>
+                    <label htmlFor="produto-preco-unitario-r" className="block text-xs font-medium text-slate-700 mb-1">Preço Unitário (R$) <span className="text-red-500" aria-hidden="true">*</span></label>
                     <input
  id="produto-preco-unitario-r"                          type="text"
                       inputMode="decimal"
