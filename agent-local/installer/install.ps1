@@ -4,12 +4,22 @@
 
 $ErrorActionPreference = "Stop"
 
+# Identifica qual instalador rodou. Sem isto, na loja nao ha como saber se foi
+# usado um zip antigo (card #81: a regra de firewall nao existia no zip anterior).
+$InstallerVersion = "2026-09-18"
+
 function Fail($msg) {
     Write-Host ""
     Write-Host "ERRO: $msg" -ForegroundColor Red
     Write-Host ""
     Read-Host "Pressione ENTER para sair"
     exit 1
+}
+
+# O Instalar.bat abre esta janela via Start-Process: qualquer erro nao tratado
+# fechava a janela na hora e o motivo sumia (card #81). O trap segura a janela.
+trap {
+    Fail "Falha inesperada: $($_.Exception.Message)"
 }
 
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
@@ -21,7 +31,7 @@ $InstallDir = "C:\PesoHub\agent-local"
 $ServiceName = "PesoHubAgentLocal"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
-Write-Host "=== Instalador do PesoHub Agent Local ===" -ForegroundColor Cyan
+Write-Host "=== Instalador do PesoHub Agent Local (versao $InstallerVersion) ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Padrao de instalacao: UMA instancia deste agente por loja, rodando" -ForegroundColor Yellow
 Write-Host "numa maquina que esteja na MESMA REDE FISICA das balancas (mesmo" -ForegroundColor Yellow
@@ -92,7 +102,19 @@ $FirewallRule = "PesoHub Agent Local - descoberta de balancas"
 Remove-NetFirewallRule -DisplayName $FirewallRule -ErrorAction SilentlyContinue
 New-NetFirewallRule -DisplayName $FirewallRule -Direction Inbound -Action Allow -Protocol UDP `
     -LocalPort $DiscoveryPort -Program $exe -Profile Any | Out-Null
-Write-Host "Firewall liberado para UDP $DiscoveryPort (descoberta de balancas)."
+
+# Confere que a regra existe de fato, habilitada e na porta certa. Sem ela o
+# agente conecta e sincroniza normalmente mas nunca encontra balanca nenhuma -
+# falha silenciosa que so aparece dias depois. Melhor parar aqui.
+$regra = Get-NetFirewallRule -DisplayName $FirewallRule -ErrorAction SilentlyContinue |
+    Where-Object { $_.Enabled -eq "True" -and $_.Action -eq "Allow" }
+$porta = if ($regra) { ($regra | Get-NetFirewallPortFilter).LocalPort } else { $null }
+if (-not $regra -or $porta -notcontains $DiscoveryPort) {
+    Fail ("A regra de firewall '$FirewallRule' nao foi criada. Sem ela o agente nao encontra as balancas.`n" +
+          "Crie manualmente (PowerShell como Administrador):`n" +
+          "  New-NetFirewallRule -DisplayName `"$FirewallRule`" -Direction Inbound -Action Allow -Protocol UDP -LocalPort $DiscoveryPort -Program `"$exe`" -Profile Any")
+}
+Write-Host "Firewall liberado e conferido para UDP $DiscoveryPort (descoberta de balancas)." -ForegroundColor Green
 
 Write-Host "Iniciando servico..."
 & $nssm start $ServiceName | Out-Null
