@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 
 export interface AsaasCustomer {
@@ -32,8 +32,29 @@ export interface CreateAsaasSubscriptionInput {
   description?: string;
 }
 
+export interface AsaasPayment {
+  id: string;
+  status: string;
+  value: number;
+  dueDate?: string;
+  paymentDate?: string;
+  invoiceUrl?: string;
+  subscription?: string;
+  externalReference?: string;
+}
+
+export interface CreateAsaasPaymentInput {
+  customer: string;
+  billingType: "PIX" | "BOLETO" | "CREDIT_CARD" | "UNDEFINED";
+  value: number;
+  dueDate: string;
+  description?: string;
+  externalReference?: string;
+}
+
 @Injectable()
 export class AsaasService {
+  private readonly logger = new Logger(AsaasService.name);
   private readonly apiKey: string;
   private readonly baseUrl: string;
 
@@ -54,8 +75,28 @@ export class AsaasService {
     await this.request("DELETE", `/subscriptions/${asaasSubscriptionId}`);
   }
 
-  async getPayment(asaasPaymentId: string): Promise<Record<string, unknown>> {
-    return this.request("GET", `/payments/${asaasPaymentId}`);
+  async getPayment(asaasPaymentId: string): Promise<AsaasPayment> {
+    return this.request<AsaasPayment>("GET", `/payments/${asaasPaymentId}`);
+  }
+
+  /**
+   * Muda o valor da assinatura quando a rede ganha ou perde balanças.
+   * Sem `updatePendingPayments`, a mudança vale só para as próximas cobranças —
+   * uma cobrança já emitida não muda de valor no meio do caminho.
+   */
+  async updateSubscriptionValue(asaasSubscriptionId: string, value: number): Promise<AsaasSubscription> {
+    return this.request<AsaasSubscription>("PUT", `/subscriptions/${asaasSubscriptionId}`, {
+      value,
+      updatePendingPayments: false,
+    });
+  }
+
+  /**
+   * Cobrança avulsa: é o formato do contrato da fabricante, em que cada mês
+   * fecha com uma quantidade diferente de balanças.
+   */
+  async createPayment(input: CreateAsaasPaymentInput): Promise<AsaasPayment> {
+    return this.request<AsaasPayment>("POST", "/payments", input);
   }
 
   private async request<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
@@ -69,8 +110,14 @@ export class AsaasService {
     });
 
     if (!res.ok) {
+      // O corpo do erro do Asaas traz ids internos, a referência externa
+      // (empresa:rede) e dados da conta. Fica no log do servidor; para quem
+      // chamou vai só o essencial.
       const errorBody = await res.text();
-      throw new InternalServerErrorException(`Asaas API error (${res.status}): ${errorBody}`);
+      this.logger.error(`Asaas ${method} ${path} falhou (${res.status}): ${errorBody}`);
+      throw new InternalServerErrorException(
+        `Não foi possível concluir a operação no provedor de pagamento (${res.status}).`,
+      );
     }
 
     if (res.status === 204) {

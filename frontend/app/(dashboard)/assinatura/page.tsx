@@ -24,7 +24,6 @@ export default function AssinaturaPage() {
   const [notice, setNotice] = useState("");
 
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoAssinatura>("PIX");
-  const [valor, setValor] = useState("199.90");
   const [cpfCnpj, setCpfCnpj] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -53,7 +52,7 @@ export default function AssinaturaPage() {
     setSaving(true);
     setError("");
     try {
-      await billingApi.subscribe({ formaPagamento, valor: Number(valor), cpfCnpj: cpfCnpj || undefined });
+      await billingApi.subscribe({ formaPagamento, cpfCnpj });
       setNotice("Assinatura criada com sucesso.");
       await load();
     } catch (err) {
@@ -130,6 +129,15 @@ export default function AssinaturaPage() {
               {Number(assinatura.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
             </span>
           </div>
+          {/* De onde vem o valor — sem isso a conta parece arbitrária. */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-500">Como é calculado</span>
+            <span className="text-slate-600">
+              {Math.max(assinatura.quantidadeBalancas, assinatura.quantidadeMinima)} balança(s) ×{" "}
+              {Number(assinatura.valorUnitario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              {assinatura.quantidadeBalancas < assinatura.quantidadeMinima && " (mínimo do contrato)"}
+            </span>
+          </div>
           {assinatura.proximoVencimento && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Próximo vencimento</span>
@@ -198,17 +206,11 @@ export default function AssinaturaPage() {
             </div>
           </div>
 
-          <div>
-            <label htmlFor="assinatura-valor-mensal-r" className="block text-sm font-medium text-slate-700 mb-2">Valor mensal (R$)</label>
-            <input id="assinatura-valor-mensal-r"
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={valor}
-              onChange={(e) => setValor(e.target.value)}
-              required
-              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
-            />
+          {/* O valor não é digitado: sai das balanças cadastradas x o preço
+              acordado, calculado no backend (card #97). */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            A mensalidade é <strong className="text-slate-800">R$ 40,00 por balança cadastrada</strong>, com o mínimo de
+            uma balança. Cadastrou ou removeu balança, o valor das próximas cobranças acompanha.
           </div>
 
           <div>

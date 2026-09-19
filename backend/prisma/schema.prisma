@@ -71,6 +71,14 @@ enum FormaPagamentoAssinatura {
   CARTAO_CREDITO
 }
 
+enum StatusCompetencia {
+  APURADA
+  COBRADA
+  PAGA
+  VENCIDA
+  CANCELADA
+}
+
 enum StatusFatura {
   PENDENTE
   CONFIRMADA
@@ -122,7 +130,9 @@ model Cliente {
   textosGlobais         TextoGlobal[]
   teclasAcessoRapido    TeclaAcessoRapido[]
   specParametros        SpecParametro[]
-  assinatura            Assinatura?
+  /// Uma por rede de lojas atendida (card #97); a antiga, no nível da empresa, tem dominioRede nulo.
+  assinaturas           Assinatura[]
+  contrato              ContratoLicenciamento?
   configuracaoAvancadas ConfiguracaoAvancada[]
   integracaoVeltrix     IntegracaoVeltrix?
 }
@@ -197,19 +207,91 @@ model PerfilLojaAcesso {
   @@index([lojaId])
 }
 
+/// Assinatura SaaS de um cliente final. Desde o card #97 o cliente final é uma
+/// REDE de lojas (o domínio de e-mail do supermercado, ver card #96), não a
+/// Empresa: a fabricante tem contrato próprio em ContratoLicenciamento.
+///
+/// `dominioRede` nulo = assinatura antiga, no nível da empresa.
 model Assinatura {
   id                  String                   @id @default(cuid())
-  clienteId           String                   @unique
+  clienteId           String
   cliente             Cliente                  @relation(fields: [clienteId], references: [id])
+  dominioRede         String?
   asaasCustomerId     String
   asaasSubscriptionId String?                  @unique
   status              StatusAssinatura         @default(TRIAL)
   formaPagamento      FormaPagamentoAssinatura
+  /// Preço por balança acordado com esta rede, congelado na contratação.
+  valorUnitario       Decimal                  @default(0) @db.Decimal(10, 2)
+  quantidadeMinima    Int                      @default(1)
+  /// Balanças apuradas no último recálculo — a origem do `valor`.
+  quantidadeBalancas  Int                      @default(0)
+  /// Total cobrado. SEMPRE calculado no backend (nunca vem da tela).
   valor               Decimal                  @db.Decimal(10, 2)
   proximoVencimento   DateTime?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
   faturas             Fatura[]
+
+  @@unique([clienteId, dominioRede])
+}
+
+/// Contrato B2B da fabricante (Ramuza): licenciamento por balança, com mínimo
+/// mensal garantido. Não é assinatura SaaS — é apurado por competência.
+model ContratoLicenciamento {
+  id               String                @id @default(cuid())
+  clienteId        String                @unique
+  cliente          Cliente               @relation(fields: [clienteId], references: [id])
+  valorUnitario    Decimal               @db.Decimal(10, 2)
+  quantidadeMinima Int
+  /// Dia do mês em que vence a fatura da competência fechada.
+  diaVencimento    Int                   @default(10)
+  asaasCustomerId  String?
+  ativo            Boolean               @default(true)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  competencias     CompetenciaFaturada[]
+}
+
+/// Um mês fechado do contrato da fabricante. O valor unitário fica congelado
+/// aqui: mudar o preço do contrato não pode reescrever o que já foi faturado.
+model CompetenciaFaturada {
+  id                 String                @id @default(cuid())
+  contratoId         String
+  contrato           ContratoLicenciamento @relation(fields: [contratoId], references: [id])
+  /// Mês de referência no formato AAAA-MM.
+  competencia        String
+  quantidadeApurada  Int
+  /// A maior entre a apurada e o mínimo do contrato — é o que se cobra.
+  quantidadeFaturada Int
+  valorUnitario      Decimal               @db.Decimal(10, 2)
+  valorTotal         Decimal               @db.Decimal(10, 2)
+  status             StatusCompetencia     @default(APURADA)
+  asaasPaymentId     String?               @unique
+  linkPagamento      String?
+  fechadaEm          DateTime              @default(now())
+  dataVencimento     DateTime
+  dataPagamento      DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@unique([contratoId, competencia])
+  @@index([status])
+}
+
+/// Todo evento recebido do Asaas, para idempotência e auditoria (card #97).
+/// O mesmo evento chega mais de uma vez; `eventoId` único barra o reprocesso.
+model EventoAsaas {
+  id             String    @id @default(cuid())
+  eventoId       String    @unique
+  tipo           String
+  asaasPaymentId String?
+  payload        Json
+  recebidoEm     DateTime  @default(now())
+  processadoEm   DateTime?
+  resultado      String?
+
+  @@index([asaasPaymentId])
 }
 
 model Fatura {

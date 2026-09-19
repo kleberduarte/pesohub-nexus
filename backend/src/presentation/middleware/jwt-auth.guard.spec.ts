@@ -3,8 +3,8 @@ import { JwtAuthGuard } from "./jwt-auth.guard";
 import { AUTH_COOKIE_NAME } from "../routes/auth/auth-cookie";
 
 describe("JwtAuthGuard", () => {
-  function makeContext(cookies: Record<string, string>) {
-    const request: any = { cookies };
+  function makeContext(cookies: Record<string, string>, method = "POST") {
+    const request: any = { cookies, method };
     return {
       switchToHttp: () => ({ getRequest: () => request }),
       getHandler: () => ({}),
@@ -12,6 +12,18 @@ describe("JwtAuthGuard", () => {
     } as any;
   }
 
+  /**
+   * Card #97: a cobrança é da REDE do usuário (domínio do e-mail), e o atraso
+   * só trava escrita depois da carência.
+   */
+  function makePrisma(assinatura: unknown, dominioDaLoja: string | null = "davo.com.br") {
+    return {
+      loja: { findUnique: jest.fn(async () => ({ dominioEmail: dominioDaLoja })) },
+      assinatura: { findUnique: jest.fn(async () => assinatura) },
+    } as any;
+  }
+
+  const venceuHaDias = (dias: number) => new Date(Date.now() - dias * 24 * 3600_000);
 
   function makeScope(resultado?: { clienteId: string | null; lojaId: string | null }) {
     return {
@@ -46,32 +58,50 @@ describe("JwtAuthGuard", () => {
   it("aceita token válido e popula request.user", async () => {
     const payload = { sub: "user-1", clienteId: "cliente-a", role: "ADMIN" };
     const jwt = { verify: jest.fn(() => payload) };
-    const prisma = { assinatura: { findUnique: jest.fn(() => null) } };
-    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector(), makeSessions(), makeScope());
+    const guard = new JwtAuthGuard(jwt as any, makePrisma(null), makeReflector(), makeSessions(), makeScope());
     const context = makeContext({ [AUTH_COOKIE_NAME]: "valid" });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(context.switchToHttp().getRequest().user).toEqual(payload);
   });
 
-  it("bloqueia tenant com assinatura inadimplente", async () => {
-    const payload = { sub: "user-1", clienteId: "cliente-a", role: "ADMIN" };
-    const jwt = { verify: jest.fn(() => payload) };
-    const prisma = { assinatura: { findUnique: jest.fn(() => ({ status: "INADIMPLENTE" })) } };
-    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector(), makeSessions(), makeScope());
-    const context = makeContext({ [AUTH_COOKIE_NAME]: "valid" });
+  const inadimplente = (dias: number) => ({ status: "INADIMPLENTE", proximoVencimento: venceuHaDias(dias) });
 
-    await expect(guard.canActivate(context)).rejects.toThrow(ForbiddenException);
+  it("dentro da carência de 7 dias, a rede em atraso segue trabalhando", async () => {
+    const payload = { sub: "user-1", clienteId: "cliente-a", role: "OPERADOR", lojaId: "davo-1" };
+    const jwt = { verify: jest.fn(() => payload) };
+    const guard = new JwtAuthGuard(jwt as any, makePrisma(inadimplente(3)), makeReflector(), makeSessions(), makeScope());
+
+    await expect(guard.canActivate(makeContext({ [AUTH_COOKIE_NAME]: "valid" }))).resolves.toBe(true);
+  });
+
+  it("passada a carência, trava a escrita mas não a leitura", async () => {
+    const payload = { sub: "user-1", clienteId: "cliente-a", role: "OPERADOR", lojaId: "davo-1" };
+    const jwt = { verify: jest.fn(() => payload) };
+    const guard = () =>
+      new JwtAuthGuard(jwt as any, makePrisma(inadimplente(30)), makeReflector(), makeSessions(), makeScope());
+
+    await expect(guard().canActivate(makeContext({ [AUTH_COOKIE_NAME]: "valid" }, "POST"))).rejects.toThrow(
+      ForbiddenException,
+    );
+    // Consultar continua liberado: as balanças seguem pesando e a tela abre.
+    await expect(guard().canActivate(makeContext({ [AUTH_COOKIE_NAME]: "valid" }, "GET"))).resolves.toBe(true);
+  });
+
+  it("loja sem rede (equipe da fabricante) não é bloqueada — o contrato dela não trava ninguém", async () => {
+    const payload = { sub: "user-1", clienteId: "cliente-a", role: "ADMIN", lojaId: "matriz" };
+    const jwt = { verify: jest.fn(() => payload) };
+    const guard = new JwtAuthGuard(jwt as any, makePrisma(null, null), makeReflector(), makeSessions(), makeScope());
+
+    await expect(guard.canActivate(makeContext({ [AUTH_COOKIE_NAME]: "valid" }))).resolves.toBe(true);
   });
 
   it("permite SUPERADMIN mesmo com assinatura inadimplente", async () => {
-    const payload = { sub: "user-1", clienteId: "cliente-a", role: "SUPERADMIN" };
+    const payload = { sub: "user-1", clienteId: "cliente-a", role: "SUPERADMIN", lojaId: "davo-1" };
     const jwt = { verify: jest.fn(() => payload) };
-    const prisma = { assinatura: { findUnique: jest.fn(() => ({ status: "INADIMPLENTE" })) } };
-    const guard = new JwtAuthGuard(jwt as any, prisma as any, makeReflector(), makeSessions(), makeScope());
-    const context = makeContext({ [AUTH_COOKIE_NAME]: "valid" });
+    const guard = new JwtAuthGuard(jwt as any, makePrisma(inadimplente(30)), makeReflector(), makeSessions(), makeScope());
 
-    await expect(guard.canActivate(context)).resolves.toBe(true);
+    await expect(guard.canActivate(makeContext({ [AUTH_COOKIE_NAME]: "valid" }))).resolves.toBe(true);
   });
 });
 
@@ -140,7 +170,10 @@ describe("JwtAuthGuard e sessões revogadas", () => {
 
   it("renova a janela de inatividade a cada requisição autenticada", async () => {
     const jwt = { verify: jest.fn(() => payload) };
-    const prisma = { assinatura: { findUnique: jest.fn(() => null) } };
+    const prisma = {
+      loja: { findUnique: jest.fn(async () => ({ dominioEmail: "davo.com.br" })) },
+      assinatura: { findUnique: jest.fn(async () => null) },
+    };
     const sessions = makeSessions();
     const guard = new JwtAuthGuard(jwt as any, prisma as any, reflector as any, sessions as any, makeScope());
 

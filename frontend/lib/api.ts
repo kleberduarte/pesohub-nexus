@@ -412,22 +412,66 @@ export interface Assinatura {
   id: string;
   status: StatusAssinatura;
   formaPagamento: FormaPagamentoAssinatura;
+  /** Total mensal — calculado no backend a partir das balanças (card #97). */
   valor: string;
+  valorUnitario: string;
+  quantidadeBalancas: number;
+  quantidadeMinima: number;
+  dominioRede: string | null;
   proximoVencimento: string | null;
   faturas: Fatura[];
 }
 
+/** Sem `valor`: quem calcula é o backend, pelas balanças cadastradas. */
 export interface CreateAssinaturaInput {
   formaPagamento: FormaPagamentoAssinatura;
-  valor: number;
-  cpfCnpj?: string;
+  cpfCnpj: string;
+  dominioRede?: string;
+}
+
+export interface CompetenciaFaturada {
+  id: string;
+  competencia: string;
+  quantidadeApurada: number;
+  quantidadeFaturada: number;
+  valorUnitario: string;
+  valorTotal: string;
+  status: "APURADA" | "COBRADA" | "PAGA" | "VENCIDA" | "CANCELADA";
+  linkPagamento: string | null;
+  dataVencimento: string;
+  dataPagamento: string | null;
+}
+
+export interface ContratoLicenciamento {
+  id: string;
+  valorUnitario: string;
+  quantidadeMinima: number;
+  diaVencimento: number;
+  ativo: boolean;
+  competencias: CompetenciaFaturada[];
+  previa: {
+    competencia: string;
+    quantidadeApurada: number;
+    quantidadeFaturada: number;
+    valorUnitario: number;
+    valorTotal: number;
+    dataVencimento: string;
+  };
 }
 
 export const billingApi = {
-  status: () => request<Assinatura>("/billing/status"),
+  status: (rede?: string) => request<Assinatura>(`/billing/status${rede ? `?rede=${encodeURIComponent(rede)}` : ""}`),
   subscribe: (data: CreateAssinaturaInput) =>
     request<Assinatura>("/billing/subscribe", { method: "POST", body: JSON.stringify(data) }),
-  cancel: () => request<Assinatura>("/billing/cancel", { method: "POST" }),
+  cancel: (dominioRede?: string) =>
+    request<Assinatura>("/billing/cancel", { method: "POST", body: JSON.stringify({ dominioRede }) }),
+  assinaturas: () => request<Assinatura[]>("/billing/assinaturas"),
+  contrato: () => request<ContratoLicenciamento>("/billing/contrato"),
+  fecharCompetencia: (competencia: string, cpfCnpj?: string) =>
+    request<CompetenciaFaturada>("/billing/contrato/fechar", {
+      method: "POST",
+      body: JSON.stringify({ competencia, cpfCnpj }),
+    }),
 };
 
 // ---------- Agents (Agent Local) ----------

@@ -10,6 +10,10 @@ import {
   SessionRevocationService,
 } from "../../infrastructure/auth/session-revocation.service";
 import { SessionScopeService } from "../../infrastructure/auth/session-scope.service";
+import { bloqueiaPorAtraso } from "../../domain/services/precificacao";
+
+/** Dias de tolerância após o vencimento antes de travar a edição (card #97). */
+const DIAS_DE_CARENCIA = 7;
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -93,9 +97,38 @@ export class JwtAuthGuard implements CanActivate {
       return true;
     }
 
-    const assinatura = await this.prisma.assinatura.findUnique({ where: { clienteId: user.clienteId } });
-    if (assinatura && (assinatura.status === "INADIMPLENTE" || assinatura.status === "CANCELADA")) {
-      throw new ForbiddenException("Assinatura inadimplente ou cancelada. Regularize o pagamento para continuar.");
+    // Card #97: a cobrança é da REDE (supermercado), não da empresa. O
+    // contrato da fabricante fica de fora de propósito — bloquear a empresa
+    // derrubaria junto todos os supermercados que dependem dela.
+    //
+    // A rede sai da LOJA ativa da sessão, não do texto do e-mail: quem tem o
+    // e-mail é o usuário, e trocar o domínio de um usuário (ou limpar o da
+    // loja) apagaria o bloqueio de uma rede inadimplente inteira.
+    const loja = user.lojaId
+      ? await this.prisma.loja.findUnique({ where: { id: user.lojaId }, select: { dominioEmail: true } })
+      : null;
+    const dominio = loja?.dominioEmail?.toLowerCase() ?? null;
+    const assinatura = dominio
+      ? await this.prisma.assinatura.findUnique({
+          where: { clienteId_dominioRede: { clienteId: user.clienteId, dominioRede: dominio } },
+        })
+      : null;
+    if (!assinatura) return true;
+
+    const emAtraso = assinatura.status === "INADIMPLENTE" || assinatura.status === "CANCELADA";
+    if (!emAtraso) return true;
+
+    // Leitura continua liberada, e as balanças seguem pesando com o que já foi
+    // sincronizado: o que trava é mudar dados e mandar para o equipamento.
+    const metodo = (request.method ?? "GET").toUpperCase();
+    const somenteLeitura = metodo === "GET" || metodo === "HEAD" || metodo === "OPTIONS";
+    const bloqueado =
+      assinatura.status === "CANCELADA" ||
+      bloqueiaPorAtraso(assinatura.proximoVencimento, DIAS_DE_CARENCIA, new Date());
+    if (bloqueado && !somenteLeitura) {
+      throw new ForbiddenException(
+        "Assinatura em atraso. Regularize o pagamento para voltar a cadastrar e sincronizar.",
+      );
     }
 
     return true;
