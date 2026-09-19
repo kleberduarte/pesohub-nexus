@@ -10,8 +10,9 @@ import { JwtAuthGuard } from "./jwt-auth.guard";
  * lista e a conversa que vem junto.
  */
 const SUPERFICIE_PUBLICA_ESPERADA = [
-  // login: é onde a sessão nasce. esqueci-senha e redefinir-senha (card #90):
-  // quem as usa por definição não tem sessão; autenticam pelo token do link.
+  // login: é onde a sessão nasce. esqueci-senha, redefinir-senha (#90) e
+  // aceitar-convite (#91): quem as usa por definição não tem sessão;
+  // autenticam pelo token de uso único do link.
   "auth/auth.controller.ts",
   "billing/billing.controller.ts", // webhook do Asaas: autentica por token no header
   "clientes/clientes-public.controller.ts", // link de acesso: autentica pelo token da URL

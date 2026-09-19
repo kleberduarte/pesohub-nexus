@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { LockOpen, Pencil, Trash2 } from "lucide-react";
+import { LockOpen, MailX, Pencil, Send, Trash2 } from "lucide-react";
 import { usersApi, clientesApi, lojasApi, ApiError, getCurrentUser, type AppUser, type Loja, type UserRole,
   contaBloqueada,
 } from "../../../lib/api";
@@ -19,8 +19,13 @@ export default function UsuariosPage() {
   const [senha, setSenha] = useState("");
   const [role, setRole] = useState<UserRole>("OPERADOR");
   const [lojaId, setLojaId] = useState("");
+  // Convite por e-mail é o padrão (card #91): a pessoa escolhe a própria
+  // senha e ninguém mais a conhece. Senha definida aqui fica como alternativa
+  // para quem não tem e-mail confiável na loja.
+  const [convidar, setConvidar] = useState(true);
   const [creating, setCreating] = useState(false);
   const [formError, setFormError] = useState("");
+  const [aviso, setAviso] = useState("");
   const [lojas, setLojas] = useState<Loja[]>([]);
   const [lojasFalharam, setLojasFalharam] = useState(false);
 
@@ -63,6 +68,40 @@ export default function UsuariosPage() {
     }
   };
 
+  // Resultado do envio vira aviso na tela: um convite que não saiu precisa
+  // ser visto, senão o convidado fica esperando um e-mail que nunca chega.
+  const avisarEnvio = (emailDestino: string, enviado: boolean | undefined) => {
+    if (enviado === false) {
+      setError(`O convite para ${emailDestino} foi criado, mas o e-mail não pôde ser enviado. Use "Reenviar convite".`);
+    } else {
+      setAviso(`Convite enviado para ${emailDestino}. O link vale por 7 dias.`);
+    }
+  };
+
+  const handleReenviarConvite = async (user: AppUser) => {
+    setError("");
+    setAviso("");
+    try {
+      const r = await usersApi.reenviarConvite(user.id);
+      avisarEnvio(user.email, r.conviteEnviado);
+      loadUsers();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível reenviar o convite.");
+    }
+  };
+
+  const handleCancelarConvite = async (user: AppUser) => {
+    setError("");
+    setAviso("");
+    try {
+      await usersApi.cancelarConvite(user.id);
+      setAviso(`Convite de ${user.email} cancelado. O link enviado não funciona mais.`);
+      loadUsers();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível cancelar o convite.");
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     clientesApi
@@ -89,9 +128,17 @@ export default function UsuariosPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
+    setError("");
+    setAviso("");
     setCreating(true);
     try {
-      await usersApi.create({ email, senha, role, ...(restringeALoja && lojaId ? { lojaId } : {}) });
+      const criado = await usersApi.create({
+        email,
+        role,
+        ...(convidar ? { convidar: true } : { senha }),
+        ...(restringeALoja && lojaId ? { lojaId } : {}),
+      });
+      if (convidar) avisarEnvio(criado.email, criado.conviteEnviado);
       setEmail("");
       setSenha("");
       setRole("OPERADOR");
@@ -173,6 +220,9 @@ export default function UsuariosPage() {
       {error && (
         <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>
       )}
+      {aviso && (
+        <div className="p-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg">{aviso}</div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <h3 className="text-sm font-semibold text-slate-700 mb-4">Novo usuário</h3>
@@ -204,11 +254,13 @@ export default function UsuariosPage() {
             <label htmlFor="usuario-senha" className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
             <input id="usuario-senha"
               type="password"
-              required
+              required={!convidar}
+              disabled={convidar}
               minLength={6}
-              value={senha}
+              value={convidar ? "" : senha}
               onChange={(e) => setSenha(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              placeholder={convidar ? "Definida pelo convidado" : undefined}
+              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-400"
             />
           </div>
           <div>
@@ -253,8 +305,24 @@ export default function UsuariosPage() {
             disabled={creating}
             className="py-2 px-4 bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {creating ? "Cadastrando..." : "Cadastrar"}
+            {creating ? "Cadastrando..." : convidar ? "Convidar" : "Cadastrar"}
           </button>
+          <label className="sm:col-span-5 flex items-start gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={convidar}
+              onChange={(e) => setConvidar(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            />
+            <span>
+              Enviar convite por e-mail
+              <span className="block text-xs text-slate-500">
+                {convidar
+                  ? "A pessoa recebe um link e escolhe a própria senha. Ninguém mais fica sabendo dela."
+                  : "Você define a senha inicial e precisa repassá-la; a pessoa troca no primeiro acesso."}
+              </span>
+            </span>
+          </label>
         </form>
         {restringeALoja && !lojaId && (
           <p className="text-xs text-amber-600 mt-2">
@@ -303,7 +371,22 @@ export default function UsuariosPage() {
                             Bloqueada
                           </span>
                         )}
-                        {!contaBloqueada(user) && user.mustChangePassword && (
+                        {user.convite === "pendente" && (
+                          <span className="ml-2 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+                            Convite pendente
+                          </span>
+                        )}
+                        {user.convite === "expirado" && (
+                          <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            Convite expirado
+                          </span>
+                        )}
+                        {user.convite === "cancelado" && (
+                          <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                            Convite cancelado
+                          </span>
+                        )}
+                        {!contaBloqueada(user) && !user.convite && user.mustChangePassword && (
                           <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                             Senha provisória
                           </span>
@@ -331,6 +414,28 @@ export default function UsuariosPage() {
                               title={lacksPermission ? permissionTitle : "Desbloquear conta (sem trocar a senha)"}
                             >
                               <LockOpen className="w-4 h-4" />
+                            </button>
+                          )}
+                          {user.convite && (
+                            <button
+                              type="button"
+                              disabled={lacksPermission}
+                              onClick={() => void handleReenviarConvite(user)}
+                              className="p-2 text-sky-500 hover:text-sky-700 transition-colors rounded-lg hover:bg-sky-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={lacksPermission ? permissionTitle : "Reenviar convite (o link anterior deixa de valer)"}
+                            >
+                              <Send className="w-4 h-4" />
+                            </button>
+                          )}
+                          {user.convite === "pendente" && (
+                            <button
+                              type="button"
+                              disabled={lacksPermission}
+                              onClick={() => void handleCancelarConvite(user)}
+                              className="p-2 text-slate-400 hover:text-amber-600 transition-colors rounded-lg hover:bg-amber-50 disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={lacksPermission ? permissionTitle : "Cancelar convite (o link para de funcionar)"}
+                            >
+                              <MailX className="w-4 h-4" />
                             </button>
                           )}
                           <button

@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as bcrypt from "bcrypt";
+import { TipoTokenSenha } from "@prisma/client";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { EmailService } from "../../../infrastructure/email/email.service";
 import { SessionRevocationService } from "../../../infrastructure/auth/session-revocation.service";
+import { resolverUrlFrontend } from "../../../infrastructure/email/url-frontend";
 import {
   acrescentarAoHistorico,
   reusaSenhaAnterior,
@@ -11,7 +13,10 @@ import {
 } from "../../../domain/services/password-policy";
 import { gerarTokenSenha, hashTokenSenha, VALIDADE_REDEFINICAO_MINUTOS } from "../../../domain/services/token-senha";
 
-const LINK_INVALIDO = "Este link é inválido ou já expirou. Peça um novo em \"Esqueci minha senha\".";
+const LINK_INVALIDO: Record<TipoTokenSenha, string> = {
+  REDEFINICAO: "Este link é inválido ou já expirou. Peça um novo em \"Esqueci minha senha\".",
+  CONVITE: "Este convite é inválido, já foi usado ou expirou. Peça um novo convite ao administrador da sua empresa.",
+};
 
 /**
  * "Esqueci minha senha" (card #90): a pessoa recupera o acesso sozinha, sem
@@ -28,10 +33,7 @@ export class RedefinicaoSenhaService {
     private readonly sessions: SessionRevocationService,
     config: ConfigService,
   ) {
-    // FRONTEND_URL é o endereço que vai no link. Sem ela, o primeiro
-    // CORS_ORIGIN — que em produção já é o endereço do frontend.
-    const cors = (config.get<string>("CORS_ORIGIN") ?? "").split(",")[0]?.trim();
-    this.urlFrontend = (config.get<string>("FRONTEND_URL") || cors || "http://localhost:3001").replace(/\/+$/, "");
+    this.urlFrontend = resolverUrlFrontend(config);
   }
 
   /**
@@ -81,13 +83,29 @@ export class RedefinicaoSenhaService {
   }
 
   /** Aplica a nova senha. Devolve o usuário para a trilha de auditoria. */
-  async redefinir(token: string, novaSenha: string): Promise<{ id: string; email: string }> {
+  redefinir(token: string, novaSenha: string): Promise<{ id: string; email: string }> {
+    return this.definirSenhaPorLink(token, novaSenha, "REDEFINICAO");
+  }
+
+  /**
+   * Convidado define a própria senha (card #91). Até aqui a conta existe com
+   * uma senha aleatória que ninguém conhece — é este passo que a torna usável.
+   */
+  aceitarConvite(token: string, novaSenha: string): Promise<{ id: string; email: string }> {
+    return this.definirSenhaPorLink(token, novaSenha, "CONVITE");
+  }
+
+  private async definirSenhaPorLink(
+    token: string,
+    novaSenha: string,
+    tipo: TipoTokenSenha,
+  ): Promise<{ id: string; email: string }> {
     const registro = await this.prisma.tokenSenha.findUnique({
       where: { tokenHash: hashTokenSenha(token) },
       include: { user: true },
     });
-    if (!registro || registro.tipo !== "REDEFINICAO" || registro.usadoEm || registro.expiraEm <= new Date()) {
-      throw new BadRequestException(LINK_INVALIDO);
+    if (!registro || registro.tipo !== tipo || registro.usadoEm || registro.expiraEm <= new Date()) {
+      throw new BadRequestException(LINK_INVALIDO[tipo]);
     }
     const user = registro.user;
 
@@ -110,7 +128,13 @@ export class RedefinicaoSenhaService {
         where: { id: registro.id, usadoEm: null },
         data: { usadoEm: new Date() },
       });
-      if (queimado.count === 0) throw new BadRequestException(LINK_INVALIDO);
+      if (queimado.count === 0) throw new BadRequestException(LINK_INVALIDO[tipo]);
+      // Senha definida: qualquer outro link pendente do usuário (convite não
+      // aceito, pedido de redefinição anterior) perde o sentido.
+      await tx.tokenSenha.updateMany({
+        where: { userId: user.id, usadoEm: null },
+        data: { usadoEm: new Date() },
+      });
 
       await tx.user.update({
         where: { id: user.id },
@@ -130,7 +154,7 @@ export class RedefinicaoSenhaService {
 
     // Se o motivo do reset foi senha vazada, a sessão aberta com ela cai aqui.
     await this.sessions.encerrarSessaoAtiva(user.id, "senha_redefinida");
-    this.logger.log(`Senha redefinida por link para o usuário ${user.id}`);
+    this.logger.log(`Senha definida por link (${tipo}) para o usuário ${user.id}`);
     return { id: user.id, email: user.email };
   }
 }

@@ -16,7 +16,7 @@ describe("UsersController — desbloqueio de conta", () => {
       },
     };
     const auditLog = { record: jest.fn().mockResolvedValue(undefined) };
-    return { controller: new UsersController(prisma as any, auditLog as any), prisma, auditLog };
+    return { controller: new UsersController(prisma as any, auditLog as any, {} as any), prisma, auditLog };
   }
 
   const req = { user: { sub: "admin-1", role: "ADMIN", clienteId: "cliente-a" } } as any;

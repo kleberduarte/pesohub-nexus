@@ -18,3 +18,29 @@ export function hashTokenSenha(token: string): string {
 
 /** Validade do link de "esqueci minha senha". Curta: é credencial em e-mail. */
 export const VALIDADE_REDEFINICAO_MINUTOS = 60;
+
+/**
+ * Validade do convite. Mais longa que a redefinição: quem é convidado nem
+ * sempre abre o e-mail no mesmo dia, e o administrador pode reenviar.
+ */
+export const VALIDADE_CONVITE_DIAS = 7;
+
+export type StatusConvite = "pendente" | "expirado" | "cancelado";
+
+/**
+ * Situação do convite de um usuário, a partir do convite mais recente.
+ *
+ * Sem coluna nova: um convite aceito é queimado no mesmo instante em que a
+ * senha é gravada, então `passwordChangedAt >= usadoEm`. Queimado sem senha
+ * nova depois dele = cancelado pelo administrador. Nulo = conta normal.
+ */
+export function statusConvite(
+  convite: { usadoEm: Date | null; expiraEm: Date } | undefined,
+  passwordChangedAt: Date | null,
+  agora = new Date(),
+): StatusConvite | null {
+  if (!convite) return null;
+  if (!convite.usadoEm) return convite.expiraEm > agora ? "pendente" : "expirado";
+  if (passwordChangedAt && passwordChangedAt >= convite.usadoEm) return null;
+  return "cancelado";
+}

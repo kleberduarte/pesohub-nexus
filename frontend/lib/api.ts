@@ -231,6 +231,11 @@ export const authApi = {
   // "Esqueci minha senha" (card #90). Sem sessão: a pessoa não está logada.
   esqueciSenha: (email: string) =>
     request<{ ok: boolean }>("/auth/esqueci-senha", { method: "POST", body: JSON.stringify({ email }) }),
+  aceitarConvite: (token: string, novaSenha: string) =>
+    request<{ ok: boolean }>("/auth/aceitar-convite", {
+      method: "POST",
+      body: JSON.stringify({ token, novaSenha }),
+    }),
   redefinirSenha: (token: string, novaSenha: string) =>
     request<{ ok: boolean }>("/auth/redefinir-senha", {
       method: "POST",
@@ -930,6 +935,10 @@ export interface AppUser {
   lockedUntil?: string | null;
   /** Conta ainda com a senha definida por quem a criou. */
   mustChangePassword?: boolean;
+  /** Situação do convite por e-mail (card #91). Nulo = conta normal. */
+  convite?: "pendente" | "expirado" | "cancelado" | null;
+  /** Só na resposta de criação/reenvio: false se o e-mail não saiu. */
+  conviteEnviado?: boolean;
 }
 
 /** True se a conta está travada agora. */
@@ -939,7 +948,9 @@ export function contaBloqueada(user: AppUser): boolean {
 
 export interface CreateUserInput {
   email: string;
-  senha: string;
+  /** Omitida quando `convidar`: a pessoa define a própria senha pelo link. */
+  senha?: string;
+  convidar?: boolean;
   role: UserRole;
   lojaId?: string;
 }
@@ -960,6 +971,10 @@ export const usersApi = {
   // repassada que este fluxo veio eliminar.
   desbloquear: (id: string) =>
     request<{ desbloqueado: boolean }>(`/users/${id}/desbloquear`, { method: "POST" }),
+  reenviarConvite: (id: string) =>
+    request<{ convite: "pendente"; conviteEnviado: boolean }>(`/users/${id}/convite`, { method: "POST" }),
+  cancelarConvite: (id: string) =>
+    request<{ convite: "cancelado" }>(`/users/${id}/convite`, { method: "DELETE" }),
 };
 
 // ---------- Sync ----------

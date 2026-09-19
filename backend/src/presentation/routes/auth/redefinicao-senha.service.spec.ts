@@ -114,6 +114,29 @@ describe("RedefinicaoSenhaService.redefinir", () => {
     expect(sessions.encerrarSessaoAtiva).toHaveBeenCalledWith("u1", "senha_redefinida");
   });
 
+  it("sucesso queima também os outros links pendentes do usuário (ex.: convite não aceito)", async () => {
+    const { servico, prisma, tx, user } = await montar();
+    prisma.tokenSenha.findUnique.mockResolvedValue(registro(user));
+    await servico.redefinir("x".repeat(43), NOVA);
+    expect(tx.tokenSenha.updateMany).toHaveBeenCalledWith({
+      where: { userId: "u1", usadoEm: null },
+      data: { usadoEm: expect.any(Date) },
+    });
+  });
+
+  it("aceitarConvite recusa link de redefinição, e vice-versa", async () => {
+    const { servico, prisma, user } = await montar();
+    prisma.tokenSenha.findUnique.mockResolvedValue(registro(user));
+    await expect(servico.aceitarConvite("x".repeat(43), NOVA)).rejects.toThrow(/convite/i);
+  });
+
+  it("aceitarConvite com link de convite válido define a senha", async () => {
+    const { servico, prisma, tx, user } = await montar();
+    prisma.tokenSenha.findUnique.mockResolvedValue(registro(user, { tipo: "CONVITE" }));
+    await expect(servico.aceitarConvite("x".repeat(43), NOVA)).resolves.toEqual({ id: "u1", email: user.email });
+    expect(tx.user.update).toHaveBeenCalled();
+  });
+
   it("dois cliques simultâneos: o que perde a queima não troca a senha", async () => {
     const { servico, prisma, tx, sessions, user } = await montar({ queimou: 0 });
     prisma.tokenSenha.findUnique.mockResolvedValue(registro(user));

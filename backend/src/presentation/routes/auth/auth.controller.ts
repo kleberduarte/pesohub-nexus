@@ -93,6 +93,18 @@ export class AuthController {
     return { ok: true };
   }
 
+  /** Convidado define a própria senha pelo link do e-mail (card #91). */
+  @Public()
+  @Post("aceitar-convite")
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async aceitarConvite(@Body() dto: RedefinirSenhaDto, @Req() req: Request) {
+    const user = await this.redefinicao.aceitarConvite(dto.token, dto.novaSenha);
+    Object.assign(req, { user: { sub: user.id } });
+    await this.auditLog.record(req, "auth.aceitar_convite");
+    return { ok: true };
+  }
+
   @Post("trocar-senha")
   async trocarSenha(
     @Req() req: AuthenticatedRequest,
