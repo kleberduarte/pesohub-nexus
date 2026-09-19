@@ -9,7 +9,8 @@ import {
   PackageSearch,
   LogOut,
   CloudUpload,
-  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Bell,
   Building2,
   Users,
@@ -58,6 +59,8 @@ const adminNavigation = [
 
 const superadminNavigation = [{ name: "Empresas", href: "/empresas", icon: Building2 }];
 
+const SIDEBAR_STORAGE_KEY = "pesohub:sidebar-collapsed";
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -68,8 +71,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<DecodedUser | null>(null);
   const [lojas, setLojas] = useState<Loja[]>([]);
   const [switchingLoja, setSwitchingLoja] = useState(false);
+  // Menu lateral recolhido mostra só os ícones; a escolha fica gravada no
+  // navegador para não reabrir a cada recarregamento.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  const toggleSidebar = () => {
+    setSidebarCollapsed((atual) => {
+      const novo = !atual;
+      try {
+        localStorage.setItem(SIDEBAR_STORAGE_KEY, novo ? "1" : "0");
+      } catch {
+        // armazenamento bloqueado — o menu só não lembra a escolha
+      }
+      return novo;
+    });
+  };
 
   useLayoutEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1") setSidebarCollapsed(true);
+    } catch {
+      // armazenamento bloqueado — segue com o menu aberto
+    }
     const cached = readCachedBranding();
     if (cached) {
       setBranding(cached as ClienteBranding);
@@ -146,51 +169,75 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Renova a sessão enquanto há atividade e avisa antes de expirar. */}
       <SessionKeepAlive />
       {/* Sidebar */}
-      <div className="w-64 bg-brand-50 border-r border-brand-100 flex flex-col h-screen overflow-y-auto">
-        <div className="h-16 flex items-center px-6 border-b border-brand-100 shrink-0 sticky top-0 bg-brand-50 z-10">
+      <div
+        className={`${
+          sidebarCollapsed ? "w-20" : "w-64"
+        } shrink-0 bg-brand-50 border-r border-brand-100 flex flex-col h-screen overflow-y-auto overflow-x-hidden transition-[width] duration-200`}
+      >
+        <div
+          className={`h-16 flex items-center border-b border-brand-100 shrink-0 sticky top-0 bg-brand-50 z-10 ${
+            sidebarCollapsed ? "justify-center px-2" : "px-6"
+          }`}
+        >
           {brandingResolved ? (
             <>
               <img
                 src={branding?.logoUrl ?? "/pesohub-icon.png"}
                 alt={branding?.nome ?? "PesoHub"}
-                className="w-8 h-8 mr-2 object-contain"
+                className={`w-8 h-8 object-contain ${sidebarCollapsed ? "" : "mr-2"}`}
               />
-              <span className="text-2xl font-bold tracking-tight text-brand-950">
-                {(branding?.nome ?? "PesoHub").toLowerCase()}
-              </span>
+              {!sidebarCollapsed && (
+                <span className="text-2xl font-bold tracking-tight text-brand-950 truncate">
+                  {(branding?.nome ?? "PesoHub").toLowerCase()}
+                </span>
+              )}
             </>
           ) : (
-            <div className="w-8 h-8 mr-2" aria-hidden />
+            <div className="w-8 h-8" aria-hidden />
           )}
         </div>
 
-        <nav className="flex-1 px-4 py-6 space-y-1">
+        <nav className={`flex-1 py-6 space-y-1 ${sidebarCollapsed ? "px-3" : "px-4"}`}>
           {navigation.map((item) => {
             const isActive = pathname === item.href;
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                title={sidebarCollapsed ? item.name : undefined}
+                className={`flex items-center py-3 text-sm font-medium rounded-lg transition-colors ${
+                  sidebarCollapsed ? "justify-center px-0" : "px-4"
+                } ${
                   isActive
                     ? "bg-brand-600 text-white shadow-sm"
                     : "text-brand-900 hover:bg-brand-100/50 hover:text-brand-700"
                 }`}
               >
-                <item.icon className={`w-5 h-5 mr-3 ${isActive ? "text-white" : "text-brand-600"}`} />
-                {item.name}
+                <item.icon
+                  className={`w-5 h-5 shrink-0 ${sidebarCollapsed ? "" : "mr-3"} ${
+                    isActive ? "text-white" : "text-brand-600"
+                  }`}
+                />
+                {!sidebarCollapsed && <span className="truncate">{item.name}</span>}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-brand-100 shrink-0 sticky bottom-0 bg-brand-50">
+        <div
+          className={`border-t border-brand-100 shrink-0 sticky bottom-0 bg-brand-50 ${
+            sidebarCollapsed ? "p-3" : "p-4"
+          }`}
+        >
           <button
             onClick={handleLogout}
-            className="flex items-center px-4 py-3 text-sm font-medium text-brand-900 hover:text-brand-700 w-full rounded-lg hover:bg-brand-100/50 transition-colors"
+            title={sidebarCollapsed ? "Sair" : undefined}
+            className={`flex items-center py-3 text-sm font-medium text-brand-900 hover:text-brand-700 w-full rounded-lg hover:bg-brand-100/50 transition-colors ${
+              sidebarCollapsed ? "justify-center px-0" : "px-4"
+            }`}
           >
-            <LogOut className="w-5 h-5 mr-3 text-brand-600" />
-            Sair
+            <LogOut className={`w-5 h-5 shrink-0 text-brand-600 ${sidebarCollapsed ? "" : "mr-3"}`} />
+            {!sidebarCollapsed && "Sair"}
           </button>
         </div>
       </div>
@@ -200,10 +247,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Header */}
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shrink-0">
           <div className="flex items-center">
-            <button className="text-slate-500 hover:text-slate-700 md:hidden">
-              <Menu className="w-6 h-6" />
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label={sidebarCollapsed ? "Expandir menu lateral" : "Recolher menu lateral"}
+              title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+              className="p-2 -ml-2 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-slate-100 transition-colors"
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="w-6 h-6" />
+              ) : (
+                <PanelLeftClose className="w-6 h-6" />
+              )}
             </button>
-            <h1 className="text-xl font-semibold text-slate-800 ml-4 md:ml-0">
+            <h1 className="text-xl font-semibold text-slate-800 ml-3">
               {navigation.find((n) => n.href === pathname)?.name || "PesoHub"}
             </h1>
           </div>
