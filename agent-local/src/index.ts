@@ -9,7 +9,7 @@ import {
   ScaleSyncPayload,
   sendProductsToScale,
 } from "./scale-client";
-import { resolverMac } from "./mac-resolver";
+import { lerTabelaArp, resolverMac, varrerSubRede } from "./mac-resolver";
 
 const BACKEND_URL = process.env.AGENT_BACKEND_URL ?? "http://localhost:3000";
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
@@ -132,6 +132,76 @@ discoverySocket.bind(DISCOVERY_PORT, () => {
 });
 
 setInterval(reportDiscovered, 15_000);
+
+/**
+ * Localização pelo MAC, sem depender do anúncio UDP.
+ *
+ * O anúncio é descartado em silêncio pelo firewall do Windows quando o agente
+ * roda como serviço sem a regra de entrada — e aí o agente não reporta nada,
+ * e a correção de IP do backend (card #79) nunca começa. Foi o que deixou uma
+ * balança da loja cadastrada no IP antigo em 2026-09-19.
+ *
+ * O backend informa os MACs das balanças deste agente; procuramos cada um na
+ * tabela ARP e o reportamos como descoberto. Não abre sessão TCP: a balança
+ * atende uma por vez e não queremos disputar com a sincronização. Quando um MAC
+ * não está na tabela, pingamos a sub-rede (no máximo a cada VARREDURA_MS) para
+ * o SO preenchê-la.
+ */
+const LOCALIZACAO_MS = 45_000;
+const VARREDURA_MS = 5 * 60_000;
+let ultimaVarredura = 0;
+let localizando = false;
+let avisouSemBalanca = false;
+
+async function localizarPorMac() {
+  if (!socket.connected || localizando) return;
+  localizando = true;
+  try {
+    const resposta = (await socket.timeout(10_000).emitWithAck("devices:known")) as {
+      devices?: { mac: string; port: number }[];
+    };
+    const conhecidas = resposta?.devices ?? [];
+    if (conhecidas.length === 0) return;
+
+    let tabela = await lerTabelaArp();
+    const faltando = conhecidas.some((d) => !tabela.has(d.mac));
+    if (faltando && Date.now() - ultimaVarredura > VARREDURA_MS) {
+      ultimaVarredura = Date.now();
+      await varrerSubRede();
+      tabela = await lerTabelaArp();
+    }
+
+    let achadas = 0;
+    for (const { mac, port } of conhecidas) {
+      const ip = tabela.get(mac);
+      if (!ip) continue;
+      achadas++;
+      const anterior = discovered.get(ip);
+      if (!anterior) console.log(`[discovery] balança ${mac} localizada pelo MAC em ${ip}:${port}`);
+      discovered.set(ip, { ip, port: anterior?.port ?? port, mac, lastSeen: Date.now() });
+    }
+
+    if (achadas === 0 && !avisouSemBalanca) {
+      console.warn(
+        `[discovery] nenhuma das ${conhecidas.length} balança(s) cadastrada(s) foi encontrada na rede ` +
+          `(nem por anúncio UDP, nem pelo MAC). Confira se estão ligadas e na mesma rede deste computador.`,
+      );
+    }
+    avisouSemBalanca = achadas === 0;
+    if (achadas > 0) reportDiscovered();
+  } catch (err) {
+    console.warn(`[discovery] falha ao localizar balanças pelo MAC: ${(err as Error).message}`);
+  } finally {
+    localizando = false;
+  }
+}
+
+socket.on("connect", () => {
+  void localizarPorMac();
+});
+setInterval(() => {
+  void localizarPorMac();
+}, LOCALIZACAO_MS);
 
 /**
  * Relatório do mapa de slots de etiqueta (card #55).

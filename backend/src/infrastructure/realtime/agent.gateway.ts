@@ -212,6 +212,25 @@ export class AgentGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.redisPub.publish(`agent:result:${correlationId}`, JSON.stringify(result));
   }
 
+  /**
+   * MACs das balanças deste agent, para ele procurá-las na tabela ARP da loja
+   * mesmo quando o anúncio UDP não chega (firewall do Windows descarta calado).
+   * Sem isso a correção de IP do card #79 nunca começa: o agente não reporta
+   * nada e a reconciliação não tem o que reconciliar. O retorno vira o ack.
+   */
+  @SubscribeMessage("devices:known")
+  async onDevicesKnown(
+    @ConnectedSocket() socket: Socket,
+  ): Promise<{ devices: { mac: string; port: number }[] }> {
+    const agentId = socket.data?.agentId as string | undefined;
+    if (!agentId) return { devices: [] };
+    const devices = await this.prisma.device.findMany({
+      where: { agentId, mac: { not: null } },
+      select: { mac: true, porta: true },
+    });
+    return { devices: devices.map((d) => ({ mac: d.mac as string, port: d.porta })) };
+  }
+
   @SubscribeMessage("devices:discovered")
   async onDevicesDiscovered(
     @ConnectedSocket() socket: Socket,
