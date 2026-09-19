@@ -39,7 +39,11 @@ beforeEach(() => {
   (usersApi.create as jest.Mock).mockResolvedValue({});
 });
 
+// O formulário fica num painel aberto por "Novo usuário"; convite é o padrão
+// (card #91), então estes testes escolhem "Definir senha" explicitamente.
 const preencherNovoUsuario = async (email: string, senha: string) => {
+  await userEvent.click(screen.getByRole("button", { name: /novo usuário/i }));
+  await userEvent.click(screen.getByRole("button", { name: /definir senha/i }));
   await userEvent.type(screen.getByLabelText(/e-mail/i), email);
   await userEvent.type(screen.getByLabelText(/^senha$/i), senha);
 };
