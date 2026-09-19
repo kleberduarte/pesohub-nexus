@@ -8,13 +8,14 @@ import { getRedisUrl } from "../queue/redis-connection";
  * uma informação de segurança, não um detalhe de implementação: é assim que a
  * pessoa descobre que alguém está usando a conta dela.
  */
-export type MotivoRevogacao = "logout" | "outro_dispositivo" | "inatividade" | "troca_de_escopo";
+export type MotivoRevogacao = "logout" | "outro_dispositivo" | "inatividade" | "troca_de_escopo" | "senha_redefinida";
 
 export const MENSAGEM_POR_MOTIVO: Record<MotivoRevogacao, string> = {
   logout: "Sessão encerrada. Faça login novamente.",
   outro_dispositivo: "Sua sessão foi encerrada porque sua conta foi acessada em outro dispositivo.",
   inatividade: "Sua sessão expirou por inatividade. Faça login novamente.",
   troca_de_escopo: "Sessão encerrada. Faça login novamente.",
+  senha_redefinida: "Sua senha foi redefinida. Entre com a nova senha.",
 };
 
 /**
@@ -64,6 +65,9 @@ export class SessionRevocationService implements OnModuleDestroy {
    */
   static readonly TOLERANCIA_ROTACAO_SEGUNDOS = 30;
 
+  /** Teto de vida de um access token (TOKEN_TTL = 15m), com folga. */
+  static readonly VIDA_MAXIMA_TOKEN_SEGUNDOS = 20 * 60;
+
   private keyRevogada(jti: string): string {
     return `session:revoked:${jti}`;
   }
@@ -99,6 +103,26 @@ export class SessionRevocationService implements OnModuleDestroy {
       // Um Redis fora do ar não pode impedir o usuário de sair; o cookie é
       // apagado de qualquer forma e o token morre sozinho.
       this.logger.error(`Falha ao revogar sessão ${jti}: ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Encerra a sessão ativa de um usuário sem conhecer o `jti` dela — caso da
+   * redefinição de senha por link, em que quem pede não está logado (card #90).
+   * Sem isso, uma sessão aberta com a senha antiga (a que motivou o reset, se
+   * vazou) continuaria valendo até expirar.
+   *
+   * O `exp` real do token não está à mão; a entrada de revogação vive pelo
+   * teto de vida de um access token, o que cobre qualquer token ainda válido.
+   */
+  async encerrarSessaoAtiva(userId: string, motivo: MotivoRevogacao): Promise<void> {
+    try {
+      const jti = await this.redis.get(this.keyAtiva(userId));
+      if (!jti) return;
+      await this.revoke(jti, Math.ceil(Date.now() / 1000) + SessionRevocationService.VIDA_MAXIMA_TOKEN_SEGUNDOS, motivo);
+      await this.redis.del(this.keyAtiva(userId));
+    } catch (err) {
+      this.logger.error(`Falha ao encerrar a sessão ativa de ${userId}: ${(err as Error).message}`);
     }
   }
 

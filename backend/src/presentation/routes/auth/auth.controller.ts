@@ -1,13 +1,15 @@
-import { Body, Controller, Post, Get, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Post, Get, HttpCode, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { Request, Response } from "express";
 import { AuthService } from "./auth.service";
+import { RedefinicaoSenhaService } from "./redefinicao-senha.service";
 import { setAuthCookie, clearAuthCookie } from "./auth-cookie";
 import { LoginDto } from "../../../application/dtos/login.dto";
 import { SwitchCompanyDto } from "../../../application/dtos/switch-company.dto";
 import { SwitchLojaDto } from "../../../application/dtos/switch-loja.dto";
 import { TrocarSenhaDto } from "../../../application/dtos/trocar-senha.dto";
+import { EsqueciSenhaDto, RedefinirSenhaDto } from "../../../application/dtos/redefinir-senha.dto";
 import { Public } from "../../middleware/public.decorator";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
@@ -32,6 +34,7 @@ type AuthenticatedRequest = Request & {
 export class AuthController {
   constructor(
     private readonly auth: AuthService,
+    private readonly redefinicao: RedefinicaoSenhaService,
     private readonly sessions: SessionRevocationService,
     private readonly auditLog: AuditLogService,
   ) {}
@@ -60,6 +63,34 @@ export class AuthController {
     const { accessToken, user } = await this.auth.refresh(req.user);
     setAuthCookie(res, accessToken);
     return { user };
+  }
+
+  /**
+   * Resposta idêntica exista o e-mail ou não — do contrário a rota vira um
+   * enumerador de contas. Throttle apertado: cada chamada pode disparar um
+   * e-mail, e sem limite ela vira ferramenta para encher a caixa de alguém.
+   */
+  @Public()
+  @Post("esqueci-senha")
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60000, limit: 3 } })
+  async esqueciSenha(@Body() dto: EsqueciSenhaDto, @Req() req: Request) {
+    await this.redefinicao.solicitar(dto.email);
+    await this.auditLog.record(req, "auth.esqueci_senha");
+    return { ok: true };
+  }
+
+  @Public()
+  @Post("redefinir-senha")
+  @HttpCode(200)
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async redefinirSenha(@Body() dto: RedefinirSenhaDto, @Req() req: Request) {
+    const user = await this.redefinicao.redefinir(dto.token, dto.novaSenha);
+    // Rota pública: o guard não anexou usuário. Anexa o dono do link para a
+    // trilha de auditoria atribuir a troca à pessoa certa.
+    Object.assign(req, { user: { sub: user.id } });
+    await this.auditLog.record(req, "auth.redefinir_senha");
+    return { ok: true };
   }
 
   @Post("trocar-senha")

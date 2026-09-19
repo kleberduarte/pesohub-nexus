@@ -228,6 +228,14 @@ export const authApi = {
     setCurrentUser(data.user);
     return data;
   },
+  // "Esqueci minha senha" (card #90). Sem sessão: a pessoa não está logada.
+  esqueciSenha: (email: string) =>
+    request<{ ok: boolean }>("/auth/esqueci-senha", { method: "POST", body: JSON.stringify({ email }) }),
+  redefinirSenha: (token: string, novaSenha: string) =>
+    request<{ ok: boolean }>("/auth/redefinir-senha", {
+      method: "POST",
+      body: JSON.stringify({ token, novaSenha }),
+    }),
   // Os dois switches gravam o escopo só desta aba. O backend não reemite o
   // cookie de propósito — se reemitisse, a troca vazaria para as outras abas.
   switchCompany: async (clienteId: string) => {

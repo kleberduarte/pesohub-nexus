@@ -674,6 +674,8 @@ model User {
   /// Hashes das senhas anteriores, para vedar reuso. Guarda as últimas 5.
   senhasAnteriores    String[]  @default([])
 
+  tokensSenha TokenSenha[]
+
   @@index([clienteId])
   @@index([perfilId])
 }
@@ -712,4 +714,29 @@ model IntegracaoVeltrix {
   ultimoErro          String?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+}
+
+/// Finalidade de um TokenSenha. Mesmo mecanismo, fluxos diferentes: quem
+/// esqueceu a senha (card #90) e quem foi convidado e ainda não tem uma (#91).
+enum TipoTokenSenha {
+  REDEFINICAO
+  CONVITE
+}
+
+/// Link de uso único para definir senha, enviado por e-mail.
+///
+/// Só o hash SHA-256 do token é gravado: quem ler o banco (backup, réplica,
+/// log de query) não consegue usar um link pendente. Queimado no primeiro uso
+/// e com expiração curta.
+model TokenSenha {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tipo      TipoTokenSenha
+  tokenHash String         @unique
+  expiraEm  DateTime
+  usadoEm   DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, tipo])
 }

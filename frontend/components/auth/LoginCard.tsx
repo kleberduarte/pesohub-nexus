@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Mail, Lock, Eye, EyeOff, Scale } from "lucide-react";
 import { login, ApiError, takeSessionEndReason, type ClienteBranding } from "../../lib/api";
 
@@ -221,6 +222,11 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
+                </div>
+                <div className="mt-2 text-right">
+                  <Link href="/esqueci-senha" className="text-sm font-medium text-brand-600 hover:text-brand-700">
+                    Esqueci minha senha
+                  </Link>
                 </div>
               </div>
 
