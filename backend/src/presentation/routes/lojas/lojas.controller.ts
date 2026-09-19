@@ -1,10 +1,25 @@
-import { Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { CreateLojaDto } from "../../../application/dtos/create-loja.dto";
 import { UpdateLojaDto } from "../../../application/dtos/update-loja.dto";
 import { RolesGuard } from "../../middleware/roles.guard";
+import { normalizarDominio } from "../../../domain/services/acesso-por-dominio";
+import { revogarUnidadeDaRede, sincronizarPerfilDaRede } from "./perfil-da-rede";
 import { Roles } from "../../middleware/roles.decorator";
 
 @ApiTags("lojas")
@@ -20,6 +35,10 @@ export class LojasController {
     // enxerga as Lojas liberadas pra ele — sem isso, o dropdown "trocar de
     // loja" e as demais telas expunham todas as Lojas do Cliente pra
     // qualquer um, mesmo alguém cadastrado só pra operar uma Loja específica.
+    // Administrador da loja sem perfil de rede: nenhuma loja, nunca todas (card #96).
+    if (!perfilId && (req as unknown as { user: { role?: string } }).user.role === "ADMIN_REDE") {
+      return [];
+    }
     if (perfilId) {
       return this.prisma.loja.findMany({
         where: { clienteId, perfilAcessos: { some: { perfilId } } },
@@ -37,20 +56,36 @@ export class LojasController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles("ADMIN", "SUPERADMIN")
-  create(@Body() dto: CreateLojaDto, @Req() req: Request) {
-    return this.prisma.loja.create({ data: { ...dto, clienteId: this.clienteId(req) } });
+  async create(@Body() dto: CreateLojaDto, @Req() req: Request) {
+    const clienteId = this.clienteId(req);
+    const dominioEmail = await this.validarDominioEmail(clienteId, dto.dominioEmail);
+    const loja = await this.prisma.loja.create({ data: { ...dto, dominioEmail, clienteId } });
+    // Unidade nova de uma rede entra no acesso dos funcionários dela (card #96).
+    await sincronizarPerfilDaRede(this.prisma, clienteId, dominioEmail);
+    return loja;
   }
 
   @Patch(":id")
   @UseGuards(RolesGuard)
   @Roles("ADMIN", "SUPERADMIN")
   async update(@Param("id") id: string, @Body() dto: UpdateLojaDto, @Req() req: Request) {
-    const result = await this.prisma.loja.updateMany({
-      where: { id, clienteId: this.clienteId(req) },
-      data: dto,
-    });
-    if (result.count === 0) {
+    const clienteId = this.clienteId(req);
+    const anterior = await this.prisma.loja.findFirst({ where: { id, clienteId }, select: { dominioEmail: true } });
+    if (!anterior) {
       return null;
+    }
+    const data =
+      dto.dominioEmail === undefined
+        ? dto
+        : { ...dto, dominioEmail: await this.validarDominioEmail(clienteId, dto.dominioEmail) };
+    await this.prisma.loja.updateMany({ where: { id, clienteId }, data });
+
+    // Trocou de domínio: sai do acesso da rede antiga e entra no da nova, na
+    // hora — sem isso o funcionário do supermercado antigo seguiria vendo a loja.
+    if (dto.dominioEmail !== undefined && data.dominioEmail !== anterior.dominioEmail) {
+      await sincronizarPerfilDaRede(this.prisma, clienteId, anterior.dominioEmail);
+      await revogarUnidadeDaRede(this.prisma, clienteId, anterior.dominioEmail, id);
+      await sincronizarPerfilDaRede(this.prisma, clienteId, data.dominioEmail);
     }
     return this.prisma.loja.findFirst({ where: { id } });
   }
@@ -99,6 +134,23 @@ export class LojasController {
       this.prisma.integracaoVeltrix.deleteMany({ where: { lojaId: id } }),
       this.prisma.loja.delete({ where: { id } }),
     ]);
+  }
+
+  /**
+   * Domínio de e-mail da loja: vazio vira null, e não pode ser o domínio da
+   * própria empresa — isso transformaria toda a equipe da empresa em
+   * "funcionário de loja" presa a uma rede.
+   */
+  private async validarDominioEmail(clienteId: string, bruto: string | undefined): Promise<string | null> {
+    const dominio = normalizarDominio(bruto);
+    if (!dominio) return null;
+    const empresa = await this.prisma.cliente.findUnique({ where: { id: clienteId }, select: { dominio: true } });
+    if (normalizarDominio(empresa?.dominio) === dominio) {
+      throw new BadRequestException(
+        `@${dominio} é o domínio da própria empresa. Na loja, use o domínio do supermercado.`,
+      );
+    }
+    return dominio;
   }
 
   private clienteId(req: Request): string {

@@ -176,7 +176,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 // ---------- Auth ----------
-export type UserRole = "SUPERADMIN" | "ADMIN" | "OPERADOR" | "VIEWER";
+/** ADMIN_REDE: administrador de um supermercado cliente (card #96) — gere só a própria equipe. */
+export type UserRole = "SUPERADMIN" | "ADMIN" | "ADMIN_REDE" | "OPERADOR" | "VIEWER";
 
 export interface DecodedUser {
   sub: string;
@@ -275,6 +276,8 @@ export interface Loja {
   responsavel?: string | null;
   email?: string | null;
   cnpj?: string | null;
+  /** Domínio de e-mail dos funcionários deste supermercado (card #96). */
+  dominioEmail?: string | null;
   ativo: boolean;
 }
 
@@ -286,6 +289,7 @@ export interface CreateLojaInput {
   responsavel?: string;
   email?: string;
   cnpj?: string;
+  dominioEmail?: string;
 }
 
 export const lojasApi = {

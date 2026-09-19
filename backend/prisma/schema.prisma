@@ -34,6 +34,9 @@ enum SyncJobItemAction {
 enum UserRole {
   SUPERADMIN
   ADMIN
+  /// Administrador de uma rede de lojas (supermercado cliente, card #96):
+  /// gerencia só os usuários do próprio domínio e só enxerga a própria rede.
+  ADMIN_REDE
   OPERADOR
   VIEWER
 }
@@ -138,6 +141,9 @@ model Loja {
   responsavel          String?
   email                String?
   cnpj                 String?
+  /// Domínio de e-mail dos funcionários deste supermercado (card #96). Lojas
+  /// com o mesmo domínio formam uma rede; quem tem esse e-mail só enxerga ela.
+  dominioEmail         String?
   ativo                Boolean               @default(true)
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
@@ -162,6 +168,7 @@ model Loja {
   integracaoVeltrix    IntegracaoVeltrix?
 
   @@index([clienteId])
+  @@index([clienteId, dominioEmail])
 }
 
 /// Um perfil de acesso configurável (ex.: "Gerente Regional", "Operador Açaí")
@@ -648,7 +655,9 @@ model User {
   /// Perfil configurável que define a quais Lojas este usuário tem acesso
   /// (dentro do Cliente). Nulo para SUPERADMIN, que não precisa de escopo de loja.
   perfilId  String?
-  perfil    Perfil?  @relation(fields: [perfilId], references: [id])
+  /// Restrict: apagar um perfil em uso deixaria o usuário sem perfil — e sem
+  /// perfil se enxerga todas as lojas (card #96).
+  perfil    Perfil?  @relation(fields: [perfilId], references: [id], onDelete: Restrict)
   email     String   @unique
   senha     String
   role      UserRole @default(OPERADOR)

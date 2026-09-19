@@ -152,10 +152,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const isAdmin = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+  // Administrador da loja (card #96) gere só a equipe do supermercado: nada de
+  // Lojas nem Assinatura, que são da empresa.
+  const isAdminRede = user?.role === "ADMIN_REDE";
   const navigation = [
     ...(user?.role === "SUPERADMIN" ? superadminNavigation : []),
     ...baseNavigation,
     ...(isAdmin ? adminNavigation : []),
+    ...(isAdminRede ? adminNavigation.filter((n) => n.href === "/usuarios") : []),
   ];
 
   const handleLogout = () => {

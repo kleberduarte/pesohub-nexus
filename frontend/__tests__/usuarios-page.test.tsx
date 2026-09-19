@@ -9,11 +9,17 @@ import { clientesApi, lojasApi, usersApi } from "../lib/api";
  * O foco é o que decide ACESSO. Errar aqui não quebra a tela: dá acesso demais
  * ou de menos a uma pessoa, silenciosamente.
  */
+let mockUsuarioAtual: { clienteId: string; role: string; email: string } = {
+  clienteId: "c-1",
+  role: "ADMIN",
+  email: "admin@ramuza.com.br",
+};
+
 jest.mock("../lib/api", () => ({
   usersApi: { list: jest.fn(), create: jest.fn(), update: jest.fn(), remove: jest.fn(), desbloquear: jest.fn() },
   lojasApi: { list: jest.fn() },
   clientesApi: { getMe: jest.fn() },
-  getCurrentUser: () => ({ clienteId: "c-1", role: "ADMIN" }),
+  getCurrentUser: () => mockUsuarioAtual,
   // Reproduz a lógica real em vez de devolver um valor fixo: um `false`
   // constante esconderia o teste de desbloqueio, que depende de a conta
   // aparecer como bloqueada.
@@ -33,6 +39,7 @@ const usuario = (over = {}) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockUsuarioAtual = { clienteId: "c-1", role: "ADMIN", email: "admin@ramuza.com.br" };
   (usersApi.list as jest.Mock).mockResolvedValue([usuario()]);
   (lojasApi.list as jest.Mock).mockResolvedValue([{ id: "loja-1", nome: "Loja Matriz" }]);
   (clientesApi.getMe as jest.Mock).mockResolvedValue({ isDefault: false, dominio: "ramuza.com.br" });
@@ -82,6 +89,43 @@ describe("Usuários — escopo de acesso por papel", () => {
 
     await waitFor(() => expect(usersApi.create).toHaveBeenCalled());
     expect((usersApi.create as jest.Mock).mock.calls[0][0]).not.toHaveProperty("lojaId");
+  });
+});
+
+describe("Usuários — funcionário de supermercado (card #96)", () => {
+  // Um e-mail @davo.com.br nunca pode virar Administrador da empresa nem ver
+  // loja de outra rede. O backend recusa; a tela nem oferece.
+  it("e-mail de rede só oferece perfis de loja e só as lojas da rede", async () => {
+    (lojasApi.list as jest.Mock).mockResolvedValue([
+      { id: "davo-1", nome: "Davo Mooca", dominioEmail: "davo.com.br" },
+      { id: "davo-2", nome: "Davo Tatuapé", dominioEmail: "davo.com.br" },
+      { id: "avo-1", nome: "Rede Avó Centro", dominioEmail: "redeavo.com.br" },
+    ]);
+    render(<UsuariosPage />);
+    await screen.findByText("operador@ramuza.com.br");
+
+    await userEvent.click(screen.getByRole("button", { name: /novo usuário/i }));
+    await userEvent.type(screen.getByLabelText(/e-mail/i), "joao@davo.com.br");
+
+    const perfis = [...(screen.getAllByLabelText(/perfil/i)[0] as HTMLSelectElement).options].map((o) => o.value);
+    expect(perfis).toEqual(["ADMIN_REDE", "OPERADOR", "VIEWER"]);
+    const lojas = [...(screen.getByLabelText(/loja/i) as HTMLSelectElement).options].map((o) => o.value);
+    expect(lojas).toEqual(["", "davo-1", "davo-2"]);
+    expect(screen.getByText(/as 2 lojas dessa rede/)).toBeInTheDocument();
+  });
+});
+
+describe("Usuários — Administrador da loja (card #96)", () => {
+  it("abre a tela e só oferece perfis de loja, sem Administrador da empresa", async () => {
+    mockUsuarioAtual = { clienteId: "c-1", role: "ADMIN_REDE", email: "gerente@davo.com.br" };
+    (lojasApi.list as jest.Mock).mockResolvedValue([{ id: "davo-1", nome: "Davo Mooca", dominioEmail: "davo.com.br" }]);
+    render(<UsuariosPage />);
+    await screen.findByText("operador@ramuza.com.br");
+
+    await userEvent.click(screen.getByRole("button", { name: /novo usuário/i }));
+    expect(screen.getByText("Precisa ser um e-mail @davo.com.br")).toBeInTheDocument();
+    const perfis = [...(screen.getAllByLabelText(/perfil/i)[0] as HTMLSelectElement).options].map((o) => o.value);
+    expect(perfis).not.toContain("ADMIN");
   });
 });
 

@@ -31,6 +31,11 @@ const ROLE_INFO: Record<UserRole, { nome: string; descricao: string; selo: strin
     descricao: "Acesso total, a todas as empresas.",
     selo: "bg-violet-50 text-violet-700 ring-violet-200",
   },
+  ADMIN_REDE: {
+    nome: "Administrador da loja",
+    descricao: "Cadastra a equipe do supermercado; vê só as lojas da própria rede.",
+    selo: "bg-amber-50 text-amber-700 ring-amber-200",
+  },
   ADMIN: {
     nome: "Administrador",
     descricao: "Gerencia usuários, lojas e assinatura, em todas as lojas.",
@@ -104,8 +109,15 @@ export default function UsuariosPage() {
   // Domínio da empresa: mostrado no formulário para a pessoa saber a regra
   // antes de digitar, em vez de descobrir pelo erro depois de submeter.
   const [dominioEmpresa, setDominioEmpresa] = useState<string | null>(null);
-  const roleOptions =
-    currentUser?.role === "SUPERADMIN" && isDefaultCliente ? (["SUPERADMIN", ...ROLE_OPTIONS] as UserRole[]) : ROLE_OPTIONS;
+  // Administrador da loja (card #96) só cadastra a equipe do próprio
+  // supermercado, e nunca acima dele mesmo.
+  const souAdminRede = currentUser?.role === "ADMIN_REDE";
+  const minhaRede = souAdminRede ? (currentUser?.email.split("@")[1]?.toLowerCase() ?? null) : null;
+  const roleOptions: UserRole[] = souAdminRede
+    ? ["ADMIN_REDE", "OPERADOR", "VIEWER"]
+    : currentUser?.role === "SUPERADMIN" && isDefaultCliente
+      ? ["SUPERADMIN", ...ROLE_OPTIONS]
+      : ROLE_OPTIONS;
 
   const loadUsers = () => {
     setLoading(true);
@@ -180,6 +192,31 @@ export default function UsuariosPage() {
       // consigo ver os produtos" (card #67).
       .catch(() => setLojasFalharam(true));
   }, []);
+
+  // Card #96: lojas podem declarar o domínio de e-mail do supermercado. Um
+  // e-mail desses é funcionário de loja: só Operador/Visualizador, e só vê as
+  // lojas daquela rede. O backend impõe; aqui a tela só não oferece o que ele
+  // vai recusar.
+  const dominioDigitado = email.split("@")[1]?.trim().toLowerCase() ?? "";
+  const lojasDaRede = dominioDigitado ? lojas.filter((l) => l.dominioEmail?.toLowerCase() === dominioDigitado) : [];
+  const ehRede = lojasDaRede.length > 0;
+  const dominiosDeRede = [...new Set(lojas.map((l) => l.dominioEmail).filter((d): d is string => !!d))];
+  // Administrador da loja só existe para e-mail de rede; e e-mail de rede
+  // nunca é Administrador da empresa.
+  const rolesDeRede: UserRole[] = ["ADMIN_REDE", "OPERADOR", "VIEWER"];
+  const rolesDoFormulario = ehRede ? rolesDeRede : roleOptions.filter((r) => r !== "ADMIN_REDE");
+  const lojasDoFormulario = ehRede ? lojasDaRede : lojas;
+  const ehEmailDeRede = (e: string) => {
+    const d = e.split("@")[1]?.toLowerCase();
+    return !!d && lojas.some((l) => l.dominioEmail?.toLowerCase() === d);
+  };
+
+  useEffect(() => {
+    if (ehRede && !ROLES_RESTRINGIVEIS_A_LOJA.includes(role) && role !== "ADMIN_REDE") setRole("OPERADOR");
+    if (!ehRede && role === "ADMIN_REDE") setRole("OPERADOR");
+    if (ehRede && lojaId && !lojasDaRede.some((l) => l.id === lojaId)) setLojaId("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ehRede, dominioDigitado]);
 
   const restringeALoja = ROLES_RESTRINGIVEIS_A_LOJA.includes(role);
 
@@ -273,7 +310,7 @@ export default function UsuariosPage() {
   // Gestão de usuários é exclusiva de quem administra a empresa. O link some
   // do menu pra outros perfis, mas alguém pode digitar a URL direto — aqui é
   // a segunda camada (a real é o backend, que já recusa list/create/etc.).
-  if (currentUser && currentUser.role !== "SUPERADMIN" && currentUser.role !== "ADMIN") {
+  if (currentUser && !["SUPERADMIN", "ADMIN", "ADMIN_REDE"].includes(currentUser.role)) {
     return (
       <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">
         Você não tem permissão para acessar esta página.
@@ -281,7 +318,7 @@ export default function UsuariosPage() {
     );
   }
 
-  const filtros: (UserRole | "TODOS")[] = ["TODOS", ...roleOptions.filter((r) => contagemPorRole[r])];
+  const filtros: (UserRole | "TODOS")[] = ["TODOS", ...(Object.keys(ROLE_INFO) as UserRole[]).filter((r) => contagemPorRole[r])];
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -422,7 +459,10 @@ export default function UsuariosPage() {
                       </td>
                       <td className="px-6 py-3.5 text-slate-600">
                         {user.perfil ? (
-                          user.perfil.nome.replace(/^Loja: /, "")
+                          user.perfil.nome
+                            .replace(/^Rede: .* · Loja: /, "")
+                            .replace(/^Loja: /, "")
+                            .replace(/^Rede: (.*)$/, "Rede @$1")
                         ) : (
                           <span className="text-slate-400">Todas as lojas</span>
                         )}
@@ -555,11 +595,21 @@ export default function UsuariosPage() {
                 autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder={dominioEmpresa ? `nome@${dominioEmpresa}` : undefined}
+                placeholder={minhaRede ? `nome@${minhaRede}` : dominioEmpresa ? `nome@${dominioEmpresa}` : undefined}
                 className={inputClass}
               />
-              {dominioEmpresa ? (
-                <p className="mt-1 text-xs text-slate-400">Precisa ser um e-mail @{dominioEmpresa}</p>
+              {ehRede ? (
+                <p className="mt-1 text-xs text-sky-700">
+                  Funcionário da rede @{dominioDigitado}: vai enxergar só{" "}
+                  {lojasDaRede.length === 1 ? "a loja dessa rede" : `as ${lojasDaRede.length} lojas dessa rede`}.
+                </p>
+              ) : souAdminRede ? (
+                <p className="mt-1 text-xs text-slate-400">Precisa ser um e-mail @{minhaRede}</p>
+              ) : dominioEmpresa ? (
+                <p className="mt-1 text-xs text-slate-400">
+                  Use @{dominioEmpresa} para a equipe da empresa
+                  {dominiosDeRede.length > 0 && <> ou o domínio de uma loja ({dominiosDeRede.map((d) => `@${d}`).join(", ")})</>}.
+                </p>
               ) : (
                 <p className="mt-1 text-xs text-amber-600">Defina o domínio da empresa antes de cadastrar usuários.</p>
               )}
@@ -596,7 +646,7 @@ export default function UsuariosPage() {
                 }}
                 className={inputClass}
               >
-                {roleOptions.map((r) => (
+                {rolesDoFormulario.map((r) => (
                   <option key={r} value={r}>
                     {ROLE_INFO[r].nome}
                   </option>
@@ -611,14 +661,14 @@ export default function UsuariosPage() {
                   Loja
                 </label>
                 <select id="usuario-loja" value={lojaId} onChange={(e) => setLojaId(e.target.value)} className={inputClass}>
-                  <option value="">Todas as lojas</option>
-                  {lojas.map((l) => (
+                  <option value="">{ehRede ? `Todas as lojas da rede @${dominioDigitado}` : "Todas as lojas"}</option>
+                  {lojasDoFormulario.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.nome}
                     </option>
                   ))}
                 </select>
-                {!lojaId && (
+                {!lojaId && !ehRede && (
                   <p className="mt-1 text-xs text-amber-600">
                     Sem uma loja selecionada, esse usuário vai enxergar todas as lojas da empresa.
                   </p>
@@ -662,7 +712,7 @@ export default function UsuariosPage() {
                 onChange={(e) => setEditRole(e.target.value as UserRole)}
                 className={inputClass}
               >
-                {roleOptions.map((r) => (
+                {(ehEmailDeRede(editTarget.email) ? rolesDeRede : roleOptions.filter((r) => r !== "ADMIN_REDE")).map((r) => (
                   <option key={r} value={r}>
                     {ROLE_INFO[r].nome}
                   </option>

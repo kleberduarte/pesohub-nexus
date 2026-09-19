@@ -24,7 +24,12 @@ import { CreateUserDto } from "../../../application/dtos/create-user.dto";
 import { UpdateUserDto } from "../../../application/dtos/update-user.dto";
 import { acrescentarAoHistorico, validarComplexidade } from "../../../domain/services/password-policy";
 import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
-import { validarDominioDeEmail } from "../../../domain/services/email-domain-policy";
+import {
+  decidirAcessoPorDominio,
+  nomePerfilDaRede,
+  nomePerfilDaUnidade,
+} from "../../../domain/services/acesso-por-dominio";
+import { sincronizarPerfilDaRede } from "../lojas/perfil-da-rede";
 import { statusConvite } from "../../../domain/services/token-senha";
 import { ConviteService } from "./convite.service";
 
@@ -43,13 +48,18 @@ export class UsersController {
 
   @Get()
   @UseGuards(RolesGuard)
-  @Roles("SUPERADMIN", "ADMIN")
+  @Roles("SUPERADMIN", "ADMIN", "ADMIN_REDE")
   async list(@Req() req: AuthenticatedRequest) {
     const clienteId = req.user.clienteId;
     if (!clienteId) return [];
 
+    const dominioDaRede = await this.dominioDaRede(req);
     const users = await this.prisma.user.findMany({
-      where: { clienteId },
+      where: {
+        clienteId,
+        // Administrador da loja só enxerga as pessoas do próprio supermercado.
+        ...(dominioDaRede ? { email: { endsWith: `@${dominioDaRede}`, mode: "insensitive" as const } } : {}),
+      },
       select: {
         id: true,
         email: true,
@@ -88,7 +98,7 @@ export class UsersController {
    */
   @Post(":id/desbloquear")
   @UseGuards(RolesGuard)
-  @Roles("SUPERADMIN", "ADMIN")
+  @Roles("SUPERADMIN", "ADMIN", "ADMIN_REDE")
   async desbloquear(@Param("id") id: string, @Req() req: AuthenticatedRequest) {
     const target = await this.prisma.user.findUnique({ where: { id } });
     if (!target || target.clienteId !== req.user.clienteId) {
@@ -97,6 +107,7 @@ export class UsersController {
     if (target.role === "SUPERADMIN" && req.user.role !== "SUPERADMIN") {
       throw new ForbiddenException("Apenas SUPERADMIN pode desbloquear um usuário SUPERADMIN");
     }
+    await this.exigirMesmaRede(req, target.email, target.role);
 
     await this.prisma.user.update({
       where: { id },
@@ -108,7 +119,7 @@ export class UsersController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles("SUPERADMIN", "ADMIN")
+  @Roles("SUPERADMIN", "ADMIN", "ADMIN_REDE")
   async create(@Body() dto: CreateUserDto, @Req() req: AuthenticatedRequest) {
     const { role: creatorRole, clienteId } = req.user;
     if (!clienteId) {
@@ -116,6 +127,17 @@ export class UsersController {
     }
     if (dto.role === "SUPERADMIN" && creatorRole !== "SUPERADMIN") {
       throw new ForbiddenException("Apenas SUPERADMIN pode cadastrar outro SUPERADMIN");
+    }
+    // Administrador da loja cadastra só gente do próprio supermercado, e nunca
+    // acima dele mesmo (card #96).
+    if (creatorRole === "ADMIN_REDE") {
+      if (!["ADMIN_REDE", "OPERADOR", "VIEWER"].includes(dto.role)) {
+        throw new ForbiddenException("Administrador da loja cadastra apenas Administrador da loja, Operador ou Visualizador");
+      }
+      const minhaRede = await this.dominioDaRede(req);
+      if (dto.email.split("@")[1]?.toLowerCase() !== minhaRede) {
+        throw new ForbiddenException(`Você só pode cadastrar e-mails @${minhaRede}.`);
+      }
     }
 
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
@@ -147,11 +169,39 @@ export class UsersController {
     // pode revogá-la quando a pessoa sair. Vale só no cadastro — contas
     // antigas fora da regra seguem funcionando até serem aposentadas à mão,
     // para ninguém ser trancado para fora sem aviso.
+    //
+    // Card #96: além do domínio da empresa, vale o domínio de uma rede de
+    // lojas (o supermercado cliente). Quem entra por ele fica preso às lojas
+    // daquela rede — ver decidirAcessoPorDominio.
+    let perfilId: string | null = null;
+    let acessoDeRede = false;
+    let dominioDaUnidade: string | null = null;
     if (dto.role !== "SUPERADMIN") {
       const empresa = await this.prisma.cliente.findUnique({ where: { id: clienteId } });
-      const erroDominio = validarDominioDeEmail(dto.email, empresa?.dominio ?? null, empresa?.nome ?? "esta empresa");
-      if (erroDominio) {
-        throw new BadRequestException(erroDominio);
+      const lojasComDominio = await this.prisma.loja.findMany({
+        where: { clienteId, dominioEmail: { not: null } },
+        select: { id: true, dominioEmail: true },
+      });
+      const acesso = decidirAcessoPorDominio({
+        email: dto.email,
+        role: dto.role,
+        lojaId: dto.lojaId,
+        dominioEmpresa: empresa?.dominio ?? null,
+        nomeEmpresa: empresa?.nome ?? "esta empresa",
+        lojas: lojasComDominio,
+      });
+      if (acesso.tipo === "recusado") {
+        throw new BadRequestException(acesso.erro);
+      }
+      if (acesso.tipo === "rede" && dto.lojaId) dominioDaUnidade = acesso.dominio;
+      if (acesso.tipo === "rede" && !dto.lojaId) {
+        perfilId = await sincronizarPerfilDaRede(this.prisma, clienteId, acesso.dominio);
+        acessoDeRede = true;
+        // Usuário sem Perfil enxerga TODAS as lojas. Para um e-mail de rede
+        // isso seria o pior erro possível, então falha em vez de seguir.
+        if (!perfilId) {
+          throw new BadRequestException(`Nenhuma loja com o domínio @${acesso.dominio}.`);
+        }
       }
     }
 
@@ -159,8 +209,7 @@ export class UsersController {
     // Perfil (PerfilLojaAcesso) que já existe pra multi-loja, criando um
     // Perfil dedicado "Loja: <nome>" com acesso só àquela Loja. Sem isso, o
     // usuário enxerga (e pode trocar entre) todas as Lojas do Cliente.
-    let perfilId: string | null = null;
-    if (dto.lojaId) {
+    if (dto.lojaId && !acessoDeRede) {
       if (dto.role === "SUPERADMIN" || dto.role === "ADMIN") {
         throw new ForbiddenException("ADMIN e SUPERADMIN administram todas as lojas — não é possível restringi-los a uma só");
       }
@@ -168,14 +217,17 @@ export class UsersController {
       if (!loja) {
         throw new NotFoundException("Loja não encontrada");
       }
+      // Funcionário de rede preso a uma unidade ganha perfil próprio da rede:
+      // se a loja sair da rede, o acesso dele cai sem mexer no da empresa.
+      const nome = dominioDaUnidade ? nomePerfilDaUnidade(dominioDaUnidade, loja.nome) : `Loja: ${loja.nome}`;
       const perfil = await this.prisma.perfil.upsert({
-        where: { clienteId_nome: { clienteId, nome: `Loja: ${loja.nome}` } },
+        where: { clienteId_nome: { clienteId, nome } },
         update: {},
-        create: {
-          clienteId,
-          nome: `Loja: ${loja.nome}`,
-          lojas: { create: { lojaId: loja.id } },
-        },
+        create: { clienteId, nome },
+      });
+      await this.prisma.perfilLojaAcesso.createMany({
+        data: [{ perfilId: perfil.id, lojaId: loja.id }],
+        skipDuplicates: true,
       });
       perfilId = perfil.id;
     }
@@ -233,7 +285,7 @@ export class UsersController {
    */
   @Post(":id/convite")
   @UseGuards(RolesGuard)
-  @Roles("SUPERADMIN", "ADMIN")
+  @Roles("SUPERADMIN", "ADMIN", "ADMIN_REDE")
   async reenviarConvite(@Param("id") id: string, @Req() req: AuthenticatedRequest) {
     const target = await this.buscarConvidado(id, req);
     const conviteEnviado = await this.convites.enviar(target, await this.nomeEmpresa(target.clienteId));
@@ -244,7 +296,7 @@ export class UsersController {
   /** Cancela o convite pendente: o link para de funcionar imediatamente. */
   @Delete(":id/convite")
   @UseGuards(RolesGuard)
-  @Roles("SUPERADMIN", "ADMIN")
+  @Roles("SUPERADMIN", "ADMIN", "ADMIN_REDE")
   async cancelarConvite(@Param("id") id: string, @Req() req: AuthenticatedRequest) {
     const target = await this.buscarConvidado(id, req);
     await this.convites.cancelar(target.id);
@@ -266,10 +318,38 @@ export class UsersController {
     if (target.role === "SUPERADMIN" && req.user.role !== "SUPERADMIN") {
       throw new ForbiddenException("Apenas SUPERADMIN pode convidar um usuário SUPERADMIN");
     }
+    await this.exigirMesmaRede(req, target.email, target.role);
     if (!statusConvite(target.tokensSenha[0], target.passwordChangedAt)) {
       throw new BadRequestException("Este usuário não tem convite em aberto.");
     }
     return target;
+  }
+
+  /**
+   * Domínio do supermercado do Administrador da loja que está agindo, ou null
+   * para quem administra a empresa (card #96). Lido do banco, não do token:
+   * o e-mail do solicitante é a fonte do escopo e não viaja no JWT.
+   */
+  private async dominioDaRede(req: AuthenticatedRequest): Promise<string | null> {
+    if (req.user.role !== "ADMIN_REDE") return null;
+    const eu = await this.prisma.user.findUnique({ where: { id: req.user.sub }, select: { email: true } });
+    const dominio = eu?.email.split("@")[1]?.toLowerCase();
+    // Sem domínio conhecido não há escopo — e sem escopo ele veria todos.
+    if (!dominio) throw new ForbiddenException("Não foi possível identificar a sua rede de lojas");
+    return dominio;
+  }
+
+  /** Administrador da loja só age sobre e-mails do próprio supermercado. */
+  private async exigirMesmaRede(req: AuthenticatedRequest, email: string, roleDoAlvo: string): Promise<void> {
+    const dominio = await this.dominioDaRede(req);
+    if (dominio && email.split("@")[1]?.toLowerCase() !== dominio) {
+      throw new NotFoundException("Usuário não encontrado");
+    }
+    // Nem uma conta antiga de Administrador da empresa com o e-mail do
+    // supermercado fica ao alcance do Administrador da loja.
+    if (dominio && (roleDoAlvo === "ADMIN" || roleDoAlvo === "SUPERADMIN")) {
+      throw new ForbiddenException("Administrador da loja não gerencia Administradores da empresa");
+    }
   }
 
   private async nomeEmpresa(clienteId: string | null): Promise<string | null> {
@@ -280,7 +360,7 @@ export class UsersController {
 
   @Patch(":id")
   @UseGuards(RolesGuard)
-  @Roles("SUPERADMIN", "ADMIN")
+  @Roles("SUPERADMIN", "ADMIN", "ADMIN_REDE")
   async update(@Param("id") id: string, @Body() dto: UpdateUserDto, @Req() req: AuthenticatedRequest) {
     const { role: creatorRole, clienteId } = req.user;
     const target = await this.prisma.user.findUnique({ where: { id } });
@@ -292,6 +372,34 @@ export class UsersController {
     }
     if (dto.role === "SUPERADMIN" && target.clienteId !== null) {
       throw new ForbiddenException("O perfil SUPERADMIN só é permitido na empresa padrão");
+    }
+    await this.exigirMesmaRede(req, target.email, target.role);
+    if (creatorRole === "ADMIN_REDE" && dto.role && !["ADMIN_REDE", "OPERADOR", "VIEWER"].includes(dto.role)) {
+      throw new ForbiddenException("Administrador da loja atribui apenas Administrador da loja, Operador ou Visualizador");
+    }
+    // Quem vira Administrador da loja precisa do e-mail de uma rede — senão
+    // ficaria com poder de gestão e sem escopo nenhum.
+    if (dto.role === "ADMIN_REDE" && target.role !== "ADMIN_REDE") {
+      const perfil = target.perfilId
+        ? await this.prisma.perfil.findUnique({ where: { id: target.perfilId }, select: { nome: true } })
+        : null;
+      const dominioDoAlvo = target.email.split("@")[1]?.toLowerCase() ?? "";
+      if (perfil?.nome !== nomePerfilDaRede(dominioDoAlvo)) {
+        throw new BadRequestException(
+          "Só um usuário com acesso à rede inteira do supermercado pode virar Administrador da loja.",
+        );
+      }
+    }
+    // Card #96: funcionário de supermercado (e-mail fora do domínio da
+    // empresa) não vira Administrador pela edição — veria todas as redes.
+    if (dto.role === "ADMIN" && clienteId) {
+      const empresa = await this.prisma.cliente.findUnique({ where: { id: clienteId }, select: { dominio: true } });
+      const dominioDoUsuario = target.email.split("@")[1]?.toLowerCase();
+      if (!empresa?.dominio || dominioDoUsuario !== empresa.dominio.toLowerCase()) {
+        throw new ForbiddenException(
+          `Só e-mails @${empresa?.dominio ?? "da empresa"} podem ser Administrador. Este é um usuário de loja.`,
+        );
+      }
     }
 
     const data: {
@@ -332,7 +440,7 @@ export class UsersController {
 
   @Delete(":id")
   @UseGuards(RolesGuard)
-  @Roles("SUPERADMIN", "ADMIN")
+  @Roles("SUPERADMIN", "ADMIN", "ADMIN_REDE")
   async remove(@Param("id") id: string, @Req() req: AuthenticatedRequest) {
     const { sub, role: creatorRole, clienteId } = req.user;
     if (id === sub) {
@@ -346,6 +454,7 @@ export class UsersController {
     if (target.role === "SUPERADMIN" && creatorRole !== "SUPERADMIN") {
       throw new ForbiddenException("Apenas SUPERADMIN pode excluir um usuário SUPERADMIN");
     }
+    await this.exigirMesmaRede(req, target.email, target.role);
 
     await this.prisma.user.delete({ where: { id } });
     return { deleted: true };

@@ -5,7 +5,7 @@ import { Plus, Edit2, Trash2, X, Store } from "lucide-react";
 import { lojasApi, ApiError, type Loja, type CreateLojaInput } from "../../../lib/api";
 import { ConfirmDialog } from "../../../components/ui/ConfirmDialog";
 
-const emptyForm: CreateLojaInput = { nome: "", endereco: "", telefone: "", responsavel: "", email: "", cnpj: "" };
+const emptyForm: CreateLojaInput = { nome: "", endereco: "", telefone: "", responsavel: "", email: "", cnpj: "", dominioEmail: "" };
 
 export default function LojasPage() {
   const [lojas, setLojas] = useState<Loja[]>([]);
@@ -51,6 +51,7 @@ export default function LojasPage() {
       responsavel: loja.responsavel ?? "",
       email: loja.email ?? "",
       cnpj: loja.cnpj ?? "",
+      dominioEmail: loja.dominioEmail ?? "",
     });
     setIsModalOpen(true);
   };
@@ -129,6 +130,7 @@ export default function LojasPage() {
             <thead className="bg-slate-50 text-slate-500 text-left">
               <tr>
                 <th className="px-4 py-3 font-medium">Nome</th>
+                <th className="px-4 py-3 font-medium">Rede (e-mail)</th>
                 <th className="px-4 py-3 font-medium">Responsável</th>
                 <th className="px-4 py-3 font-medium">Telefone</th>
                 <th className="px-4 py-3 font-medium">Status</th>
@@ -141,6 +143,9 @@ export default function LojasPage() {
                   <td className="px-4 py-3 flex items-center gap-2 text-slate-800 font-medium">
                     <Store className="w-4 h-4 text-slate-400" />
                     {loja.nome}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {loja.dominioEmail ? `@${loja.dominioEmail}` : <span className="text-slate-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-slate-600">{loja.responsavel || "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{loja.telefone || "—"}</td>
@@ -231,6 +236,24 @@ export default function LojasPage() {
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500"
                   />
                 </div>
+              </div>
+              <div>
+                <label htmlFor="loja-dominio-email" className="block text-sm font-medium text-slate-700 mb-1">
+                  Domínio de e-mail dos funcionários <span className="text-slate-400 font-normal">(opcional)</span>
+                </label>
+                <div className="flex items-center rounded-lg border border-slate-200 focus-within:ring-2 focus-within:ring-brand-500">
+                  <span className="pl-3 text-slate-400">@</span>
+                  <input id="loja-dominio-email"
+                    value={form.dominioEmail}
+                    onChange={(e) => setForm({ ...form, dominioEmail: e.target.value })}
+                    placeholder="supermercado.com.br"
+                    className="w-full px-1 py-2 rounded-lg focus:outline-none"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-slate-500">
+                  Permite cadastrar usuários com esse e-mail. Eles enxergam só as lojas com o mesmo domínio — use o
+                  mesmo em todas as unidades de uma rede.
+                </p>
               </div>
               <button
                 type="submit"

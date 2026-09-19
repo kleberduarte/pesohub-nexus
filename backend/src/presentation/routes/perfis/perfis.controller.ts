@@ -1,4 +1,18 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  ConflictException,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { ehPerfilDeRede } from "../../../domain/services/acesso-por-dominio";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
@@ -34,6 +48,7 @@ export class PerfisController {
   @Post()
   async create(@Body() dto: CreatePerfilDto, @Req() req: Request) {
     const clienteId = this.clienteId(req);
+    this.recusarNomeDeRede(dto.nome);
     return this.prisma.perfil.create({
       data: {
         nome: dto.nome,
@@ -49,6 +64,8 @@ export class PerfisController {
     const clienteId = this.clienteId(req);
     const existing = await this.prisma.perfil.findFirst({ where: { id, clienteId } });
     if (!existing) return null;
+    this.recusarPerfilDeRede(existing.nome);
+    if (dto.nome) this.recusarNomeDeRede(dto.nome);
 
     if (dto.lojaIds) {
       await this.prisma.perfilLojaAcesso.deleteMany({ where: { perfilId: id } });
@@ -67,7 +84,36 @@ export class PerfisController {
   @Delete(":id")
   @HttpCode(204)
   async remove(@Param("id") id: string, @Req() req: Request) {
-    await this.prisma.perfil.deleteMany({ where: { id, clienteId: this.clienteId(req) } });
+    const clienteId = this.clienteId(req);
+    const existing = await this.prisma.perfil.findFirst({ where: { id, clienteId } });
+    if (!existing) return;
+    this.recusarPerfilDeRede(existing.nome);
+    // Apagar um perfil em uso deixaria os usuários dele SEM perfil — e sem
+    // perfil se enxerga todas as lojas. Troque o perfil deles antes.
+    const emUso = await this.prisma.user.count({ where: { perfilId: id } });
+    if (emUso > 0) {
+      throw new ConflictException(`Este perfil está em uso por ${emUso} usuário(s). Troque o perfil deles antes de excluir.`);
+    }
+    await this.prisma.perfil.delete({ where: { id } });
+  }
+
+  /**
+   * Perfis "Rede: ..." definem o que um supermercado enxerga (card #96) e são
+   * mantidos pelo sistema a partir do domínio das lojas. Editar à mão poderia
+   * pôr a loja de um concorrente no acesso de outro.
+   */
+  private recusarPerfilDeRede(nome: string): void {
+    if (ehPerfilDeRede(nome)) {
+      throw new BadRequestException(
+        "Perfis de rede são mantidos automaticamente pelo domínio de e-mail das lojas e não podem ser alterados.",
+      );
+    }
+  }
+
+  private recusarNomeDeRede(nome: string): void {
+    if (ehPerfilDeRede(nome)) {
+      throw new BadRequestException('Nomes começando com "Rede:" são reservados aos perfis automáticos de rede.');
+    }
   }
 
   private clienteId(req: Request): string {

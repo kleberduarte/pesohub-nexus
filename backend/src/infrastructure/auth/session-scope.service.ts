@@ -81,7 +81,9 @@ export class SessionScopeService {
     if (user.role === "SUPERADMIN" || user.role === "ADMIN") return true;
 
     const dono = await this.prisma.user.findUnique({ where: { id: user.sub } });
-    if (!dono?.perfilId) return true;
+    // Administrador da loja sem perfil de rede: não enxerga nada, nunca tudo
+    // (card #96) — senão um supermercado veria os outros.
+    if (!dono?.perfilId) return dono?.role !== "ADMIN_REDE";
     const acesso = await this.prisma.perfilLojaAcesso.findFirst({
       where: { perfilId: dono.perfilId, lojaId },
     });

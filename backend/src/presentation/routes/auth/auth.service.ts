@@ -80,7 +80,11 @@ export class AuthService {
     // seguinte — que cadastrava produto e sincronizava para a loja errada.
     const scoped = user.role === "SUPERADMIN" && user.clienteId !== null;
     const effectiveClienteId = user.clienteId ?? (await this.clienteInicialDeSuperadmin(user.role));
-    const effectiveLojaId = await this.resolveEffectiveLoja(effectiveClienteId, user.perfilId);
+    // Administrador da loja sem perfil de rede não abre em loja nenhuma (card #96).
+    const effectiveLojaId =
+      user.role === "ADMIN_REDE" && !user.perfilId
+        ? null
+        : await this.resolveEffectiveLoja(effectiveClienteId, user.perfilId);
 
     const precisaTrocarSenha = user.mustChangePassword || senhaExpirada(user.passwordChangedAt);
 
@@ -300,7 +304,8 @@ export class AuthService {
    */
   private async userHasLojaAccess(userId: string, lojaId: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.perfilId) return true;
+    // Administrador da loja sem perfil de rede não enxerga nada (card #96).
+    if (!user?.perfilId) return user?.role !== "ADMIN_REDE";
     const acesso = await this.prisma.perfilLojaAcesso.findFirst({ where: { perfilId: user.perfilId, lojaId } });
     return !!acesso;
   }

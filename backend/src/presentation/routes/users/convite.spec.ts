@@ -87,6 +87,7 @@ describe("UsersController — convite", () => {
         update: jest.fn().mockResolvedValue({}),
       },
       cliente: { findUnique: jest.fn().mockResolvedValue({ nome: "Ramuza", dominio: "ramuza.com.br" }) },
+      loja: { findMany: jest.fn().mockResolvedValue([]) },
     };
     const auditLog = { record: jest.fn().mockResolvedValue(undefined) };
     const convites = { enviar: jest.fn().mockResolvedValue(true), cancelar: jest.fn().mockResolvedValue(1) };
