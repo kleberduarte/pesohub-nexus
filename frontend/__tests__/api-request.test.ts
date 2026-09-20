@@ -147,3 +147,42 @@ describe("request — erros em geral", () => {
     expect(decidiuRedirecionar()).toBe(false);
   });
 });
+
+/**
+ * Card #83 — a loja fora do escopo passou a ser negada pelo backend. Sem
+ * recuperação no cliente, uma loja guardada que perdeu validade (perfil
+ * alterado, loja apagada) trancaria a pessoa fora do sistema inteiro: toda
+ * chamada sairia com o mesmo header inválido e receberia 403.
+ */
+describe("request — loja guardada que saiu do escopo (card #83)", () => {
+  const LOJA_FORA = "Loja fora do seu escopo de acesso.";
+
+  it("esquece a loja e repete a chamada sem ela", async () => {
+    setSessionScope({ lojaId: "loja-velha", clienteId: "cliente-1" } as never);
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce(respostaErro(403, LOJA_FORA))
+      .mockResolvedValueOnce(respostaOk({ data: [], total: 0 }));
+
+    await devicesApi.list();
+
+    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(2);
+    const segundaTentativa = (global.fetch as jest.Mock).mock.calls[1][1].headers as Record<string, string>;
+    expect(segundaTentativa["x-pesohub-loja"]).toBeUndefined();
+  });
+
+  it("não entra em laço: se o 403 persistir, o erro sobe", async () => {
+    setSessionScope({ lojaId: "loja-velha", clienteId: "cliente-1" } as never);
+    (global.fetch as jest.Mock).mockResolvedValue(respostaErro(403, LOJA_FORA));
+
+    await expect(devicesApi.list()).rejects.toBeInstanceOf(ApiError);
+    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(2);
+  });
+
+  it("403 por outro motivo não mexe na loja guardada", async () => {
+    setSessionScope({ lojaId: "loja-1", clienteId: "cliente-1" } as never);
+    (global.fetch as jest.Mock).mockResolvedValue(respostaErro(403, "Sem permissão para este recurso"));
+
+    await expect(devicesApi.list()).rejects.toBeInstanceOf(ApiError);
+    expect((global.fetch as jest.Mock).mock.calls).toHaveLength(1);
+  });
+});

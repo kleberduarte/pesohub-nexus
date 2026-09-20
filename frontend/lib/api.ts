@@ -135,7 +135,15 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+/**
+ * Recado do backend quando a loja guardada saiu do escopo do usuário (#83).
+ * Antes ele seguia em silêncio com a loja anterior; agora nega — e o cliente
+ * precisa saber se recuperar, senão uma loja velha na aba trava o sistema
+ * inteiro para a pessoa.
+ */
+const LOJA_FORA_DO_ESCOPO = "Loja fora do seu escopo de acesso.";
+
+async function request<T>(path: string, options: RequestInit = {}, jaTentouSemLoja = false): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     credentials: "include",
@@ -164,6 +172,17 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         // que a sessão única existe para revelar.
         if (message) sessionStorage.setItem(SESSION_END_REASON_KEY, message);
         window.location.href = "/login";
+      }
+    }
+
+    // Loja guardada na aba não vale mais (perfil mudou, loja apagada). Em vez
+    // de deixar a pessoa presa numa tela de erro, esquece a loja e repete uma
+    // única vez: o backend então resolve a primeira loja permitida.
+    if (res.status === 403 && message === LOJA_FORA_DO_ESCOPO && !jaTentouSemLoja) {
+      const escopo = getSessionScope();
+      if (escopo?.lojaId) {
+        setSessionScope({ ...escopo, lojaId: null });
+        return request<T>(path, options, true);
       }
     }
 

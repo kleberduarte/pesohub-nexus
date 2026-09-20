@@ -1,3 +1,4 @@
+import { ForbiddenException } from "@nestjs/common";
 import { HEADER_CLIENTE, HEADER_LOJA, SessionScopeService } from "./session-scope.service";
 
 /**
@@ -46,19 +47,20 @@ describe("SessionScopeService", () => {
   });
 
   // O ataque óbvio: mandar no cabeçalho o id de uma loja de OUTRA empresa.
-  it("ignora loja que não pertence à empresa do usuário", async () => {
+  // Desde o card #83 isso NEGA a requisição em vez de seguir com o escopo
+  // antigo: responder dados da loja A a quem pediu a loja B é pior que um erro.
+  it("recusa loja que não pertence à empresa do usuário", async () => {
     const { service } = makeService({
       // findFirst filtra por clienteId, então a loja de outra empresa não é achada.
       loja: { findFirst: jest.fn().mockResolvedValue(null) },
     });
 
-    await expect(service.resolver(admin, { [HEADER_LOJA]: "loja-de-outra-empresa" })).resolves.toEqual({
-      clienteId: "cliente-a",
-      lojaId: "loja-1",
-    });
+    await expect(
+      service.resolver(admin, { [HEADER_LOJA]: "loja-de-outra-empresa" }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it("ignora loja fora do Perfil de um OPERADOR", async () => {
+  it("recusa loja fora do Perfil de um OPERADOR", async () => {
     const operador = { ...admin, role: "OPERADOR" };
     const { service } = makeService({
       loja: { findFirst: jest.fn().mockResolvedValue({ id: "loja-9", clienteId: "cliente-a" }) },
@@ -66,8 +68,45 @@ describe("SessionScopeService", () => {
       perfilLojaAcesso: { findFirst: jest.fn().mockResolvedValue(null) },
     });
 
-    const escopo = await service.resolver(operador, { [HEADER_LOJA]: "loja-9" });
-    expect(escopo.lojaId).toBe("loja-1");
+    await expect(service.resolver(operador, { [HEADER_LOJA]: "loja-9" })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  // O coração do card #83: ADMIN deixou de ser passe livre.
+  it("recusa loja fora do Perfil de um ADMIN de loja", async () => {
+    const { service } = makeService({
+      loja: { findFirst: jest.fn().mockResolvedValue({ id: "loja-9", clienteId: "cliente-a" }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ role: "ADMIN", perfilId: "perfil-da-loja-1" }) },
+      perfilLojaAcesso: { findFirst: jest.fn().mockResolvedValue(null) },
+    });
+
+    await expect(service.resolver(admin, { [HEADER_LOJA]: "loja-9" })).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it("ADMIN com Perfil segue entrando nas lojas do próprio Perfil", async () => {
+    const { service } = makeService({
+      loja: { findFirst: jest.fn().mockResolvedValue({ id: "loja-2", clienteId: "cliente-a" }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ role: "ADMIN", perfilId: "perfil-da-loja-2" }) },
+      perfilLojaAcesso: { findFirst: jest.fn().mockResolvedValue({ id: "acesso-1" }) },
+    });
+
+    const escopo = await service.resolver(admin, { [HEADER_LOJA]: "loja-2" });
+    expect(escopo.lojaId).toBe("loja-2");
+  });
+
+  // Retrocompatibilidade: nenhum ADMIN de hoje tem Perfil, e todos eles
+  // precisam continuar administrando a empresa inteira.
+  it("ADMIN sem Perfil continua alcançando qualquer loja da empresa", async () => {
+    const { service } = makeService({
+      loja: { findFirst: jest.fn().mockResolvedValue({ id: "loja-7", clienteId: "cliente-a" }) },
+      user: { findUnique: jest.fn().mockResolvedValue({ role: "ADMIN", perfilId: null }) },
+    });
+
+    const escopo = await service.resolver(admin, { [HEADER_LOJA]: "loja-7" });
+    expect(escopo.lojaId).toBe("loja-7");
   });
 
   it("permite loja dentro do Perfil de um OPERADOR", async () => {

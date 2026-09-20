@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../database/prisma.service";
 
 /**
@@ -30,6 +30,9 @@ export interface EscopoUsuario {
  * o banco a cada requisição — o cabeçalho só escolhe entre o que a conta já
  * tem direito de ver, nunca amplia permissão.
  */
+/** Mensagem única: o frontend a reconhece para limpar a loja guardada. */
+export const LOJA_FORA_DO_ESCOPO = "Loja fora do seu escopo de acesso.";
+
 @Injectable()
 export class SessionScopeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -56,9 +59,15 @@ export class SessionScopeService {
 
     const lojaPedida = primeiroValor(headers[HEADER_LOJA]);
     if (lojaPedida && lojaPedida !== lojaId && clienteId) {
-      if (await this.podeAcessarLoja(user, clienteId, lojaPedida)) {
-        lojaId = lojaPedida;
+      if (!(await this.podeAcessarLoja(user, clienteId, lojaPedida))) {
+        // NEGA em vez de seguir com o escopo antigo (card #83). Antes, pedir
+        // uma loja proibida devolvia calado os dados de OUTRA loja — a tela
+        // dizia "Loja B" e a resposta era da Loja A. Falha silenciosa dessa
+        // classe já custou caro no protocolo da balança; aqui custaria
+        // confiança entre supermercados concorrentes.
+        throw new ForbiddenException(LOJA_FORA_DO_ESCOPO);
       }
+      lojaId = lojaPedida;
     }
 
     // Trocou de empresa e ficou sem loja: cai na primeira permitida, para a
@@ -71,19 +80,33 @@ export class SessionScopeService {
   }
 
   /**
-   * ADMIN/SUPERADMIN sem Perfil enxergam todas as lojas da empresa. Com Perfil,
-   * só as lojas daquele Perfil (ver PerfilLojaAcesso).
+   * Quem pode operar numa loja.
+   *
+   * O modelo é papel × escopo, não um papel novo (card #83): "ADMIN de loja" é
+   * um ADMIN com Perfil de uma loja só. Perfil nulo continua significando
+   * "todas as lojas da empresa", o que mantém retrocompatível todo ADMIN que
+   * já existe — nenhum deles tem Perfil hoje.
+   *
+   * O Perfil é lido do BANCO, nunca do token: um token emitido antes de o
+   * escopo ser restringido continuaria valendo até expirar.
    */
   async podeAcessarLoja(user: EscopoUsuario, clienteId: string, lojaId: string): Promise<boolean> {
     const loja = await this.prisma.loja.findFirst({ where: { id: lojaId, clienteId } });
     if (!loja) return false;
 
-    if (user.role === "SUPERADMIN" || user.role === "ADMIN") return true;
+    // SUPERADMIN global administra a base inteira; o scoped é preso à empresa
+    // dele, mas dentro dela enxerga tudo.
+    if (user.role === "SUPERADMIN") return true;
 
     const dono = await this.prisma.user.findUnique({ where: { id: user.sub } });
-    // Administrador da loja sem perfil de rede: não enxerga nada, nunca tudo
-    // (card #96) — senão um supermercado veria os outros.
-    if (!dono?.perfilId) return dono?.role !== "ADMIN_REDE";
+    if (!dono) return false;
+
+    if (!dono.perfilId) {
+      // Administrador da loja sem perfil de rede: não enxerga nada, nunca tudo
+      // (card #96) — senão um supermercado veria os outros.
+      return dono.role !== "ADMIN_REDE";
+    }
+
     const acesso = await this.prisma.perfilLojaAcesso.findFirst({
       where: { perfilId: dono.perfilId, lojaId },
     });
