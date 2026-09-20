@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Scale, CloudUpload, Tags, LineChart } from "lucide-react";
+import { Eye, EyeOff, Scale, CloudUpload, Tags, LineChart, ShieldCheck } from "lucide-react";
+import { PesoHubLogo, PesoHubMark } from "../brand/PesoHubLogo";
 import { login, ApiError, takeSessionEndReason, type ClienteBranding } from "../../lib/api";
 
 interface LoginCardProps {
@@ -70,7 +71,12 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
           <div className="absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-accent-500/10 blur-3xl" />
 
           <div className="relative z-10">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+            {branding?.logoUrl ? (
+              <img src={branding.logoUrl} alt={brandName} className="h-9 w-9 object-contain" />
+            ) : (
+              <PesoHubMark className="h-9 w-9" />
+            )}
+            <p className="mt-8 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
               Plataforma de gestão de balanças
             </p>
             <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-slate-900">
@@ -98,25 +104,26 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
             ))}
           </ul>
 
-          <p className="relative z-10 text-sm text-slate-400">
-            © {new Date().getFullYear()} {brandName}
-          </p>
+          <div className="relative z-10 flex items-center justify-between gap-4 border-t border-slate-200/70 pt-6">
+            <span className="inline-flex items-center gap-2 text-xs text-slate-500">
+              <ShieldCheck className="h-4 w-4 text-brand-600" />
+              Sessão única por usuário e dados isolados por loja
+            </span>
+            <span className="text-xs text-slate-400">© {new Date().getFullYear()} {brandName}</span>
+          </div>
         </aside>
 
         {/* Autenticação */}
         <main className="flex w-full justify-center px-2 py-10 lg:px-10">
           <div className="w-full max-w-md">
-            <div className="mb-10 flex flex-col items-center lg:items-start">
+            <div className="mb-9 flex flex-col items-center lg:items-start">
               {branding?.logoUrl ? (
-                <img src={branding.logoUrl} alt={brandName} className="h-12 object-contain" />
-              ) : (
-                <span className="text-3xl font-bold tracking-tight">
-                  <span className="text-brand-600">PESO</span>
-                  <span className="text-accent-500">HUB</span>
+                <span className="inline-flex items-center gap-3">
+                  <img src={branding.logoUrl} alt={brandName} className="h-11 w-11 object-contain" />
+                  <span className="text-2xl font-semibold tracking-tight text-slate-800">{brandName}</span>
                 </span>
-              )}
-              {branding?.logoUrl && (
-                <span className="mt-2 text-lg font-semibold tracking-tight text-slate-800">{brandName}</span>
+              ) : (
+                <PesoHubLogo />
               )}
             </div>
 

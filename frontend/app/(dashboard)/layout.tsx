@@ -36,6 +36,7 @@ import {
 } from "../../lib/api";
 import { applyBranding, readCachedBranding } from "../../lib/branding";
 import SessionKeepAlive from "../../components/auth/SessionKeepAlive";
+import { PesoHubMark } from "../../components/brand/PesoHubLogo";
 
 const baseNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -191,13 +192,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         >
           {brandingResolved ? (
             <>
-              <img
-                src={branding?.logoUrl ?? "/pesohub-icon.png"}
-                alt={branding?.nome ?? "PesoHub"}
-                className={`w-8 h-8 object-contain ${sidebarCollapsed ? "" : "mr-2"}`}
-              />
+              {branding?.logoUrl ? (
+                <img
+                  src={branding.logoUrl}
+                  alt={branding.nome ?? "PesoHub"}
+                  className={`w-8 h-8 object-contain ${sidebarCollapsed ? "" : "mr-2"}`}
+                />
+              ) : (
+                <PesoHubMark className={`w-8 h-8 ${sidebarCollapsed ? "" : "mr-2"}`} />
+              )}
               {!sidebarCollapsed && (
-                <span className="text-2xl font-bold tracking-tight text-brand-950 truncate">
+                <span className="text-2xl font-semibold tracking-tight text-brand-950 truncate">
                   {(branding?.nome ?? "PesoHub").toLowerCase()}
                 </span>
               )}
