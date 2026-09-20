@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import AssinaturaPage from "../app/(dashboard)/assinatura/page";
-import { billingApi } from "../lib/api";
+import { billingApi, ApiError } from "../lib/api";
 
 /**
  * Card #99 — a tela de cobrança do supermercado. O que se trava aqui é o que
@@ -9,9 +9,11 @@ import { billingApi } from "../lib/api";
  * quando vence, o que o atraso realmente bloqueia (e o que NÃO bloqueia), e
  * que cancelar não é um clique só.
  */
+let papelAtual = "ADMIN_REDE";
+
 jest.mock("../lib/api", () => ({
   billingApi: { status: jest.fn(), subscribe: jest.fn(), cancel: jest.fn() },
-  getCurrentUser: () => ({ role: "ADMIN_REDE", email: "gerente@davo.com.br" }),
+  getCurrentUser: () => ({ role: papelAtual, email: "gerente@davo.com.br" }),
   ApiError: class ApiError extends Error {
     status = 500;
   },
@@ -39,6 +41,7 @@ const assinaturaBase = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  papelAtual = "ADMIN_REDE";
 });
 
 it("mostra o valor, o vencimento e a conta que gerou o valor", async () => {
@@ -146,4 +149,17 @@ it("ativa com a forma de pagamento escolhida", async () => {
   await waitFor(() =>
     expect(subscribeMock).toHaveBeenCalledWith({ formaPagamento: "BOLETO", cpfCnpj: "12345678000199" }),
   );
+});
+
+it("explica ao administrador da empresa que a tela não é dele, em vez de oferecer um formulário sem saída", async () => {
+  // Achado abrindo a URL à mão como admin@ramuza.com.br: sem assinatura de
+  // rede, a tela oferecia ativação e o backend recusava com "informe a rede".
+  papelAtual = "ADMIN";
+  const erro404 = Object.assign(new Error("Nenhuma assinatura encontrada para esta rede."), { status: 404 });
+  Object.setPrototypeOf(erro404, ApiError.prototype);
+  statusMock.mockRejectedValue(erro404);
+  render(<AssinaturaPage />);
+
+  expect(await screen.findByText(/é a conta do supermercado, não da empresa/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /Ativar assinatura/ })).not.toBeInTheDocument();
 });

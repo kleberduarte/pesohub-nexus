@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { CreditCard, QrCode, FileText, Loader2, AlertTriangle, Check, Info, Scale } from "lucide-react";
-import { billingApi, ApiError, type Assinatura, type FormaPagamentoAssinatura } from "../../../lib/api";
+import {
+  billingApi,
+  getCurrentUser,
+  ApiError,
+  type Assinatura,
+  type FormaPagamentoAssinatura,
+} from "../../../lib/api";
 
 const FORMAS_PAGAMENTO: { value: FormaPagamentoAssinatura; label: string; icon: typeof QrCode }[] = [
   { value: "PIX", label: "Pix", icon: QrCode },
@@ -107,9 +113,17 @@ export default function AssinaturaPage() {
     );
   }
 
+  // Quem administra a EMPRESA não tem assinatura: a conta é de cada rede de
+  // supermercado. Sem este recorte, quem chegasse pela URL encontrava um
+  // formulário de ativação que o backend recusa ("informe a rede") — o mesmo
+  // formulário frio que o card #99 veio tirar do caminho, só que do público
+  // errado. O menu já não traz ninguém para cá; isto cobre a URL digitada.
+  const papel = getCurrentUser()?.role;
+  const telaDeOutroPublico = !assinatura && (papel === "ADMIN" || papel === "SUPERADMIN");
+
   const situacao = assinatura?.bloqueio?.situacao ?? (assinatura?.status === "ATIVA" ? "ATIVA" : "AGUARDANDO");
   const selo = SITUACAO_LABEL[situacao] ?? SITUACAO_LABEL.AGUARDANDO;
-  const precisaAtivar = Boolean(assinatura?.aguardandoAtivacao) || !assinatura;
+  const precisaAtivar = !telaDeOutroPublico && (Boolean(assinatura?.aguardandoAtivacao) || !assinatura);
   const previa = assinatura?.previa;
   // A prévia só vira aviso quando REALMENTE muda o que vai ser cobrado — do
   // contrário seria um alerta permanente dizendo que nada mudou.
@@ -131,6 +145,25 @@ export default function AssinaturaPage() {
         <div className="p-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg">{notice}</div>
       )}
       {error && <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>}
+
+      {telaDeOutroPublico && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 flex items-start gap-3">
+          <Info className="w-5 h-5 mt-0.5 shrink-0 text-slate-400" />
+          <div className="text-sm space-y-2">
+            <p className="text-slate-800 font-medium">Esta tela é a conta do supermercado, não da empresa.</p>
+            <p className="text-slate-600">
+              Cada rede de supermercado tem a própria assinatura, e quem a vê é o Administrador da loja, com o e-mail do
+              domínio da rede. A cobrança de todas as redes, junto com o contrato de licenciamento, fica no painel
+              Financeiro.
+            </p>
+            {papel === "SUPERADMIN" && (
+              <a href="/financeiro" className="inline-block text-brand-600 hover:underline font-medium">
+                Ir para o Financeiro
+              </a>
+            )}
+          </div>
+        </div>
+      )}
 
       {assinatura && (
         <>
