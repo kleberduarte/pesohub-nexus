@@ -61,8 +61,8 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
     "w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-800 placeholder:text-slate-300 transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500";
 
   return (
-    <div className="min-h-screen bg-white p-4 lg:p-8">
-      <div className="mx-auto grid h-full max-w-7xl items-center gap-8 lg:grid-cols-2">
+    <div className="flex min-h-screen items-center bg-white p-4 lg:p-8">
+      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 lg:grid-cols-2 lg:gap-16">
         {/* Institucional — cartão claro, escondido no celular para o formulário
             aparecer primeiro em tela pequena. */}
         <aside className="relative hidden overflow-hidden rounded-3xl bg-slate-50 p-12 lg:flex lg:min-h-[38rem] lg:flex-col lg:justify-between">
@@ -120,7 +120,7 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
               )}
             </div>
 
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Acesse sua conta</h2>
+            <h2 className="text-xl font-semibold tracking-[0.2px] text-slate-900">Acesse sua conta</h2>
 
             <form onSubmit={handleLogin} className="mt-8 space-y-5">
               {sessionEndReason && !error && (
@@ -136,7 +136,7 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
               )}
 
               <div>
-                <label htmlFor="login-e-mail" className="mb-1.5 block text-sm font-medium text-slate-700">
+                <label htmlFor="login-e-mail" className="mb-1.5 block text-sm text-slate-600">
                   E-mail
                 </label>
                 <input
@@ -151,7 +151,7 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
               </div>
 
               <div>
-                <label htmlFor="login-senha" className="mb-1.5 block text-sm font-medium text-slate-700">
+                <label htmlFor="login-senha" className="mb-1.5 block text-sm text-slate-600">
                   Senha
                 </label>
                 <div className="relative flex items-center">

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+// Geist é auto-hospedada pelo pacote: nenhuma requisição externa, o que
+// também evita liberar mais um domínio na CSP (card #102).
+import { GeistSans } from "geist/font/sans";
 import "./globals.css";
 import { brandingBootScript } from "../lib/branding";
 
@@ -19,7 +22,7 @@ export default async function RootLayout({
   // congelaria o nonce do build.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
-    <html lang="pt-BR" suppressHydrationWarning>
+    <html lang="pt-BR" className={GeistSans.variable} suppressHydrationWarning>
       <head>
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: brandingBootScript }} />
       </head>
