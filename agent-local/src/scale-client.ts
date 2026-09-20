@@ -240,8 +240,10 @@ const FIELD_VINCULO_ALERGICO = 61;
 /**
  * Template de um registro NU3 (tabela nutricional) capturado da balança
  * (2026-08-27, ver [[project_scale_protocol_field_gap]]): idx1 índice da
- * tabela, idx2 nome, idx4/5 porção (quantidade/unidade), idx6 porções por
- * embalagem, idx7-26 os 10 nutrientes padrão em pares (valor, %VD) — valor
+ * tabela, idx2 nome, idx4/5 porção (quantidade/unidade). O idx6 NÃO é
+ * "porções por embalagem": na impressão ele cola no fim da linha da porção
+ * (`Porção: 30 g1` no card #49). Fica vazio de propósito. idx7-26 os 10
+ * nutrientes padrão em pares (valor, %VD) — valor
  * energético, carboidratos, açúcares totais, açúcares adicionados, proteínas,
  * gorduras totais, gorduras saturadas, gorduras trans, fibra alimentar, sódio
  * — nessa ordem fixa — e idx27-56 dez grupos de 3 (nome, valor, %VD) pra
@@ -371,9 +373,10 @@ export function buildNu3Row(tabela: TabelaNutricionalPayload): string {
     fields[NU3_FIELD_PORCAO_QTD] = quantidade;
     fields[NU3_FIELD_PORCAO_UNIDADE] = unidade;
   }
-  if (tabela.porcoesPorEmbalagem != null) {
-    fields[NU3_FIELD_PORCOES_POR_EMBALAGEM] = String(Math.round(tabela.porcoesPorEmbalagem));
-  }
+  // idx6 fica vazio de propósito: a balança imprime esse campo emendado na
+  // linha da porção (`Porção: 30 g1`, card #49). porcoesPorEmbalagem continua
+  // no PesoHub só para a tela.
+  fields[NU3_FIELD_PORCOES_POR_EMBALAGEM] = "";
   if (tabela.ingredientes) fields[NU3_FIELD_INGREDIENTES] = sanitizeField(tabela.ingredientes);
 
   for (const item of tabela.itens) {

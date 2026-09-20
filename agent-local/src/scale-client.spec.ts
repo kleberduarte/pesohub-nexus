@@ -2,6 +2,7 @@ import { createServer } from "net";
 import type { AddressInfo } from "net";
 import {
   buildPluRow,
+  buildNu3Row,
   descreverFormatosDivergentes,
   encodePrice,
   encodeTara,
@@ -340,5 +341,26 @@ describe("listarSlotsEtiqueta", () => {
     const r = await listarSlotsEtiqueta("127.0.0.1", b.porta);
     b.fechar();
     expect(r.ok).toBe(false);
+  });
+});
+
+/**
+ * Card #49: idx6 do NU3 saía emendado na linha da porção (`30 g1`).
+ * O campo continua existindo no fio — só não leva porcoesPorEmbalagem.
+ */
+describe("buildNu3Row — idx6 da porção", () => {
+  const campo = (linha: string, idx: number) => linha.split("\t")[idx];
+
+  it("não manda porções por embalagem no idx6", () => {
+    const linha = buildNu3Row({
+      numero: 40,
+      nome: "TESTE",
+      porcao: "30 g",
+      porcoesPorEmbalagem: 1,
+      itens: [],
+    } as any);
+    expect(campo(linha, 4)).toBe("30");
+    expect(campo(linha, 5)).toBe("g");
+    expect(campo(linha, 6)).toBe("");
   });
 });

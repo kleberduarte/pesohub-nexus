@@ -17,6 +17,12 @@ import {
 } from "../../lib/api";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { EtiquetaPreview } from "../products/EtiquetaPreview";
+import {
+  ALTURA_ROLO_MM,
+  LARGURA_IMPRIMIVEL_MM,
+  avisoLayoutVsRolo,
+  etiquetasFisicasOcupadas,
+} from "../../lib/papel-etiqueta";
 
 type ElementoTipo =
   | "nome"
@@ -134,8 +140,8 @@ export function FormatoImpressaoPanel() {
   const [editing, setEditing] = useState<FormatoImpressao | null>(null);
   const [numero, setNumero] = useState(0);
   const [nome, setNome] = useState("");
-  const [larguraMm, setLarguraMm] = useState(56);
-  const [alturaMm, setAlturaMm] = useState(90);
+  const [larguraMm, setLarguraMm] = useState(LARGURA_IMPRIMIVEL_MM);
+  const [alturaMm, setAlturaMm] = useState(ALTURA_ROLO_MM);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<FormatoImpressao | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -184,8 +190,8 @@ export function FormatoImpressaoPanel() {
     // Sem mapa, mantém o 0 de antes em vez de chutar um número.
     setNumero(slots?.livres[0] ?? 0);
     setNome("");
-    setLarguraMm(56);
-    setAlturaMm(90);
+    setLarguraMm(LARGURA_IMPRIMIVEL_MM);
+    setAlturaMm(ALTURA_ROLO_MM);
     setModalOpen(true);
   };
 
@@ -415,6 +421,11 @@ export function FormatoImpressaoPanel() {
                   <td className="px-4 py-3">{f.nome}</td>
                   <td className="px-4 py-3 font-mono text-xs">
                     {f.larguraMm}mm x {f.alturaMm}mm
+                    {etiquetasFisicasOcupadas(f.alturaMm) > 1 ? (
+                      <span className="ml-2 font-sans text-amber-700">
+                        {etiquetasFisicasOcupadas(f.alturaMm)} etiquetas do rolo
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">{elementosCount(f)}</td>
                   <td className="px-4 py-3">
@@ -536,6 +547,12 @@ export function FormatoImpressaoPanel() {
                   />
                 </div>
               </div>
+              {avisoLayoutVsRolo(alturaMm) ? (
+                <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  {avisoLayoutVsRolo(alturaMm)} Use um modelo 60x40 na aba Layouts padrão, ou a impressão volta a
+                  ocupar várias etiquetas (card #49).
+                </p>
+              ) : null}
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
@@ -570,6 +587,12 @@ export function FormatoImpressaoPanel() {
               </button>
             </div>
 
+            {avisoLayoutVsRolo(layoutEditing.alturaMm) ? (
+              <p className="mb-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                {avisoLayoutVsRolo(layoutEditing.alturaMm)} As linhas tracejadas marcam o corte do rolo.
+              </p>
+            ) : null}
+
             <div className="flex flex-wrap gap-2 mb-4">
               {(Object.keys(TIPO_LABEL) as ElementoTipo[]).map((tipo) => (
                 <button
@@ -593,6 +616,17 @@ export function FormatoImpressaoPanel() {
                 className="relative bg-white border-2 border-slate-300 rounded shrink-0"
                 style={{ width: canvasSize.width, height: canvasSize.height }}
               >
+                {Array.from(
+                  { length: Math.max(0, etiquetasFisicasOcupadas(layoutEditing.alturaMm) - 1) },
+                  (_, i) => (
+                    <div
+                      key={`corte-${i}`}
+                      className="absolute left-0 right-0 border-t border-dashed border-amber-400 pointer-events-none z-10"
+                      style={{ top: (i + 1) * ALTURA_ROLO_MM * PX_PER_MM }}
+                      title="Corte do rolo"
+                    />
+                  ),
+                )}
                 {elementos.map((el) => {
                   // Borda e divisória são o traço em si, não uma caixa com
                   // rótulo dentro: desenhar o nome do tipo dentro delas

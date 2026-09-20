@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { formatosImpressaoApi, ApiError, type FormatoImpressao } from "../../lib/api";
 import { LAYOUTS_PADRAO, type LayoutPadrao } from "../../lib/layouts-padrao";
+import { avisoLayoutVsRolo } from "../../lib/papel-etiqueta";
 
 /**
  * Aba somente-leitura com os modelos de etiqueta de fábrica da Ramuza.
@@ -116,7 +117,8 @@ export function LayoutsPadraoPanel() {
         <h2 className="text-lg font-semibold text-slate-900">Layouts padrão</h2>
         <p className="text-sm text-slate-500">
           Modelos de fábrica da Ramuza, prontos para uso. São somente leitura: use um como ponto de partida e
-          o ajuste é feito na cópia, em Formato de Impressão.
+          o ajuste é feito na cópia, em Formato de Impressão. O rolo da loja tem 40mm de altura — o que passar
+          disso imprime em mais de uma etiqueta.
         </p>
       </div>
 
@@ -146,6 +148,11 @@ export function LayoutsPadraoPanel() {
               <p className="text-sm font-medium text-slate-900">{layout.nome}</p>
               <p className="text-xs text-slate-500">
                 {layout.larguraMm}mm x {layout.alturaMm}mm · {layout.elementos.length} elementos
+                {avisoLayoutVsRolo(layout.alturaMm) ? (
+                  <span className="block text-amber-700 mt-1">Não cabe no rolo de 40mm</span>
+                ) : (
+                  <span className="block text-emerald-700 mt-1">Cabe no rolo da loja</span>
+                )}
               </p>
             </div>
             <button
@@ -167,6 +174,12 @@ export function LayoutsPadraoPanel() {
               Cria um formato novo desta loja com {usando.elementos.length} elementos, {usando.larguraMm}mm x{" "}
               {usando.alturaMm}mm.
             </p>
+            {avisoLayoutVsRolo(usando.alturaMm) ? (
+              <p className="mb-4 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                {avisoLayoutVsRolo(usando.alturaMm)} Prefira um modelo 60x40 se a impressão tiver que sair em uma
+                etiqueta só.
+              </p>
+            ) : null}
 
             {error && (
               <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">

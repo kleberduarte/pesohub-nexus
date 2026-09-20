@@ -124,3 +124,27 @@ describe("Formato de Impressão — aviso de envio à balança", () => {
     expect(await screen.findByText(/nenhuma balança com agent local/i)).toBeVisible();
   });
 });
+
+/**
+ * Cards #60/#49: formato novo nasce no tamanho do rolo (40mm). Sem o aviso,
+ * a pessoa recria o LAB 22 de 120mm e a etiqueta volta a ocupar três do rolo.
+ */
+describe("Formato de Impressão — tamanho do rolo", () => {
+  beforeEach(() => {
+    (devicesApi.slotsEtiqueta as jest.Mock).mockResolvedValue({ slots: [], livres: [15] });
+    (formatosImpressaoApi.list as jest.Mock).mockResolvedValue([]);
+  });
+
+  it("abre o cadastro novo com 40mm de altura", async () => {
+    await abrirNovo();
+    expect(await screen.findByLabelText(/altura \(mm\)/i)).toHaveValue(40);
+  });
+
+  it("avisa quando a altura passa do rolo", async () => {
+    await abrirNovo();
+    const altura = await screen.findByLabelText(/altura \(mm\)/i);
+    await userEvent.clear(altura);
+    await userEvent.type(altura, "120");
+    expect(await screen.findByText(/imprime em 3 etiquetas/i)).toBeVisible();
+  });
+});
