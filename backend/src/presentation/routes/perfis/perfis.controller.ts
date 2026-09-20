@@ -53,6 +53,7 @@ export class PerfisController {
   async create(@Body() dto: CreatePerfilDto, @Req() req: Request) {
     const clienteId = this.clienteId(req);
     this.recusarNomeDeRede(dto.nome);
+    await this.exigirLojasDaEmpresa(clienteId, dto.lojaIds);
     return this.prisma.perfil.create({
       data: {
         nome: dto.nome,
@@ -70,6 +71,7 @@ export class PerfisController {
     if (!existing) return null;
     this.recusarPerfilDeRede(existing.nome);
     if (dto.nome) this.recusarNomeDeRede(dto.nome);
+    await this.exigirLojasDaEmpresa(clienteId, dto.lojaIds);
 
     if (dto.lojaIds) {
       await this.prisma.perfilLojaAcesso.deleteMany({ where: { perfilId: id } });
@@ -83,6 +85,31 @@ export class PerfisController {
       },
       include: { lojas: { include: { loja: true } } },
     });
+  }
+
+  /**
+   * Toda loja do perfil precisa ser da empresa de quem pede.
+   *
+   * Sem esta checagem, `lojaIds` era gravado direto: bastava conhecer o id de
+   * uma loja de outra empresa para vincular o próprio Perfil a ela — e a
+   * resposta, que inclui `loja`, devolvia os dados dessa loja de volta. O
+   * vínculo em si não dava acesso aos dados operacionais (o escopo da sessão
+   * refiltra a loja por empresa), mas vazava cadastro entre concorrentes e
+   * deixava uma linha cross-tenant esperando o próximo consumidor que
+   * confiasse nela. Mesma validação que o cadastro de usuário já fazia.
+   */
+  private async exigirLojasDaEmpresa(clienteId: string, lojaIds?: string[]) {
+    if (!lojaIds?.length) return;
+    const unicos = [...new Set(lojaIds)];
+    const daEmpresa = await this.prisma.loja.findMany({
+      where: { id: { in: unicos }, clienteId },
+      select: { id: true },
+    });
+    if (daEmpresa.length !== unicos.length) {
+      // Não diz QUAL id falhou: isso confirmaria a existência de uma loja de
+      // outra empresa para quem está sondando.
+      throw new BadRequestException("Uma ou mais lojas informadas não pertencem a esta empresa.");
+    }
   }
 
   @Delete(":id")

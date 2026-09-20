@@ -306,7 +306,14 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     // Administrador da loja sem perfil de rede não enxerga nada (card #96).
     if (!user?.perfilId) return user?.role !== "ADMIN_REDE";
-    const acesso = await this.prisma.perfilLojaAcesso.findFirst({ where: { perfilId: user.perfilId, lojaId } });
+    // A empresa entra na consulta de propósito, mesmo com o chamador já
+    // validando a loja antes: uma linha de PerfilLojaAcesso apontando para
+    // loja de outra empresa não deve valer como acesso em lugar nenhum. Não
+    // depender de o próximo chamador lembrar da checagem é o que torna isto
+    // defesa em profundidade e não redundância.
+    const acesso = await this.prisma.perfilLojaAcesso.findFirst({
+      where: { perfilId: user.perfilId, lojaId, loja: { clienteId: user.clienteId ?? undefined } },
+    });
     return !!acesso;
   }
 
