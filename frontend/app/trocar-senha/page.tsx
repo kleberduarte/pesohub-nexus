@@ -55,6 +55,7 @@ export default function TrocarSenhaPage() {
         onSubmit={handleSubmit}
         className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
       >
+        <img src="/balancashub-logo-escuro.png" alt="Balanças Hub" className="mb-6 h-9 w-auto object-contain" />
         <h1 className="text-lg font-semibold text-slate-900">Defina uma nova senha</h1>
         <p className="mt-1 text-sm text-slate-600">
           Sua senha atual foi definida por outra pessoa ou já venceu. Escolha uma senha que só você conheça.

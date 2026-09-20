@@ -10,7 +10,7 @@ import DefinirSenhaPorLink from "../../components/auth/DefinirSenhaPorLink";
 export default function AceitarConvitePage() {
   return (
     <DefinirSenhaPorLink
-      titulo="Bem-vindo ao PesoHub"
+      titulo="Bem-vindo ao Balanças Hub"
       descricao="Escolha a senha que você vai usar para entrar. Só você vai conhecê-la."
       semToken={{
         texto:

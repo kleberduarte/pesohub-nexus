@@ -139,6 +139,7 @@ export default function DefinirSenhaPorLink({ titulo, ...resto }: Props) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-100 p-4">
       <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <img src="/balancashub-logo-escuro.png" alt="Balanças Hub" className="mb-6 h-9 w-auto object-contain" />
         <h1 className="text-lg font-semibold text-slate-900">{titulo}</h1>
         {/* useSearchParams exige Suspense no build de produção do Next 15. */}
         <Suspense fallback={<p className="mt-3 text-sm text-slate-500">Carregando...</p>}>

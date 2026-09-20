@@ -7,7 +7,7 @@ import "./globals.css";
 import { brandingBootScript } from "../lib/branding";
 
 export const metadata: Metadata = {
-  title: "PesoHub",
+  title: "Balanças Hub",
   description: "Conectando dados, pesando o futuro",
 };
 
