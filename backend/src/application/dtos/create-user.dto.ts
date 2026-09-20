@@ -24,7 +24,20 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role!: UserRole;
 
-  /** Restringe o usuário a uma única Loja (via Perfil dedicado a ela). Sem isso, ele enxerga todas as Lojas do Cliente. */
+  /**
+   * Escopo do usuário: o Perfil define a quais Lojas ele tem acesso. Sem
+   * Perfil, ele enxerga todas as Lojas da empresa (card #83).
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  perfilId?: string;
+
+  /**
+   * Atalho antigo: restringe a uma única Loja criando um Perfil dedicado a
+   * ela. Mantido por compatibilidade com quem já chama assim; `perfilId`
+   * explícito tem precedência.
+   */
   @IsOptional()
   @IsString()
   @MaxLength(128)

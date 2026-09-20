@@ -25,6 +25,7 @@ import { UpsertContratoDto } from "../../../application/dtos/upsert-contrato.dto
 import { FecharCompetenciaDto } from "../../../application/dtos/fechar-competencia.dto";
 import { Public } from "../../middleware/public.decorator";
 import { RolesGuard } from "../../middleware/roles.guard";
+import { EscopoAdminGuard, ExigeEmpresaInteira } from "../../middleware/escopo-admin.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { SkipBillingCheck } from "../../middleware/skip-billing-check.decorator";
 
@@ -54,9 +55,11 @@ export class BillingController {
     private readonly config: ConfigService,
   ) {}
 
+  // Assinar compromete a rede inteira: é da empresa, não de uma loja (#85).
   @Post("subscribe")
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, EscopoAdminGuard)
   @Roles("ADMIN", "SUPERADMIN", "ADMIN_REDE")
+  @ExigeEmpresaInteira()
   async subscribe(@Body() dto: CreateAssinaturaDto, @Req() req: Request) {
     const user = this.usuario(req);
     const rede = await this.billing.resolverRede(user, dto.dominioRede);
@@ -104,9 +107,11 @@ export class BillingController {
     return this.billing.listarAssinaturas(this.usuario(req).clienteId);
   }
 
+  // Cancelar derruba a rede toda — mesma régua da assinatura.
   @Post("cancel")
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, EscopoAdminGuard)
   @Roles("ADMIN", "SUPERADMIN", "ADMIN_REDE")
+  @ExigeEmpresaInteira()
   async cancel(@Req() req: Request, @Body() body: { dominioRede?: string }) {
     const user = this.usuario(req);
     const rede = await this.billing.resolverRede(user, body?.dominioRede);

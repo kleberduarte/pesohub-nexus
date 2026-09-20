@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   NotFoundException,
@@ -18,6 +19,7 @@ import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { CreateLojaDto } from "../../../application/dtos/create-loja.dto";
 import { UpdateLojaDto } from "../../../application/dtos/update-loja.dto";
 import { RolesGuard } from "../../middleware/roles.guard";
+import { EscopoAdminGuard, ExigeEmpresaInteira } from "../../middleware/escopo-admin.guard";
 import { normalizarDominio } from "../../../domain/services/acesso-por-dominio";
 import { revogarUnidadeDaRede, sincronizarPerfilDaRede } from "./perfil-da-rede";
 import { BillingService } from "../billing/billing.service";
@@ -57,9 +59,11 @@ export class LojasController {
     return this.prisma.loja.findFirst({ where: { id, clienteId: this.clienteId(req) } });
   }
 
+  // Abrir loja nova é decisão da empresa, não de quem gerencia uma delas.
   @Post()
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, EscopoAdminGuard)
   @Roles("ADMIN", "SUPERADMIN")
+  @ExigeEmpresaInteira()
   async create(@Body() dto: CreateLojaDto, @Req() req: Request) {
     const clienteId = this.clienteId(req);
     const dominioEmail = await this.validarDominioEmail(clienteId, dto.dominioEmail);
@@ -76,6 +80,10 @@ export class LojasController {
   @Roles("ADMIN", "SUPERADMIN")
   async update(@Param("id") id: string, @Body() dto: UpdateLojaDto, @Req() req: Request) {
     const clienteId = this.clienteId(req);
+    // Editar é permitido nas PRÓPRIAS lojas: quem tem escopo mexe só no que
+    // administra (card #85). Sem isso, o gerente da Loja 1 renomearia a Loja 2
+    // — ou mudaria o domínio dela, trocando quem enxerga o quê.
+    await this.exigirLojaNoMeuEscopo(req, id);
     const anterior = await this.prisma.loja.findFirst({ where: { id, clienteId }, select: { dominioEmail: true } });
     if (!anterior) {
       return null;
@@ -97,10 +105,12 @@ export class LojasController {
     return this.prisma.loja.findFirst({ where: { id } });
   }
 
+  // Apagar loja também: leva junto balanças, produtos e usuários dela.
   @Delete(":id")
   @HttpCode(204)
-  @UseGuards(RolesGuard)
+  @UseGuards(RolesGuard, EscopoAdminGuard)
   @Roles("ADMIN", "SUPERADMIN")
+  @ExigeEmpresaInteira()
   async remove(@Param("id") id: string, @Req() req: Request) {
     const clienteId = this.clienteId(req);
     const loja = await this.prisma.loja.findFirst({ where: { id, clienteId } });
@@ -166,5 +176,22 @@ export class LojasController {
 
   private perfilId(req: Request): string | null {
     return (req as unknown as { user: { perfilId?: string | null } }).user.perfilId ?? null;
+  }
+
+  /**
+   * Garante que a loja está dentro do escopo de quem pede. Perfil nulo =
+   * empresa inteira, então quem administra tudo passa direto. O escopo vem do
+   * banco, não do token.
+   */
+  private async exigirLojaNoMeuEscopo(req: Request, lojaId: string) {
+    const sub = (req as unknown as { user?: { sub?: string } }).user?.sub;
+    if (!sub) throw new ForbiddenException("Sessão inválida");
+    const quemPede = await this.prisma.user.findUnique({ where: { id: sub }, select: { perfilId: true } });
+    if (!quemPede?.perfilId) return;
+    const acesso = await this.prisma.perfilLojaAcesso.findFirst({
+      where: { perfilId: quemPede.perfilId, lojaId },
+      select: { id: true },
+    });
+    if (!acesso) throw new ForbiddenException("Esta loja está fora do seu acesso.");
   }
 }

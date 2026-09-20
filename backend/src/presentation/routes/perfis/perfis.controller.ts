@@ -19,11 +19,15 @@ import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { CreatePerfilDto } from "../../../application/dtos/create-perfil.dto";
 import { UpdatePerfilDto } from "../../../application/dtos/update-perfil.dto";
 import { RolesGuard } from "../../middleware/roles.guard";
+import { EscopoAdminGuard, ExigeEmpresaInteira } from "../../middleware/escopo-admin.guard";
 import { Roles } from "../../middleware/roles.decorator";
 
 @ApiTags("perfis")
-@UseGuards(RolesGuard)
+@UseGuards(RolesGuard, EscopoAdminGuard)
 @Roles("ADMIN", "SUPERADMIN")
+// Perfil é a peça que define o escopo de todo mundo: quem administra uma loja
+// não edita a régua que o limita (card #85).
+@ExigeEmpresaInteira()
 @Controller("perfis")
 export class PerfisController {
   constructor(private readonly prisma: PrismaService) {}
