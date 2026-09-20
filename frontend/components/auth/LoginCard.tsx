@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, EyeOff, Scale, CloudUpload, Tags, LineChart, ShieldCheck } from "lucide-react";
-import { PesoHubLogo, PesoHubMark } from "../brand/PesoHubLogo";
+import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { login, ApiError, takeSessionEndReason, type ClienteBranding } from "../../lib/api";
+import { PesoHubLogo } from "../brand/PesoHubLogo";
 
 interface LoginCardProps {
   branding: ClienteBranding | null;
@@ -13,12 +13,13 @@ interface LoginCardProps {
 }
 
 /**
- * Login no padrão que o mercado consolidou (card #102): duas colunas, com o
- * institucional num cartão claro à esquerda e o formulário limpo à direita —
- * rótulos acima dos campos, botão de largura total e muito espaço em branco.
+ * Login em duas metades (card #102): formulário sobre fundo escuro à esquerda e
+ * a foto do equipamento sangrando até a borda à direita — o produto aparece
+ * antes de qualquer texto explicar o que o sistema faz.
  *
- * A identidade continua sendo a da empresa ativa: logo, nome e cores vêm do
- * branding, e o layout só emoldura isso.
+ * A foto é preto e branco de propósito: o equipamento tem cores fortes (visor
+ * verde, marca do fabricante) que brigariam com a identidade de cada empresa.
+ * Em cinza, ela aceita por cima o véu da cor do cliente.
  */
 export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) {
   const [email, setEmail] = useState("");
@@ -59,164 +60,138 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
   };
 
   const campo =
-    "w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-slate-800 placeholder:text-slate-300 transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-brand-500";
+    "w-full rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3.5 text-white transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-accent-500";
 
   return (
-    <div className="flex min-h-screen items-center bg-white p-4 lg:p-8">
-      <div className="mx-auto grid w-full max-w-7xl items-center gap-8 lg:grid-cols-2 lg:gap-16">
-        {/* Institucional — cartão claro, escondido no celular para o formulário
-            aparecer primeiro em tela pequena. */}
-        <aside className="relative hidden overflow-hidden rounded-3xl bg-slate-50 p-12 lg:flex lg:min-h-[38rem] lg:flex-col lg:justify-between">
-          <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-brand-100/60 blur-3xl" />
-          <div className="absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-accent-500/10 blur-3xl" />
-
-          <div className="relative z-10">
+    <div className="flex min-h-screen flex-col bg-slate-950 lg:flex-row">
+      {/* Formulário */}
+      <main className="order-2 flex flex-1 items-center justify-center px-6 py-12 sm:px-10 lg:order-1 lg:px-16">
+        <div className="w-full max-w-sm">
+          <div className="mb-10">
             {branding?.logoUrl ? (
-              <img src={branding.logoUrl} alt={brandName} className="h-9 w-9 object-contain" />
+              <span className="inline-flex items-center gap-3">
+                <img src={branding.logoUrl} alt={brandName} className="h-11 w-11 object-contain" />
+                <span className="text-2xl font-semibold tracking-tight text-white">{brandName}</span>
+              </span>
             ) : (
-              <PesoHubMark className="h-9 w-9" />
+              <PesoHubLogo wordClassName="text-2xl" />
             )}
-            <p className="mt-8 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-              Plataforma de gestão de balanças
-            </p>
-            <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-slate-900">
-              {tagline.endsWith(".") ? tagline.slice(0, -1) : tagline}.
-            </h1>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-slate-500">
-              Produtos, etiquetas e balanças de todas as lojas em um lugar só — com sincronização
-              acompanhada de perto.
-            </p>
+            <p className="mt-6 text-sm text-white/50">{tagline}</p>
           </div>
 
-          <ul className="relative z-10 mt-10 space-y-4">
-            {[
-              { icone: Scale, texto: "Balanças conectadas e monitoradas em tempo real" },
-              { icone: Tags, texto: "Etiquetas e tabela nutricional sem retrabalho" },
-              { icone: CloudUpload, texto: "Sincronização com registro do que foi para cada equipamento" },
-              { icone: LineChart, texto: "Visão de todas as lojas, sem misturar dados" },
-            ].map(({ icone: Icone, texto }) => (
-              <li key={texto} className="flex items-start gap-3">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-600 shadow-sm ring-1 ring-slate-200/70">
-                  <Icone className="h-4 w-4" strokeWidth={2} />
-                </span>
-                <span className="text-sm leading-relaxed text-slate-600">{texto}</span>
-              </li>
-            ))}
-          </ul>
+          <h1 className="text-2xl font-semibold tracking-tight text-white">Acesse sua conta</h1>
 
-          <div className="relative z-10 flex items-center justify-between gap-4 border-t border-slate-200/70 pt-6">
-            <span className="inline-flex items-center gap-2 text-xs text-slate-500">
-              <ShieldCheck className="h-4 w-4 text-brand-600" />
-              Sessão única por usuário e dados isolados por loja
-            </span>
-            <span className="text-xs text-slate-400">© {new Date().getFullYear()} {brandName}</span>
-          </div>
-        </aside>
+          <form onSubmit={handleLogin} className="mt-8 space-y-5">
+            {sessionEndReason && !error && (
+              <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-sm text-amber-200">
+                {sessionEndReason}
+              </div>
+            )}
 
-        {/* Autenticação */}
-        <main className="flex w-full justify-center px-2 py-10 lg:px-10">
-          <div className="w-full max-w-md">
-            <div className="mb-9 flex flex-col items-center lg:items-start">
-              {branding?.logoUrl ? (
-                <span className="inline-flex items-center gap-3">
-                  <img src={branding.logoUrl} alt={brandName} className="h-11 w-11 object-contain" />
-                  <span className="text-2xl font-semibold tracking-tight text-slate-800">{brandName}</span>
-                </span>
-              ) : (
-                <PesoHubLogo />
-              )}
+            {error && (
+              <div
+                className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-2.5 text-sm text-red-200"
+                role="alert"
+              >
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="login-e-mail" className="mb-1.5 block text-sm text-white/70">
+                E-mail
+              </label>
+              <input
+                id="login-e-mail"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={campo}
+              />
             </div>
 
-            <h2 className="text-xl font-semibold tracking-[0.2px] text-slate-900">Acesse sua conta</h2>
-
-            <form onSubmit={handleLogin} className="mt-8 space-y-5">
-              {sessionEndReason && !error && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-                  {sessionEndReason}
-                </div>
-              )}
-
-              {error && (
-                <div className="rounded-xl border border-red-100 bg-red-50 px-3 py-2.5 text-sm text-red-600" role="alert">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label htmlFor="login-e-mail" className="mb-1.5 block text-sm text-slate-600">
-                  E-mail
-                </label>
+            <div>
+              <label htmlFor="login-senha" className="mb-1.5 block text-sm text-white/70">
+                Senha
+              </label>
+              <div className="relative flex items-center">
                 <input
-                  id="login-e-mail"
-                  type="email"
+                  id="login-senha"
+                  type={showPassword ? "text" : "password"}
                   required
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={campo}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={`${campo} pr-12`}
                 />
-              </div>
-
-              <div>
-                <label htmlFor="login-senha" className="mb-1.5 block text-sm text-slate-600">
-                  Senha
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    id="login-senha"
-                    type={showPassword ? "text" : "password"}
-                    required
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className={`${campo} pr-12`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 text-slate-400 transition-colors hover:text-slate-600"
-                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
-                <Link
-                  href="/esqueci-senha"
-                  className="mt-2 inline-block text-sm font-medium text-brand-600 underline-offset-2 hover:underline"
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 text-white/40 transition-colors hover:text-white/70"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
-                  Esqueci minha senha
-                </Link>
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full rounded-xl bg-brand-600 px-4 py-3.5 font-semibold text-white transition-all duration-200 hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+              <Link
+                href="/esqueci-senha"
+                className="mt-2 inline-block text-sm text-accent-500 underline-offset-2 hover:underline"
               >
-                {loading ? "Entrando..." : "Entrar"}
-              </button>
-            </form>
+                Esqueci minha senha
+              </Link>
+            </div>
 
-            {/* No PesoHub não existe autocadastro: o acesso nasce de um convite. */}
-            <p className="mt-8 text-center text-sm text-slate-500">
-              Primeira vez por aqui?{" "}
-              <button
-                type="button"
-                onClick={() => setExplicarAcesso((v) => !v)}
-                className="font-semibold text-brand-600 underline-offset-2 hover:underline"
-              >
-                Como conseguir acesso
-              </button>
-            </p>
-            {explicarAcesso && (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-relaxed text-slate-600">
-                O acesso é criado pelo administrador da sua empresa, que envia um convite por e-mail.
-                No link do convite você define a sua própria senha — ninguém mais fica sabendo dela.
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-xl bg-brand-600 px-4 py-3.5 font-semibold text-white transition-all duration-200 hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+
+          {/* No PesoHub não existe autocadastro: o acesso nasce de um convite. */}
+          <p className="mt-8 text-sm text-white/50">
+            Primeira vez por aqui?{" "}
+            <button
+              type="button"
+              onClick={() => setExplicarAcesso((v) => !v)}
+              className="font-semibold text-accent-500 underline-offset-2 hover:underline"
+            >
+              Como conseguir acesso
+            </button>
+          </p>
+          {explicarAcesso && (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-4 text-sm leading-relaxed text-white/70">
+              O acesso é criado pelo administrador da sua empresa, que envia um convite por e-mail. No
+              link do convite você define a sua própria senha — ninguém mais fica sabendo dela.
+            </div>
+          )}
+
+          <p className="mt-10 flex items-center gap-2 text-xs text-white/35">
+            <ShieldCheck className="h-4 w-4" />
+            Sessão única por usuário e dados isolados por loja
+          </p>
+        </div>
+      </main>
+
+      {/* Equipamento — sangra até a borda, como na referência */}
+      <aside className="relative order-1 h-56 overflow-hidden sm:h-72 lg:order-2 lg:h-auto lg:w-[46%]">
+        <img
+          src="/login-balanca.webp"
+          alt="Balança de supermercado conectada ao PesoHub"
+          className="h-full w-full object-cover object-center"
+        />
+        {/* Véu com a cor da marca: costura a foto cinza à identidade da empresa. */}
+        <div className="absolute inset-0 bg-brand-600/30 mix-blend-color" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/20 to-transparent" />
+
+        <p className="absolute bottom-8 left-8 right-8 hidden max-w-sm text-sm leading-relaxed text-white/70 lg:block">
+          Produtos, etiquetas e sincronização de todas as balanças da rede — acompanhados de perto.
+        </p>
+      </aside>
     </div>
   );
 }
