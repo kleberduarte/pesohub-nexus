@@ -2,9 +2,11 @@
  * Marca do PesoHub (card #102).
  *
  * O símbolo junta as duas ideias do produto numa forma só: uma BALANÇA (haste,
- * travessão e base) cujos pratos são NÓS de uma rede — o "hub" que liga as
- * balanças das lojas. Desenhado em vetor para ficar nítido do favicon ao
- * cabeçalho, e com as cores vindas da paleta da empresa ativa, não fixas.
+ * travessão e base) cujos pratos são NÓS ligados pelo travessão — o "hub" que
+ * liga as balanças das lojas. Vetor, com as cores vindas da paleta da empresa.
+ *
+ * Desenho propositalmente grosso e com poucos elementos: a primeira versão
+ * tinha ligações finas e um nó extra que sumiam no ícone de 32px.
  *
  * Só é usada quando a empresa não tem logo próprio: cliente com marca própria
  * continua vendo a dele.
@@ -22,26 +24,20 @@ export function PesoHubMark({ className = "h-10 w-10" }: { className?: string })
       <rect width="48" height="48" rx="13" fill="url(#ph-grad)" />
       <g
         stroke="#fff"
-        strokeWidth="2.6"
+        strokeWidth="3.2"
         strokeLinecap="round"
         strokeLinejoin="round"
         fill="none"
-        opacity="0.96"
       >
-        {/* travessão e haste: a balança */}
-        <path d="M13.5 17.5h21" />
-        <path d="M24 17.5v16" />
-        <path d="M17.5 33.5h13" />
+        {/* travessão, haste e base: a balança */}
+        <path d="M11 18h26" />
+        <path d="M24 18v16.5" />
+        <path d="M16.5 34.5h15" />
       </g>
-      {/* pratos que também são nós da rede */}
-      <circle cx="13.5" cy="17.5" r="3.6" fill="#fff" />
-      <circle cx="34.5" cy="17.5" r="3.6" fill="#fff" />
-      <circle cx="24" cy="12.6" r="2.6" fill="#fff" />
-      {/* ligações do hub, mais discretas que a estrutura */}
-      <g stroke="#fff" strokeWidth="1.6" strokeLinecap="round" opacity="0.55">
-        <path d="M15.6 15.1 22 12.9" />
-        <path d="M32.4 15.1 26 12.9" />
-      </g>
+      {/* pratos, que também são os nós ligados pelo travessão */}
+      <circle cx="11" cy="18" r="4.6" fill="#fff" />
+      <circle cx="37" cy="18" r="4.6" fill="#fff" />
+      <circle cx="24" cy="18" r="2.6" fill="#fff" />
     </svg>
   );
 }
