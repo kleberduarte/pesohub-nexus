@@ -24,6 +24,8 @@ describe("ContratoService — contrato da fabricante", () => {
       competenciaFaturada: {
         findUnique: jest.fn().mockResolvedValue(competenciaExistente),
         create: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "f1", ...data })),
+        // A reserva da emissão (evita boleto em dobro) passa por updateMany.
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn().mockImplementation(({ data }) => Promise.resolve({ id: "f1", ...data })),
       },
       device: { count: jest.fn().mockResolvedValue(devices) },
@@ -77,6 +79,23 @@ describe("ContratoService — contrato da fabricante", () => {
     const { servico, asaas } = montar(650, jaFechada);
     await expect(servico.fechar("ramuza", "2026-08")).resolves.toBe(jaFechada);
     expect(asaas.createPayment).not.toHaveBeenCalled();
+  });
+
+  it("emissão simultânea: a segunda chamada é recusada em vez de emitir outro boleto", async () => {
+    const { servico, asaas, prisma } = montar(650);
+    // Perdeu a corrida pela reserva: outra chamada já está emitindo.
+    prisma.competenciaFaturada.updateMany.mockResolvedValue({ count: 0 });
+    await expect(servico.fechar("ramuza", "2026-08")).rejects.toThrow(/emissão em andamento/i);
+    expect(asaas.createPayment).not.toHaveBeenCalled();
+  });
+
+  it("falha do Asaas libera a reserva para o retry", async () => {
+    const { servico, asaas, prisma } = montar(650);
+    asaas.createPayment.mockRejectedValue(new Error("Asaas fora do ar"));
+    await expect(servico.fechar("ramuza", "2026-08")).rejects.toThrow("Asaas fora do ar");
+    const chamadas = prisma.competenciaFaturada.updateMany.mock.calls;
+    const liberacao = chamadas[chamadas.length - 1][0];
+    expect(liberacao.data).toEqual({ asaasPaymentId: null });
   });
 
   it("não fecha competência que ainda não terminou", async () => {

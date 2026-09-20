@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { AsaasService } from "../../../infrastructure/billing/asaas.service";
 import { UpsertContratoDto } from "../../../application/dtos/upsert-contrato.dto";
@@ -112,6 +112,38 @@ export class ContratoService {
         },
       }));
 
+    // Reserva a emissão: `asaasPaymentId` é único, então só uma chamada
+    // consegue marcar a linha. Sem isso, dois fechamentos simultâneos da mesma
+    // competência já apurada emitiam DOIS boletos reais, e o banco guardava só
+    // o último — o primeiro ficava órfão e cobrável.
+    const marca = `emitindo:${linha.id}`;
+    const reserva = await this.prisma.competenciaFaturada.updateMany({
+      where: { id: linha.id, asaasPaymentId: null },
+      data: { asaasPaymentId: marca },
+    });
+    if (reserva.count === 0) {
+      throw new ConflictException("Já existe uma emissão em andamento para esta competência.");
+    }
+
+    try {
+      return await this.emitir(clienteId, contrato, linha, competencia, cpfCnpj);
+    } catch (err) {
+      // Libera a reserva para o próximo retry poder emitir.
+      await this.prisma.competenciaFaturada.updateMany({
+        where: { id: linha.id, asaasPaymentId: marca },
+        data: { asaasPaymentId: null },
+      });
+      throw err;
+    }
+  }
+
+  private async emitir(
+    clienteId: string,
+    contrato: { id: string; asaasCustomerId: string | null },
+    linha: { id: string; valorTotal: unknown; dataVencimento: Date; quantidadeFaturada: number; valorUnitario: unknown },
+    competencia: string,
+    cpfCnpj?: string,
+  ) {
     const cliente = await this.prisma.cliente.findUniqueOrThrow({ where: { id: clienteId } });
     let asaasCustomerId = contrato.asaasCustomerId;
     if (!asaasCustomerId) {
@@ -134,7 +166,7 @@ export class ContratoService {
       billingType: "BOLETO",
       value: Number(linha.valorTotal),
       dueDate: new Date(linha.dataVencimento).toISOString().slice(0, 10),
-      description: `PesoHub — licenciamento ${competencia}: ${apuracao.quantidadeFaturada} balança(s) x R$ ${apuracao.valorUnitario}`,
+      description: `PesoHub — licenciamento ${competencia}: ${linha.quantidadeFaturada} balança(s) x R$ ${Number(linha.valorUnitario)}`,
       externalReference: `${contrato.id}:${competencia}`,
     });
 

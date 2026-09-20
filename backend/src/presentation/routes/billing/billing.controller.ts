@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Headers,
+  Param,
   Post,
   Query,
   Req,
@@ -15,6 +17,8 @@ import { Request } from "express";
 import { createHash, timingSafeEqual } from "crypto";
 import { BillingService } from "./billing.service";
 import { ContratoService } from "./contrato.service";
+import { PainelService } from "./painel.service";
+import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 import { CreateAssinaturaDto } from "../../../application/dtos/create-assinatura.dto";
 import { UpsertContratoDto } from "../../../application/dtos/upsert-contrato.dto";
 import { FecharCompetenciaDto } from "../../../application/dtos/fechar-competencia.dto";
@@ -43,6 +47,8 @@ export class BillingController {
   constructor(
     private readonly billing: BillingService,
     private readonly contratos: ContratoService,
+    private readonly painel: PainelService,
+    private readonly auditLog: AuditLogService,
     private readonly config: ConfigService,
   ) {}
 
@@ -107,6 +113,55 @@ export class BillingController {
   @Roles("SUPERADMIN")
   fechar(@Body() body: FecharCompetenciaDto, @Req() req: Request) {
     return this.contratos.fechar(this.usuario(req).clienteId, body.competencia, body.cpfCnpj);
+  }
+
+  // --- Painel financeiro do PesoHub (card #98) ---
+
+  /** Todas as assinaturas e contratos da base. Só o SUPERADMIN global. */
+  @Get("painel")
+  @UseGuards(RolesGuard)
+  @Roles("SUPERADMIN")
+  async painelFinanceiro(@Req() req: Request) {
+    await this.painel.exigirSuperadminGlobal(this.usuario(req).sub);
+    return this.painel.visaoGeral();
+  }
+
+  /**
+   * Fecha a competência de uma empresa a partir do painel. EMITE COBRANÇA
+   * REAL — a tela confirma antes, e aqui a empresa é explícita, para não
+   * depender de qual empresa está ativa na sessão.
+   */
+  @Post("painel/contratos/:clienteId/fechar")
+  @UseGuards(RolesGuard)
+  @Roles("SUPERADMIN")
+  async fecharPeloPainel(
+    @Param("clienteId") clienteId: string,
+    @Body() body: FecharCompetenciaDto,
+    @Req() req: Request,
+  ) {
+    await this.painel.exigirSuperadminGlobal(this.usuario(req).sub);
+    // Identificador do PesoHub é cuid, não uuid — ParseUUIDPipe recusaria os
+    // ids reais. Aqui só se barra lixo antes de ir ao banco.
+    if (!/^[a-z0-9_-]{1,40}$/i.test(clienteId)) {
+      throw new BadRequestException("Empresa inválida.");
+    }
+
+    // Ação de maior consequência da base: dinheiro real em nome de terceiros.
+    // Fica registrado quem fechou, de qual empresa e com que resultado.
+    await this.auditLog.record(req, "billing.painel.fechar_competencia", {
+      clienteId,
+      competencia: body.competencia,
+      etapa: "solicitado",
+    });
+    const competencia = await this.contratos.fechar(clienteId, body.competencia, body.cpfCnpj);
+    await this.auditLog.record(req, "billing.painel.fechar_competencia", {
+      clienteId,
+      competencia: body.competencia,
+      etapa: "emitido",
+      valorTotal: String(competencia.valorTotal),
+      status: competencia.status,
+    });
+    return competencia;
   }
 
   // Chamado pelo Asaas, que não tem sessão: autentica por token compartilhado

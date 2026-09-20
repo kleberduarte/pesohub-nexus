@@ -20,6 +20,7 @@ import {
   Settings,
   Wand2,
   CreditCard,
+  Wallet,
   Store,
 } from "lucide-react";
 import {
@@ -57,7 +58,11 @@ const adminNavigation = [
   { name: "Assinatura", href: "/assinatura", icon: CreditCard },
 ];
 
-const superadminNavigation = [{ name: "Empresas", href: "/empresas", icon: Building2 }];
+const superadminNavigation = [
+  { name: "Empresas", href: "/empresas", icon: Building2 },
+  // Visão de cobrança de toda a base — só quem opera o PesoHub (card #98).
+  { name: "Financeiro", href: "/financeiro", icon: Wallet },
+];
 
 const SIDEBAR_STORAGE_KEY = "pesohub:sidebar-collapsed";
 

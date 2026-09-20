@@ -459,7 +459,83 @@ export interface ContratoLicenciamento {
   };
 }
 
+export type SituacaoCobranca = "ATIVA" | "AGUARDANDO" | "ATRASADA" | "BLOQUEADA" | "CANCELADA";
+
+export interface PainelAssinatura {
+  id: string;
+  empresa: string;
+  clienteId: string;
+  rede: string | null;
+  situacao: SituacaoCobranca;
+  formaPagamento: FormaPagamentoAssinatura;
+  valorUnitario: number;
+  quantidadeMinima: number;
+  balancasCobradas: number;
+  balancasHoje: number;
+  valor: number;
+  valorPrevisto: number;
+  proximoVencimento: string | null;
+  ultimaFatura: {
+    valor: number;
+    status: string;
+    vencimento: string | null;
+    pagamento: string | null;
+    link: string | null;
+  } | null;
+}
+
+export interface PainelContrato {
+  id: string;
+  empresa: string;
+  clienteId: string;
+  ativo: boolean;
+  valorUnitario: number;
+  quantidadeMinima: number;
+  diaVencimento: number;
+  temClienteNoAsaas: boolean;
+  previa: {
+    competencia: string;
+    quantidadeApurada: number;
+    quantidadeFaturada: number;
+    valorUnitario: number;
+    valorTotal: number;
+  };
+  competencias: {
+    id: string;
+    competencia: string;
+    quantidadeApurada: number;
+    quantidadeFaturada: number;
+    valorTotal: number;
+    status: "APURADA" | "COBRADA" | "PAGA" | "VENCIDA" | "CANCELADA";
+    dataVencimento: string;
+    dataPagamento: string | null;
+    link: string | null;
+  }[];
+}
+
+export interface PainelFinanceiro {
+  resumo: {
+    receitaMensalPrevista: number;
+    mensalidadeRedes: number;
+    mensalidadeContratos: number;
+    emAtraso: number;
+    recebidoNoMes: number;
+    assinaturasAtivas: number;
+    assinaturasAguardando: number;
+    assinaturasEmAtraso: number;
+    contratosAtivos: number;
+  };
+  assinaturas: PainelAssinatura[];
+  contratos: PainelContrato[];
+}
+
 export const billingApi = {
+  painel: () => request<PainelFinanceiro>("/billing/painel"),
+  fecharCompetenciaDe: (clienteId: string, competencia: string, cpfCnpj?: string) =>
+    request<{ id: string; competencia: string; status: string; linkPagamento: string | null }>(
+      `/billing/painel/contratos/${clienteId}/fechar`,
+      { method: "POST", body: JSON.stringify({ competencia, cpfCnpj }) },
+    ),
   status: (rede?: string) => request<Assinatura>(`/billing/status${rede ? `?rede=${encodeURIComponent(rede)}` : ""}`),
   subscribe: (data: CreateAssinaturaInput) =>
     request<Assinatura>("/billing/subscribe", { method: "POST", body: JSON.stringify(data) }),
