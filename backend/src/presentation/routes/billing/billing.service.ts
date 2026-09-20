@@ -238,6 +238,76 @@ export class BillingService {
   }
 
   /**
+   * Como pagar uma fatura, sem sair do sistema (card #101): QR do Pix, código
+   * copia-e-cola e linha digitável do boleto.
+   *
+   * É LEITURA PURA no Asaas — nada é emitido aqui; os dados são os da cobrança
+   * que já existe. E é escopada: a fatura precisa ser da rede de quem pede,
+   * senão o identificador de uma fatura vira o meio de ler a cobrança de um
+   * concorrente.
+   */
+  async dadosDePagamento(
+    usuario: { sub: string; role: string; clienteId: string },
+    faturaId: string,
+    redePedida?: string,
+  ) {
+    const rede = await this.resolverRede(usuario, redePedida);
+    const fatura = await this.prisma.fatura.findUnique({
+      where: { id: faturaId },
+      include: { assinatura: { select: { clienteId: true, dominioRede: true } } },
+    });
+
+    // Mesma resposta para "não existe" e "não é sua": quem procura fatura
+    // alheia não descobre nem que ela existe.
+    const minha =
+      fatura &&
+      fatura.assinatura.clienteId === usuario.clienteId &&
+      (rede === null || fatura.assinatura.dominioRede === rede);
+    if (!minha) throw new NotFoundException("Fatura não encontrada.");
+
+    if (fatura.status === "RECEBIDA" || fatura.status === "CONFIRMADA") {
+      throw new BadRequestException("Esta fatura já está paga.");
+    }
+    if (fatura.status === "CANCELADA") {
+      throw new BadRequestException("Esta fatura foi cancelada.");
+    }
+
+    // Pix e boleto são consultados em paralelo e cada um pode faltar: uma
+    // cobrança de cartão não tem linha digitável, e uma conta sem chave Pix
+    // não tem QR. Falta de um não pode derrubar o outro nem a tela.
+    const [pix, boleto] = await Promise.all([
+      this.asaas.getPixQrCode(fatura.asaasPaymentId).catch((err: Error) => {
+        this.logger.warn(`Pix da fatura ${fatura.id} indisponível: ${err.message}`);
+        return null;
+      }),
+      this.asaas.getLinhaDigitavel(fatura.asaasPaymentId).catch((err: Error) => {
+        this.logger.warn(`Boleto da fatura ${fatura.id} indisponível: ${err.message}`);
+        return null;
+      }),
+    ]);
+
+    return {
+      faturaId: fatura.id,
+      valor: fatura.valor,
+      status: fatura.status,
+      dataVencimento: fatura.dataVencimento,
+      linkPagamento: fatura.linkPagamento,
+      pix: pix?.payload
+        ? {
+            copiaECola: pix.payload,
+            // Base64 puro do Asaas; quem monta o "data:image/png;base64," é a
+            // tela, que é onde isso significa alguma coisa.
+            qrCodeBase64: pix.encodedImage ?? null,
+            expiraEm: pix.expirationDate ?? null,
+          }
+        : null,
+      boleto: boleto?.identificationField
+        ? { linhaDigitavel: boleto.identificationField, codigoDeBarras: boleto.barCode ?? null }
+        : null,
+    };
+  }
+
+  /**
    * Situação de cobrança da rede de QUEM ESTÁ USANDO o sistema, para a faixa
    * de aviso no topo (card #100). Diferente do `status`, aqui nada estoura:
    * é consultado a cada carregamento, por qualquer papel, e quem não pertence

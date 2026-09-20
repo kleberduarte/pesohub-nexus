@@ -43,6 +43,22 @@ export interface AsaasPayment {
   externalReference?: string;
 }
 
+/** Resposta de GET /payments/{id}/pixQrCode. */
+export interface AsaasPixQrCode {
+  /** PNG do QR em base64, SEM o prefixo "data:image/png;base64,". */
+  encodedImage?: string;
+  /** Código copia-e-cola (BR Code). */
+  payload?: string;
+  expirationDate?: string;
+}
+
+/** Resposta de GET /payments/{id}/identificationField. */
+export interface AsaasLinhaDigitavel {
+  identificationField?: string;
+  nossoNumero?: string;
+  barCode?: string;
+}
+
 export interface CreateAsaasPaymentInput {
   customer: string;
   billingType: "PIX" | "BOLETO" | "CREDIT_CARD" | "UNDEFINED";
@@ -77,6 +93,22 @@ export class AsaasService {
 
   async getPayment(asaasPaymentId: string): Promise<AsaasPayment> {
     return this.request<AsaasPayment>("GET", `/payments/${asaasPaymentId}`);
+  }
+
+  /**
+   * Dados do Pix de uma cobrança: imagem do QR em base64 e o código
+   * copia-e-cola. Leitura pura — não emite nada no Asaas (card #101).
+   */
+  async getPixQrCode(asaasPaymentId: string): Promise<AsaasPixQrCode> {
+    return this.request<AsaasPixQrCode>("GET", `/payments/${asaasPaymentId}/pixQrCode`);
+  }
+
+  /**
+   * Linha digitável do boleto. Também é leitura pura; o Asaas só responde
+   * quando a cobrança tem boleto emitido.
+   */
+  async getLinhaDigitavel(asaasPaymentId: string): Promise<AsaasLinhaDigitavel> {
+    return this.request<AsaasLinhaDigitavel>("GET", `/payments/${asaasPaymentId}/identificationField`);
   }
 
   /**

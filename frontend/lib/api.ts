@@ -550,6 +550,19 @@ export interface PainelFinanceiro {
   contratos: PainelContrato[];
 }
 
+/** Como pagar uma fatura em aberto, sem sair do sistema (card #101). */
+export interface DadosDePagamento {
+  faturaId: string;
+  valor: string;
+  status: StatusFatura;
+  dataVencimento: string | null;
+  linkPagamento: string | null;
+  /** Nulo quando a cobrança não tem Pix (ex.: conta sem chave cadastrada). */
+  pix: { copiaECola: string; qrCodeBase64: string | null; expiraEm: string | null } | null;
+  /** Nulo quando a cobrança não tem boleto emitido. */
+  boleto: { linhaDigitavel: string; codigoDeBarras: string | null } | null;
+}
+
 /** Faixa de aviso no topo do sistema quando a rede está em atraso (card #100). */
 export type AvisoDaRede =
   | { emAtraso: false }
@@ -565,6 +578,7 @@ export type AvisoDaRede =
 
 export const billingApi = {
   avisoDaRede: () => request<AvisoDaRede>("/billing/aviso-da-rede"),
+  dadosDePagamento: (faturaId: string) => request<DadosDePagamento>(`/billing/faturas/${faturaId}/pagamento`),
   painel: () => request<PainelFinanceiro>("/billing/painel"),
   fecharCompetenciaDe: (clienteId: string, competencia: string, cpfCnpj?: string) =>
     request<{ id: string; competencia: string; status: string; linkPagamento: string | null }>(

@@ -71,6 +71,21 @@ export class BillingController {
   }
 
   /**
+   * Como pagar uma fatura sem sair do sistema: QR do Pix, copia-e-cola e
+   * linha digitável (card #101). Só leitura no Asaas, e só da própria rede.
+   */
+  @Get("faturas/:id/pagamento")
+  @UseGuards(RolesGuard)
+  @Roles("ADMIN", "SUPERADMIN", "ADMIN_REDE")
+  dadosDePagamento(@Param("id") id: string, @Req() req: Request, @Query("rede") rede?: string) {
+    // Id do PesoHub é cuid, não uuid — aqui só se barra lixo antes do banco.
+    if (!/^[a-z0-9_-]{1,40}$/i.test(id)) {
+      throw new BadRequestException("Fatura inválida.");
+    }
+    return this.billing.dadosDePagamento(this.usuario(req), id, rede);
+  }
+
+  /**
    * Faixa de aviso no topo do sistema (card #100). Qualquer pessoa da rede
    * pode consultar: é o que evita que só quem abre a tela de Assinatura
    * descubra que a cobrança está em atraso.

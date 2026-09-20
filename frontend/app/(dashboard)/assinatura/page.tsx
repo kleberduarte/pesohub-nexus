@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CreditCard, QrCode, FileText, Loader2, AlertTriangle, Check, Info, Scale } from "lucide-react";
+import ComoPagarFatura from "../../../components/billing/ComoPagarFatura";
 import {
   billingApi,
   getCurrentUser,
@@ -136,6 +137,9 @@ export default function AssinaturaPage() {
   const mudancaNaProxima =
     previa && assinatura && previa.valorTotal !== Number(assinatura.valor) ? previa : null;
   const vencida = situacao === "ATRASADA" || situacao === "BLOQUEADA";
+  // A fatura que a pessoa ainda precisa pagar. As faturas vêm da mais recente
+  // para a mais antiga; a primeira em aberto é a que interessa.
+  const faturaEmAberto = assinatura?.faturas.find((f) => f.status === "PENDENTE" || f.status === "VENCIDA") ?? null;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -334,6 +338,22 @@ export default function AssinaturaPage() {
             {saving ? "Ativando..." : "Ativar assinatura"}
           </button>
         </form>
+      )}
+
+      {/* Pagar sem sair da tela (card #101): a fatura em aberto vem com o QR
+          do Pix e a linha digitável prontos, em vez de mandar a pessoa caçar
+          o link no e-mail. */}
+      {faturaEmAberto && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-700">Como pagar</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Fatura de {real(faturaEmAberto.valor)}
+              {faturaEmAberto.dataVencimento ? `, com vencimento em ${data(faturaEmAberto.dataVencimento)}` : ""}.
+            </p>
+          </div>
+          <ComoPagarFatura faturaId={faturaEmAberto.id} />
+        </div>
       )}
 
       {assinatura && assinatura.faturas.length > 0 && (
