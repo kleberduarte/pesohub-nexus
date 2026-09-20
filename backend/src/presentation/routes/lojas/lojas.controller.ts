@@ -20,12 +20,16 @@ import { UpdateLojaDto } from "../../../application/dtos/update-loja.dto";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { normalizarDominio } from "../../../domain/services/acesso-por-dominio";
 import { revogarUnidadeDaRede, sincronizarPerfilDaRede } from "./perfil-da-rede";
+import { BillingService } from "../billing/billing.service";
 import { Roles } from "../../middleware/roles.decorator";
 
 @ApiTags("lojas")
 @Controller("lojas")
 export class LojasController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly billing: BillingService,
+  ) {}
 
   @Get()
   async findAll(@Req() req: Request) {
@@ -62,6 +66,8 @@ export class LojasController {
     const loja = await this.prisma.loja.create({ data: { ...dto, dominioEmail, clienteId } });
     // Unidade nova de uma rede entra no acesso dos funcionários dela (card #96).
     await sincronizarPerfilDaRede(this.prisma, clienteId, dominioEmail);
+    // E a rede já nasce com a assinatura aguardando ativação (card #99).
+    await this.billing.garantirAssinaturaPendente(clienteId, dominioEmail);
     return loja;
   }
 
@@ -86,6 +92,7 @@ export class LojasController {
       await sincronizarPerfilDaRede(this.prisma, clienteId, anterior.dominioEmail);
       await revogarUnidadeDaRede(this.prisma, clienteId, anterior.dominioEmail, id);
       await sincronizarPerfilDaRede(this.prisma, clienteId, data.dominioEmail);
+      await this.billing.garantirAssinaturaPendente(clienteId, data.dominioEmail);
     }
     return this.prisma.loja.findFirst({ where: { id } });
   }

@@ -223,6 +223,11 @@ model Fatura {
   dataVencimento DateTime?
   dataPagamento  DateTime?
   createdAt      DateTime     @default(now())
+  /// Avisos de cobrança já enviados (card #99). Guardados por fatura para que
+  /// uma nova rodada não reenvie o mesmo e-mail ao cliente.
+  avisoGeradaEm      DateTime?
+  avisoPreVencimento DateTime?
+  avisoVencidaEm     DateTime?
 
   @@index([assinaturaId])
 }

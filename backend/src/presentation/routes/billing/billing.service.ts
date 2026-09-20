@@ -82,6 +82,46 @@ export class BillingService {
     });
   }
 
+  /**
+   * Toda rede nasce com uma assinatura em "aguardando ativação", já com o
+   * valor calculado (card #99). Antes, quem nunca abrisse a tela ficava sem
+   * cobrança nenhuma — e o gerente encarava um formulário em branco, sem saber
+   * o preço. Não fala com o Asaas: só existe quando ele escolhe como pagar.
+   */
+  async garantirAssinaturaPendente(clienteId: string, dominioRedeBruto: string | null | undefined) {
+    const dominioRede = normalizarDominio(dominioRedeBruto);
+    if (!dominioRede) return null;
+
+    const existente = await this.prisma.assinatura.findUnique({
+      where: { clienteId_dominioRede: { clienteId, dominioRede } },
+    });
+    if (existente) return existente;
+
+    const quantidade = await this.contarBalancasDaRede(clienteId, dominioRede);
+    const cobranca = calcularCobranca(quantidade, VALOR_POR_BALANCA, MINIMO_BALANCAS_REDE);
+    try {
+      return await this.prisma.assinatura.create({
+        data: {
+          clienteId,
+          dominioRede,
+          asaasCustomerId: "",
+          status: "TRIAL",
+          // Só vira escolha de verdade na ativação; aqui é o padrão do produto.
+          formaPagamento: "PIX",
+          valorUnitario: VALOR_POR_BALANCA,
+          quantidadeMinima: MINIMO_BALANCAS_REDE,
+          quantidadeBalancas: cobranca.quantidadeApurada,
+          valor: cobranca.valorTotal,
+        },
+      });
+    } catch {
+      // Corrida com outra criação da mesma rede: a que já existe vale.
+      return this.prisma.assinatura.findUnique({
+        where: { clienteId_dominioRede: { clienteId, dominioRede } },
+      });
+    }
+  }
+
   async subscribe(clienteId: string, dominioRede: string | null, dto: CreateAssinaturaDto) {
     if (!dominioRede) {
       throw new BadRequestException(
@@ -112,8 +152,14 @@ export class BillingService {
       valor: cobranca.valorTotal,
       asaasSubscriptionId: null,
     };
+    // Reaproveita tanto a assinatura cancelada quanto a que nasceu com a rede
+    // e ainda não foi ativada (sem assinatura no Asaas).
     const reaproveitada = await this.prisma.assinatura.updateMany({
-      where: { clienteId, dominioRede, status: "CANCELADA" },
+      where: {
+        clienteId,
+        dominioRede,
+        OR: [{ status: "CANCELADA" }, { status: "TRIAL", asaasSubscriptionId: null }],
+      },
       data: reserva,
     });
     if (reaproveitada.count === 0) {
