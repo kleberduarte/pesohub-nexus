@@ -10,10 +10,7 @@ import {
   SessionRevocationService,
 } from "../../infrastructure/auth/session-revocation.service";
 import { SessionScopeService } from "../../infrastructure/auth/session-scope.service";
-import { bloqueiaPorAtraso } from "../../domain/services/precificacao";
-
-/** Dias de tolerância após o vencimento antes de travar a edição (card #97). */
-const DIAS_DE_CARENCIA = 7;
+import { DIAS_DE_CARENCIA, bloqueiaPorAtraso } from "../../domain/services/precificacao";
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {

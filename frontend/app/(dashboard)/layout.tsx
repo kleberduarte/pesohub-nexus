@@ -49,14 +49,20 @@ const baseNavigation = [
   { name: "Sincronização", href: "/sync", icon: CloudUpload },
 ];
 
-// Gestão de usuários/lojas/assinatura é coisa de quem administra a empresa —
-// um usuário criado pra operar só numa Loja (OPERADOR/VIEWER) não deve nem
-// ver esses links, muito menos acessar as telas por trás deles.
+// Gestão de usuários/lojas é coisa de quem administra a empresa — um usuário
+// criado pra operar só numa Loja (OPERADOR/VIEWER) não deve nem ver esses
+// links, muito menos acessar as telas por trás deles.
 const adminNavigation = [
   { name: "Usuários", href: "/usuarios", icon: Users },
   { name: "Lojas", href: "/lojas", icon: Store },
-  { name: "Assinatura", href: "/assinatura", icon: CreditCard },
 ];
+
+// Assinatura é a conta do SUPERMERCADO, e quem a paga é a rede. Por isso o
+// link é do Administrador da loja, e não de quem administra a empresa: o
+// admin da Ramuza acompanha a cobrança de todas as redes pelo Financeiro
+// (card #99). O backend já fazia esse recorte — o menu é que mandava o
+// público errado para uma tela que não é dele.
+const assinaturaNavigation = [{ name: "Assinatura", href: "/assinatura", icon: CreditCard }];
 
 const superadminNavigation = [{ name: "Empresas", href: "/empresas", icon: Building2 }];
 
@@ -158,7 +164,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isAdmin = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
   // Administrador da loja (card #96) gere só a equipe do supermercado: nada de
-  // Lojas nem Assinatura, que são da empresa.
+  // Lojas, que são da empresa — mas a assinatura da própria rede é dele.
   const isAdminRede = user?.role === "ADMIN_REDE";
   const navigation = [
     ...(user?.role === "SUPERADMIN" ? superadminNavigation : []),
@@ -166,6 +172,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...baseNavigation,
     ...(isAdmin ? adminNavigation : []),
     ...(isAdminRede ? adminNavigation.filter((n) => n.href === "/usuarios") : []),
+    ...(isAdminRede ? assinaturaNavigation : []),
   ];
 
   const handleLogout = () => {

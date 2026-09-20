@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
-import { calcularCobranca, competenciaDe } from "../../../domain/services/precificacao";
+import { calcularCobranca, competenciaDe, limiteDeCarencia } from "../../../domain/services/precificacao";
 
 /**
  * Painel financeiro do PesoHub (card #98).
@@ -14,9 +14,6 @@ import { calcularCobranca, competenciaDe } from "../../../domain/services/precif
  * A "prévia" mostra quanto a assinatura ficaria com as balanças de hoje, o que
  * deixa visível uma cobrança defasada sem alterar nada.
  */
-
-/** Dias de tolerância antes de a rede em atraso ser travada (igual ao guard). */
-const DIAS_DE_CARENCIA = 7;
 
 export type SituacaoCobranca = "ATIVA" | "AGUARDANDO" | "ATRASADA" | "BLOQUEADA" | "CANCELADA";
 
@@ -78,7 +75,7 @@ export function situacaoDaAssinatura(
   if (status === "TRIAL") return "AGUARDANDO";
   if (status !== "INADIMPLENTE") return "ATIVA";
   const limite = proximoVencimento
-    ? new Date(proximoVencimento.getTime() + DIAS_DE_CARENCIA * 24 * 60 * 60 * 1000)
+    ? limiteDeCarencia(proximoVencimento)
     : null;
   // Em atraso mas dentro da carência a rede segue trabalhando; passou, trava.
   return limite && agora > limite ? "BLOQUEADA" : "ATRASADA";

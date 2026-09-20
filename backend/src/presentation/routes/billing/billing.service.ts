@@ -2,7 +2,8 @@ import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundEx
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
 import { AsaasService } from "../../../infrastructure/billing/asaas.service";
 import { CreateAssinaturaDto } from "../../../application/dtos/create-assinatura.dto";
-import { calcularCobranca } from "../../../domain/services/precificacao";
+import { DIAS_DE_CARENCIA, calcularCobranca, limiteDeCarencia } from "../../../domain/services/precificacao";
+import { situacaoDaAssinatura } from "./painel.service";
 import { normalizarDominio } from "../../../domain/services/acesso-por-dominio";
 
 const ASAAS_BILLING_TYPE: Record<CreateAssinaturaDto["formaPagamento"], "PIX" | "BOLETO" | "CREDIT_CARD"> = {
@@ -218,7 +219,22 @@ export class BillingService {
       Number(assinatura.valorUnitario) || VALOR_POR_BALANCA,
       assinatura.quantidadeMinima,
     );
-    return { ...assinatura, previa };
+
+    // A tela precisa dizer ao gerente EXATAMENTE o que o guard vai fazer e
+    // quando — "em atraso" sem data é o que faz a pessoa ligar para o suporte.
+    // Mesma conta do guard, pela mesma função (card #99).
+    const situacao = situacaoDaAssinatura(assinatura.status, assinatura.proximoVencimento);
+    const bloqueio = {
+      situacao,
+      bloqueado: situacao === "BLOQUEADA" || situacao === "CANCELADA",
+      diasDeCarencia: DIAS_DE_CARENCIA,
+      bloqueiaEm: limiteDeCarencia(assinatura.proximoVencimento),
+    };
+    // A assinatura nasce junto com a rede, sem nada no Asaas ainda (card #99).
+    // A tela precisa distinguir "ainda não ativada" de "em teste": é a
+    // diferença entre pedir a forma de pagamento e não pedir nada.
+    const aguardandoAtivacao = !assinatura.asaasSubscriptionId && assinatura.status !== "CANCELADA";
+    return { ...assinatura, previa, bloqueio, aguardandoAtivacao };
   }
 
   /**

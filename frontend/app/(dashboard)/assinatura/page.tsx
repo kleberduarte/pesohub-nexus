@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CreditCard, QrCode, FileText, Loader2, AlertTriangle } from "lucide-react";
+import { CreditCard, QrCode, FileText, Loader2, AlertTriangle, Check, Info, Scale } from "lucide-react";
 import { billingApi, ApiError, type Assinatura, type FormaPagamentoAssinatura } from "../../../lib/api";
 
 const FORMAS_PAGAMENTO: { value: FormaPagamentoAssinatura; label: string; icon: typeof QrCode }[] = [
@@ -10,12 +10,32 @@ const FORMAS_PAGAMENTO: { value: FormaPagamentoAssinatura; label: string; icon: 
   { value: "CARTAO_CREDITO", label: "Cartão de crédito", icon: CreditCard },
 ];
 
-const STATUS_LABEL: Record<Assinatura["status"], { label: string; className: string }> = {
-  TRIAL: { label: "Período de teste", className: "bg-slate-100 text-slate-700" },
-  ATIVA: { label: "Ativa", className: "bg-emerald-50 text-emerald-700" },
-  INADIMPLENTE: { label: "Inadimplente", className: "bg-red-50 text-red-600" },
-  CANCELADA: { label: "Cancelada", className: "bg-slate-100 text-slate-500" },
+/**
+ * O selo do topo fala da COBRANÇA, não do cadastro: "aguardando ativação" é
+ * diferente de "ativa", e quem está em atraso precisa saber se já travou ou
+ * ainda está na carência. O backend manda essa situação pronta (card #99),
+ * calculada pela mesma função que o guard usa para bloquear.
+ */
+const SITUACAO_LABEL: Record<string, { label: string; className: string }> = {
+  ATIVA: { label: "Ativa", className: "bg-emerald-50 text-emerald-700 border-emerald-100" },
+  AGUARDANDO: { label: "Aguardando ativação", className: "bg-amber-50 text-amber-700 border-amber-100" },
+  ATRASADA: { label: "Pagamento em atraso", className: "bg-amber-50 text-amber-700 border-amber-100" },
+  BLOQUEADA: { label: "Bloqueada por atraso", className: "bg-red-50 text-red-600 border-red-100" },
+  CANCELADA: { label: "Cancelada", className: "bg-slate-100 text-slate-500 border-slate-200" },
 };
+
+const STATUS_FATURA_LABEL: Record<string, { label: string; className: string }> = {
+  PENDENTE: { label: "Aguardando pagamento", className: "text-amber-700" },
+  CONFIRMADA: { label: "Confirmada", className: "text-emerald-700" },
+  RECEBIDA: { label: "Paga", className: "text-emerald-700" },
+  VENCIDA: { label: "Vencida", className: "text-red-600" },
+  CANCELADA: { label: "Cancelada", className: "text-slate-400" },
+};
+
+const real = (valor: number | string) =>
+  Number(valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+const data = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
 
 export default function AssinaturaPage() {
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null);
@@ -26,6 +46,8 @@ export default function AssinaturaPage() {
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoAssinatura>("PIX");
   const [cpfCnpj, setCpfCnpj] = useState("");
   const [saving, setSaving] = useState(false);
+  // Cancelar é irreversível pela tela: pede confirmação explicando o efeito.
+  const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -53,10 +75,10 @@ export default function AssinaturaPage() {
     setError("");
     try {
       await billingApi.subscribe({ formaPagamento, cpfCnpj });
-      setNotice("Assinatura criada com sucesso.");
+      setNotice("Assinatura ativada. A primeira cobrança chega por e-mail.");
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível criar a assinatura.");
+      setError(err instanceof ApiError ? err.message : "Não foi possível ativar a assinatura.");
     } finally {
       setSaving(false);
     }
@@ -68,6 +90,7 @@ export default function AssinaturaPage() {
     try {
       await billingApi.cancel();
       setNotice("Assinatura cancelada.");
+      setConfirmandoCancelamento(false);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível cancelar a assinatura.");
@@ -84,107 +107,144 @@ export default function AssinaturaPage() {
     );
   }
 
+  const situacao = assinatura?.bloqueio?.situacao ?? (assinatura?.status === "ATIVA" ? "ATIVA" : "AGUARDANDO");
+  const selo = SITUACAO_LABEL[situacao] ?? SITUACAO_LABEL.AGUARDANDO;
+  const precisaAtivar = Boolean(assinatura?.aguardandoAtivacao) || !assinatura;
+  const previa = assinatura?.previa;
+  // A prévia só vira aviso quando REALMENTE muda o que vai ser cobrado — do
+  // contrário seria um alerta permanente dizendo que nada mudou.
+  const mudancaNaProxima =
+    previa && assinatura && previa.valorTotal !== Number(assinatura.valor) ? previa : null;
+
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-semibold text-slate-800">Assinatura</h1>
-        <p className="text-slate-500 text-sm mt-1">Gerencie a cobrança mensal do PesoHub via Asaas.</p>
+        <p className="text-slate-500 text-sm mt-1">
+          A mensalidade do supermercado{assinatura?.dominioRede ? ` @${assinatura.dominioRede}` : ""}: quanto é, como é
+          calculada e quando vence.
+        </p>
       </div>
 
       {notice && (
         <div className="p-3 text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg">{notice}</div>
       )}
-      {error && (
-        <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>
+      {error && <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg">{error}</div>}
+
+      {assinatura && (
+        <>
+          {/* Topo: o que se paga e quando. É a pergunta que traz a pessoa aqui. */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="text-sm text-slate-500">Mensalidade</span>
+                <p className="text-3xl font-semibold text-slate-800 mt-1">{real(assinatura.valor)}</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  {assinatura.proximoVencimento
+                    ? `Próxima cobrança em ${data(assinatura.proximoVencimento)}`
+                    : "Sem cobrança agendada"}
+                </p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium border ${selo.className}`}>{selo.label}</span>
+            </div>
+
+            {!precisaAtivar && (
+              <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-sm">
+                <span className="text-slate-500">Forma de pagamento</span>
+                <span className="text-slate-800 font-medium">
+                  {FORMAS_PAGAMENTO.find((f) => f.value === assinatura.formaPagamento)?.label}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Atraso: o que trava, o que NÃO trava, e a partir de quando. */}
+          {(situacao === "ATRASADA" || situacao === "BLOQUEADA") && (
+            <div
+              className={`rounded-xl border p-4 ${
+                situacao === "BLOQUEADA" ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <AlertTriangle
+                  className={`w-5 h-5 mt-0.5 shrink-0 ${situacao === "BLOQUEADA" ? "text-red-600" : "text-amber-600"}`}
+                />
+                <div className="space-y-2 text-sm">
+                  <p className={`font-medium ${situacao === "BLOQUEADA" ? "text-red-700" : "text-amber-800"}`}>
+                    {situacao === "BLOQUEADA"
+                      ? "Cadastro e sincronização bloqueados por falta de pagamento."
+                      : assinatura.bloqueio?.bloqueiaEm
+                        ? `Pagamento em atraso. O bloqueio começa em ${data(assinatura.bloqueio.bloqueiaEm)}.`
+                        : "Pagamento em atraso."}
+                  </p>
+                  {/* O medo de parar a operação é o que gera ligação para o
+                      suporte. Dizer o que continua funcionando vale mais que
+                      qualquer aviso de cobrança. */}
+                  <p className="text-slate-700">
+                    <strong>As balanças continuam pesando e imprimindo etiquetas normalmente</strong>, com os produtos
+                    já sincronizados. O que fica travado é cadastrar ou alterar dados aqui no sistema e enviá-los para o
+                    equipamento.
+                  </p>
+                  {assinatura.bloqueio?.diasDeCarencia ? (
+                    <p className="text-slate-600">
+                      São {assinatura.bloqueio.diasDeCarencia} dias de tolerância após o vencimento antes de travar.
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Consumo: de onde sai o valor. Sem isso, a conta parece arbitrária. */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 space-y-3">
+            <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Scale className="w-4 h-4 text-slate-400" />
+              Como o valor é calculado
+            </h2>
+            <div className="flex items-baseline justify-between text-sm">
+              <span className="text-slate-600">
+                {previa?.quantidadeFaturada ?? assinatura.quantidadeBalancas} balança
+                {(previa?.quantidadeFaturada ?? assinatura.quantidadeBalancas) === 1 ? "" : "s"} ×{" "}
+                {real(assinatura.valorUnitario)}
+              </span>
+              <span className="text-slate-800 font-medium">{real(previa?.valorTotal ?? assinatura.valor)}</span>
+            </div>
+            {previa && previa.quantidadeApurada < previa.quantidadeFaturada && (
+              <p className="text-xs text-slate-500">
+                A rede tem {previa.quantidadeApurada} balança(s) cadastrada(s), mas o contrato tem mínimo de{" "}
+                {assinatura.quantidadeMinima} — é o mínimo que está sendo cobrado.
+              </p>
+            )}
+            <p className="text-xs text-slate-500">
+              Cadastrou ou removeu balança, o valor das próximas cobranças acompanha. Uma cobrança já emitida não muda
+              de valor no meio do caminho.
+            </p>
+          </div>
+
+          {/* O que muda na próxima cobrança — só quando de fato muda. */}
+          {mudancaNaProxima && (
+            <div className="rounded-xl border border-sky-100 bg-sky-50 p-4 flex items-start gap-3 text-sm">
+              <Info className="w-4 h-4 mt-0.5 shrink-0 text-sky-600" />
+              <p className="text-slate-700">
+                Hoje a rede tem {mudancaNaProxima.quantidadeFaturada} balança(s) cobráveis. A próxima cobrança passa de{" "}
+                <strong>{real(assinatura.valor)}</strong> para <strong>{real(mudancaNaProxima.valorTotal)}</strong>.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
-      {assinatura ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-slate-500">Status</span>
-            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${STATUS_LABEL[assinatura.status].className}`}>
-              {STATUS_LABEL[assinatura.status].label}
-            </span>
-          </div>
-
-          {assinatura.status === "INADIMPLENTE" && (
-            <div className="flex items-start gap-2 p-3 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg">
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-              <span>
-                Pagamento em atraso. O acesso ao sistema fica bloqueado até a regularização. Verifique a última fatura
-                abaixo.
-              </span>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">Forma de pagamento</span>
-            <span className="text-slate-800 font-medium">
-              {FORMAS_PAGAMENTO.find((f) => f.value === assinatura.formaPagamento)?.label}
-            </span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">Valor mensal</span>
-            <span className="text-slate-800 font-medium">
-              {Number(assinatura.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-            </span>
-          </div>
-          {/* De onde vem o valor — sem isso a conta parece arbitrária. */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">Como é calculado</span>
-            <span className="text-slate-600">
-              {Math.max(assinatura.quantidadeBalancas, assinatura.quantidadeMinima)} balança(s) ×{" "}
-              {Number(assinatura.valorUnitario).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-              {assinatura.quantidadeBalancas < assinatura.quantidadeMinima && " (mínimo do contrato)"}
-            </span>
-          </div>
-          {assinatura.proximoVencimento && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-500">Próximo vencimento</span>
-              <span className="text-slate-800 font-medium">
-                {new Date(assinatura.proximoVencimento).toLocaleDateString("pt-BR")}
-              </span>
-            </div>
-          )}
-
-          {assinatura.faturas.length > 0 && (
-            <div className="pt-2 border-t border-slate-100">
-              <h3 className="text-sm font-semibold text-slate-700 mb-2">Faturas recentes</h3>
-              <ul className="divide-y divide-slate-100">
-                {assinatura.faturas.map((f) => (
-                  <li key={f.id} className="flex items-center justify-between py-2 text-sm">
-                    <span className="text-slate-600">
-                      {Number(f.valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                    </span>
-                    <span className="text-slate-500">{f.status}</span>
-                    {f.linkPagamento && (
-                      <a
-                        href={f.linkPagamento}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-brand-600 hover:underline"
-                      >
-                        Ver fatura
-                      </a>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {assinatura.status !== "CANCELADA" && (
-            <button
-              onClick={handleCancel}
-              disabled={saving}
-              className="w-full mt-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors font-medium disabled:opacity-60"
-            >
-              Cancelar assinatura
-            </button>
-          )}
-        </div>
-      ) : (
+      {/* Ativação: a assinatura já existe com o valor calculado, só falta
+          dizer como pagar. Nada de formulário em branco (card #99). */}
+      {precisaAtivar && assinatura?.status !== "CANCELADA" && (
         <form onSubmit={handleSubscribe} className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 space-y-5">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-700">Ativar a assinatura</h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Escolha como pagar. A cobrança é mensal e chega por e-mail; o valor é o calculado acima.
+            </p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Forma de pagamento</label>
             <div className="grid grid-cols-3 gap-3">
@@ -206,16 +266,12 @@ export default function AssinaturaPage() {
             </div>
           </div>
 
-          {/* O valor não é digitado: sai das balanças cadastradas x o preço
-              acordado, calculado no backend (card #97). */}
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            A mensalidade é <strong className="text-slate-800">R$ 40,00 por balança cadastrada</strong>, com o mínimo de
-            uma balança. Cadastrou ou removeu balança, o valor das próximas cobranças acompanha.
-          </div>
-
           <div>
-            <label htmlFor="assinatura-cpf-ou-cnpj" className="block text-sm font-medium text-slate-700 mb-2">CPF ou CNPJ</label>
-            <input id="assinatura-cpf-ou-cnpj"
+            <label htmlFor="assinatura-cpf-ou-cnpj" className="block text-sm font-medium text-slate-700 mb-2">
+              CPF ou CNPJ
+            </label>
+            <input
+              id="assinatura-cpf-ou-cnpj"
               type="text"
               value={cpfCnpj}
               onChange={(e) => setCpfCnpj(e.target.value)}
@@ -228,11 +284,84 @@ export default function AssinaturaPage() {
           <button
             type="submit"
             disabled={saving}
-            className="w-full flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium disabled:opacity-60"
           >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Assinar"}
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            {saving ? "Ativando..." : "Ativar assinatura"}
           </button>
         </form>
+      )}
+
+      {assinatura && assinatura.faturas.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h2 className="text-sm font-semibold text-slate-700 mb-3">Faturas</h2>
+          <ul className="divide-y divide-slate-100">
+            {assinatura.faturas.map((f) => {
+              const rotulo = STATUS_FATURA_LABEL[f.status] ?? { label: f.status, className: "text-slate-500" };
+              return (
+                <li key={f.id} className="flex items-center gap-4 py-2.5 text-sm">
+                  <span className="text-slate-800 font-medium w-24 shrink-0">{real(f.valor)}</span>
+                  <span className="text-slate-500 w-28 shrink-0">
+                    {f.dataVencimento ? `Venc. ${data(f.dataVencimento)}` : "—"}
+                  </span>
+                  <span className={`flex-1 ${rotulo.className}`}>{rotulo.label}</span>
+                  {f.linkPagamento && (
+                    <a
+                      href={f.linkPagamento}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-brand-600 hover:underline shrink-0"
+                    >
+                      Ver fatura
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {assinatura && assinatura.status !== "CANCELADA" && !precisaAtivar && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          {confirmandoCancelamento ? (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-700">
+                Cancelar encerra a cobrança mensal e, a partir daí, <strong>trava cadastro e sincronização</strong> para
+                toda a rede. As balanças seguem pesando e imprimindo com o que já foi enviado. Para voltar, será preciso
+                assinar de novo.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium disabled:opacity-60"
+                >
+                  {saving ? "Cancelando..." : "Confirmar cancelamento"}
+                </button>
+                <button
+                  onClick={() => setConfirmandoCancelamento(false)}
+                  disabled={saving}
+                  className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium"
+                >
+                  Manter assinatura
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm text-slate-500">
+                Cancelar a assinatura encerra a cobrança e trava cadastro e sincronização da rede.
+              </p>
+              <button
+                onClick={() => setConfirmandoCancelamento(true)}
+                className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors text-sm font-medium shrink-0"
+              >
+                Cancelar assinatura
+              </button>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

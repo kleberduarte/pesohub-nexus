@@ -408,6 +408,22 @@ export interface Fatura {
   createdAt: string;
 }
 
+/** O que se cobraria HOJE, com as balanças cadastradas neste momento. */
+export interface PreviaCobranca {
+  quantidadeApurada: number;
+  quantidadeFaturada: number;
+  valorUnitario: number;
+  valorTotal: number;
+}
+
+/** O que o guard fará com esta rede, e quando (card #99). */
+export interface BloqueioAssinatura {
+  situacao: "ATIVA" | "AGUARDANDO" | "ATRASADA" | "BLOQUEADA" | "CANCELADA";
+  bloqueado: boolean;
+  diasDeCarencia: number;
+  bloqueiaEm: string | null;
+}
+
 export interface Assinatura {
   id: string;
   status: StatusAssinatura;
@@ -420,6 +436,11 @@ export interface Assinatura {
   dominioRede: string | null;
   proximoVencimento: string | null;
   faturas: Fatura[];
+  /** Ausentes nas respostas de listagem; presentes em /billing/status. */
+  previa?: PreviaCobranca;
+  bloqueio?: BloqueioAssinatura;
+  /** Nasceu com a rede e ainda não tem cobrança no provedor de pagamento. */
+  aguardandoAtivacao?: boolean;
 }
 
 /** Sem `valor`: quem calcula é o backend, pelas balanças cadastradas. */

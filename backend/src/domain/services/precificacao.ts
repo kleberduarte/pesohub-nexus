@@ -67,11 +67,31 @@ export function vencimentoDaCompetencia(competencia: string, diaVencimento: numb
 }
 
 /**
+ * Dias de tolerância após o vencimento antes de travar a edição (card #97).
+ * Mora aqui, junto das regras de cobrança, porque o guard, o painel e a tela
+ * de Assinatura precisam contar o MESMO prazo — três cópias da constante
+ * dariam três respostas diferentes sobre quando a rede trava.
+ */
+export const DIAS_DE_CARENCIA = 7;
+
+/**
+ * Data em que a inadimplência passa a bloquear. Null quando não há vencimento
+ * conhecido — nesse caso nada trava.
+ */
+export function limiteDeCarencia(vencimento: Date | null, diasDeCarencia = DIAS_DE_CARENCIA): Date | null {
+  if (!vencimento) return null;
+  return new Date(vencimento.getTime() + diasDeCarencia * 24 * 60 * 60 * 1000);
+}
+
+/**
  * Bloqueio por inadimplência: só depois da carência, e a competência é sempre
  * contada a partir do vencimento. Antes disso a rede segue trabalhando.
  */
-export function bloqueiaPorAtraso(vencimento: Date | null, diasDeCarencia: number, agora: Date): boolean {
-  if (!vencimento) return false;
-  const limite = new Date(vencimento.getTime() + diasDeCarencia * 24 * 60 * 60 * 1000);
-  return agora > limite;
+export function bloqueiaPorAtraso(
+  vencimento: Date | null,
+  diasDeCarencia: number,
+  agora: Date,
+): boolean {
+  const limite = limiteDeCarencia(vencimento, diasDeCarencia);
+  return limite !== null && agora > limite;
 }
