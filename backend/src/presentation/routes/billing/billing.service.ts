@@ -238,6 +238,51 @@ export class BillingService {
   }
 
   /**
+   * Situação de cobrança da rede de QUEM ESTÁ USANDO o sistema, para a faixa
+   * de aviso no topo (card #100). Diferente do `status`, aqui nada estoura:
+   * é consultado a cada carregamento, por qualquer papel, e quem não pertence
+   * a uma rede (ou está em dia) simplesmente não vê faixa nenhuma.
+   */
+  async avisoDaRede(usuario: { sub: string; clienteId: string | null }) {
+    if (!usuario.clienteId) return { emAtraso: false as const };
+
+    const eu = await this.prisma.user.findUnique({ where: { id: usuario.sub }, select: { email: true } });
+    const dominio = normalizarDominio(eu?.email.split("@")[1]);
+    if (!dominio) return { emAtraso: false as const };
+
+    const loja = await this.prisma.loja.findFirst({
+      where: { clienteId: usuario.clienteId, dominioEmail: dominio },
+      select: { id: true },
+    });
+    if (!loja) return { emAtraso: false as const };
+
+    const assinatura = await this.prisma.assinatura.findFirst({
+      where: { clienteId: usuario.clienteId, dominioRede: dominio },
+      include: {
+        faturas: {
+          where: { status: { in: ["PENDENTE", "VENCIDA"] } },
+          orderBy: { dataVencimento: "asc" },
+          take: 1,
+        },
+      },
+    });
+    if (!assinatura) return { emAtraso: false as const };
+
+    const situacao = situacaoDaAssinatura(assinatura.status, assinatura.proximoVencimento);
+    if (situacao !== "ATRASADA" && situacao !== "BLOQUEADA") return { emAtraso: false as const };
+
+    return {
+      emAtraso: true as const,
+      situacao,
+      valor: String(assinatura.valor),
+      vencimento: assinatura.proximoVencimento,
+      bloqueiaEm: limiteDeCarencia(assinatura.proximoVencimento),
+      diasDeCarencia: DIAS_DE_CARENCIA,
+      linkPagamento: assinatura.faturas[0]?.linkPagamento ?? null,
+    };
+  }
+
+  /**
    * Recalcula o valor pela quantidade atual de balanças e avisa o Asaas.
    * Escrita de verdade: só por ação explícita, nunca dentro de uma consulta.
    */

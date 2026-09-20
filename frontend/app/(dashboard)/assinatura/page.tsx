@@ -41,7 +41,13 @@ const STATUS_FATURA_LABEL: Record<string, { label: string; className: string }> 
 const real = (valor: number | string) =>
   Number(valor).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-const data = (iso: string) => new Date(iso).toLocaleDateString("pt-BR");
+/**
+ * Vencimento é data de CALENDÁRIO, não instante: o Asaas manda "2026-09-10",
+ * que vira meia-noite UTC. Formatar no fuso de Brasília (UTC-3) exibiria 21h
+ * do dia ANTERIOR — a tela mostraria o vencimento um dia mais cedo do que o
+ * real. Por isso, UTC.
+ */
+const data = (iso: string) => new Date(iso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
 
 export default function AssinaturaPage() {
   const [assinatura, setAssinatura] = useState<Assinatura | null>(null);

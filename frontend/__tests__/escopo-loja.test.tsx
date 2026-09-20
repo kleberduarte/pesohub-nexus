@@ -17,6 +17,9 @@ jest.mock("../lib/api", () => ({
   authApi: { me: jest.fn(), switchLoja: jest.fn(), logout: jest.fn() },
   lojasApi: { list: jest.fn() },
   clientesApi: { branding: jest.fn() },
+  // O layout traz a faixa de aviso de cobrança (card #100); sem este dublê,
+  // o teste de escopo de loja quebra por causa de uma tela que não é o alvo.
+  billingApi: { avisoDaRede: jest.fn(() => Promise.resolve({ emAtraso: false })) },
   getCurrentUser: jest.fn(),
   setActiveClienteToken: jest.fn(),
   applyBranding: jest.fn(),

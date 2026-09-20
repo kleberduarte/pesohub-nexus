@@ -18,6 +18,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { BillingService } from "./billing.service";
 import { ContratoService } from "./contrato.service";
 import { PainelService } from "./painel.service";
+import { AvisosCobrancaService } from "./avisos-cobranca.service";
 import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 import { CreateAssinaturaDto } from "../../../application/dtos/create-assinatura.dto";
 import { UpsertContratoDto } from "../../../application/dtos/upsert-contrato.dto";
@@ -48,6 +49,7 @@ export class BillingController {
     private readonly billing: BillingService,
     private readonly contratos: ContratoService,
     private readonly painel: PainelService,
+    private readonly avisos: AvisosCobrancaService,
     private readonly auditLog: AuditLogService,
     private readonly config: ConfigService,
   ) {}
@@ -66,6 +68,17 @@ export class BillingController {
     const user = this.usuario(req);
     const dominio = await this.billing.resolverRede(user, rede);
     return this.billing.status(user.clienteId, dominio);
+  }
+
+  /**
+   * Faixa de aviso no topo do sistema (card #100). Qualquer pessoa da rede
+   * pode consultar: é o que evita que só quem abre a tela de Assinatura
+   * descubra que a cobrança está em atraso.
+   */
+  @Get("aviso-da-rede")
+  avisoDaRede(@Req() req: Request) {
+    const user = this.usuario(req);
+    return this.billing.avisoDaRede(user);
   }
 
   /** Assinaturas de todas as redes da empresa — visão de quem administra. */
@@ -164,6 +177,28 @@ export class BillingController {
       status: competencia.status,
     });
     return competencia;
+  }
+
+  /**
+   * Dispara a rodada de avisos de cobrança na hora (card #100). A rodada
+   * automática é diária; este endpoint existe para quem opera o PesoHub não
+   * precisar esperar o próximo ciclo. Não emite cobrança nem altera valores:
+   * só manda e-mail do que já venceu ou está para vencer, e cada aviso segue
+   * saindo uma vez só.
+   */
+  @Post("avisos/executar")
+  @UseGuards(RolesGuard)
+  @Roles("SUPERADMIN")
+  async executarAvisos(@Req() req: Request) {
+    const user = this.usuario(req);
+    await this.painel.exigirSuperadminGlobal(user.sub, user.clienteId);
+    const resumo = await this.avisos.rodar();
+    await this.auditLog.record(req, "billing.avisos.executar", {
+      enviados: String(resumo.enviados),
+      falhas: String(resumo.falhas),
+      semDestinatario: String(resumo.semDestinatario),
+    });
+    return resumo;
   }
 
   // Chamado pelo Asaas, que não tem sessão: autentica por token compartilhado

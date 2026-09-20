@@ -550,7 +550,21 @@ export interface PainelFinanceiro {
   contratos: PainelContrato[];
 }
 
+/** Faixa de aviso no topo do sistema quando a rede está em atraso (card #100). */
+export type AvisoDaRede =
+  | { emAtraso: false }
+  | {
+      emAtraso: true;
+      situacao: "ATRASADA" | "BLOQUEADA";
+      valor: string;
+      vencimento: string | null;
+      bloqueiaEm: string | null;
+      diasDeCarencia: number;
+      linkPagamento: string | null;
+    };
+
 export const billingApi = {
+  avisoDaRede: () => request<AvisoDaRede>("/billing/aviso-da-rede"),
   painel: () => request<PainelFinanceiro>("/billing/painel"),
   fecharCompetenciaDe: (clienteId: string, competencia: string, cpfCnpj?: string) =>
     request<{ id: string; competencia: string; status: string; linkPagamento: string | null }>(

@@ -36,6 +36,7 @@ import {
 } from "../../lib/api";
 import { applyBranding, readCachedBranding } from "../../lib/branding";
 import SessionKeepAlive from "../../components/auth/SessionKeepAlive";
+import FaixaDeAtraso from "../../components/billing/FaixaDeAtraso";
 
 const baseNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -331,6 +332,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
           </div>
         </header>
+
+        {/* Aviso de cobrança em atraso: logo abaixo do cabeçalho, acima de
+            qualquer tela, porque quem está devendo não abre a de Assinatura
+            por conta própria (card #100). */}
+        <FaixaDeAtraso />
 
         {/* Main Area */}
         <main className="flex-1 overflow-y-auto p-8">{children}</main>

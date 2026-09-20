@@ -163,3 +163,15 @@ it("explica ao administrador da empresa que a tela não é dele, em vez de ofere
   expect(await screen.findByText(/é a conta do supermercado, não da empresa/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Ativar assinatura/ })).not.toBeInTheDocument();
 });
+
+it("mostra o dia certo do vencimento, sem recuar um dia pelo fuso", async () => {
+  // Data de calendário do Asaas vira meia-noite UTC; no fuso de Brasília isso
+  // é 21h do dia anterior, e a tela anunciava o vencimento um dia mais cedo.
+  statusMock.mockResolvedValue({
+    ...assinaturaBase,
+    proximoVencimento: "2026-10-10T00:00:00.000Z",
+  });
+  render(<AssinaturaPage />);
+
+  expect(await screen.findByText(/Próxima cobrança em 10\/10\/2026/)).toBeInTheDocument();
+});
