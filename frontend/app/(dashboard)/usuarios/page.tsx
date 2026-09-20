@@ -15,8 +15,9 @@ import {
   UserPlus,
   X,
 } from "lucide-react";
-import { usersApi, clientesApi, lojasApi, ApiError, getCurrentUser, type AppUser, type Loja, type UserRole,
+import { usersApi, clientesApi, lojasApi, perfisApi, ApiError, getCurrentUser, type AppUser, type Loja, type UserRole, type Perfil,
   contaBloqueada,
+  ehPerfilDeRede,
 } from "../../../lib/api";
 
 const ROLES_RESTRINGIVEIS_A_LOJA: UserRole[] = ["OPERADOR", "VIEWER"];
@@ -88,6 +89,9 @@ export default function UsuariosPage() {
   const [aviso, setAviso] = useState("");
   const [lojas, setLojas] = useState<Loja[]>([]);
   const [lojasFalharam, setLojasFalharam] = useState(false);
+  const [perfis, setPerfis] = useState<Perfil[]>([]);
+  const [todasAsLojas, setTodasAsLojas] = useState(true);
+  const [lojasMarcadas, setLojasMarcadas] = useState<string[]>([]);
 
   const [busca, setBusca] = useState("");
   const [filtroRole, setFiltroRole] = useState<UserRole | "TODOS">("TODOS");
@@ -97,6 +101,8 @@ export default function UsuariosPage() {
   const [editSenha, setEditSenha] = useState("");
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  const [editTodasAsLojas, setEditTodasAsLojas] = useState(true);
+  const [editPerfilId, setEditPerfilId] = useState("");
 
   const [deleteTarget, setDeleteTarget] = useState<AppUser | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -191,6 +197,7 @@ export default function UsuariosPage() {
       // por falha de leitura fica sem enxergar nada, e o sintoma vira "não
       // consigo ver os produtos" (card #67).
       .catch(() => setLojasFalharam(true));
+    perfisApi.list().then(setPerfis).catch(() => setPerfis([]));
   }, []);
 
   // Card #96: lojas podem declarar o domínio de e-mail do supermercado. Um
@@ -206,6 +213,9 @@ export default function UsuariosPage() {
   const rolesDeRede: UserRole[] = ["ADMIN_REDE", "OPERADOR", "VIEWER"];
   const rolesDoFormulario = ehRede ? rolesDeRede : roleOptions.filter((r) => r !== "ADMIN_REDE");
   const lojasDoFormulario = ehRede ? lojasDaRede : lojas;
+  // Quem já tem Perfil não pode marcar "todas as lojas": isso seria promover
+  // a si (ou ao novo usuário) para a empresa inteira (card #87).
+  const naoPodeEmpresaInteira = Boolean(currentUser?.perfilId) || souAdminRede;
   const ehEmailDeRede = (e: string) => {
     const d = e.split("@")[1]?.toLowerCase();
     return !!d && lojas.some((l) => l.dominioEmail?.toLowerCase() === d);
@@ -219,6 +229,25 @@ export default function UsuariosPage() {
   }, [ehRede, dominioDigitado]);
 
   const restringeALoja = ROLES_RESTRINGIVEIS_A_LOJA.includes(role);
+  const mostraEscopoDeLojas = !restringeALoja;
+
+  const mesmosIds = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const sa = [...a].sort();
+    const sb = [...b].sort();
+    return sa.every((id, i) => id === sb[i]);
+  };
+
+  const acharOuCriarPerfil = async (ids: string[]) => {
+    const existente = perfis.find(
+      (p) => !ehPerfilDeRede(p.nome) && mesmosIds(p.lojas.map((l) => l.lojaId), ids),
+    );
+    if (existente) return existente.id;
+    const nomes = lojasDoFormulario.filter((l) => ids.includes(l.id)).map((l) => l.nome).join(", ");
+    const criado = await perfisApi.create({ nome: nomes.slice(0, 120), lojaIds: ids });
+    setPerfis((atual) => [...atual, criado]);
+    return criado.id;
+  };
 
   const fecharNovo = () => {
     setNovoAberto(false);
@@ -232,18 +261,31 @@ export default function UsuariosPage() {
     setAviso("");
     setCreating(true);
     try {
-      const criado = await usersApi.create({
+      const payload: Parameters<typeof usersApi.create>[0] = {
         email,
         role,
         ...(convidar ? { convidar: true } : { senha }),
-        ...(restringeALoja && lojaId ? { lojaId } : {}),
-      });
+      };
+      if (restringeALoja && lojaId) {
+        payload.lojaId = lojaId;
+      } else if (mostraEscopoDeLojas && !(todasAsLojas && !naoPodeEmpresaInteira)) {
+        if (lojasMarcadas.length === 0) {
+          setFormError("Marque as lojas ou ative “Todas as lojas (atuais e futuras)”.");
+          setCreating(false);
+          return;
+        }
+        if (lojasMarcadas.length === 1) payload.lojaId = lojasMarcadas[0];
+        else payload.perfilId = await acharOuCriarPerfil(lojasMarcadas);
+      }
+      const criado = await usersApi.create(payload);
       if (convidar) avisarEnvio(criado.email, criado.conviteEnviado);
       else setAviso(`Usuário ${criado.email ?? email} cadastrado.`);
       setEmail("");
       setSenha("");
       setRole("OPERADOR");
       setLojaId("");
+      setTodasAsLojas(!naoPodeEmpresaInteira);
+      setLojasMarcadas([]);
       setNovoAberto(false);
       loadUsers();
     } catch (err) {
@@ -258,6 +300,8 @@ export default function UsuariosPage() {
     setEditRole(user.role);
     setEditSenha("");
     setEditError("");
+    setEditTodasAsLojas(!user.perfil?.id);
+    setEditPerfilId(user.perfil?.id ?? "");
   };
 
   const handleSaveEdit = async (e: React.FormEvent) => {
@@ -269,6 +313,9 @@ export default function UsuariosPage() {
       await usersApi.update(editTarget.id, {
         role: editRole,
         ...(editSenha ? { senha: editSenha } : {}),
+        ...(!naoPodeEmpresaInteira
+          ? { perfilId: editTodasAsLojas ? "" : editPerfilId || undefined }
+          : {}),
       });
       setEditTarget(null);
       loadUsers();
@@ -334,7 +381,11 @@ export default function UsuariosPage() {
         </div>
         <button
           type="button"
-          onClick={() => setNovoAberto(true)}
+          onClick={() => {
+            setTodasAsLojas(!naoPodeEmpresaInteira);
+            setLojasMarcadas([]);
+            setNovoAberto(true);
+          }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-lg shadow-sm transition-colors"
         >
           <UserPlus className="w-4 h-4" />
@@ -655,6 +706,50 @@ export default function UsuariosPage() {
               <p className="mt-1 text-xs text-slate-500">{ROLE_INFO[role].descricao}</p>
             </div>
 
+            {mostraEscopoDeLojas && (
+              <fieldset>
+                <legend className="block text-sm font-medium text-slate-700 mb-2">Lojas</legend>
+                <label className="flex items-start gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5"
+                    checked={todasAsLojas && !naoPodeEmpresaInteira}
+                    disabled={naoPodeEmpresaInteira}
+                    onChange={(e) => {
+                      setTodasAsLojas(e.target.checked);
+                      if (e.target.checked) setLojasMarcadas([]);
+                    }}
+                  />
+                  <span>
+                    Todas as lojas (atuais e futuras)
+                    {naoPodeEmpresaInteira && (
+                      <span className="block text-xs text-slate-400 font-normal">
+                        Só quem administra a empresa inteira pode conceder isso.
+                      </span>
+                    )}
+                  </span>
+                </label>
+                {!(todasAsLojas && !naoPodeEmpresaInteira) && (
+                  <div className="mt-3 space-y-2 rounded-xl border border-slate-200 p-3">
+                    {lojasDoFormulario.map((l) => (
+                      <label key={l.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={lojasMarcadas.includes(l.id)}
+                          onChange={() =>
+                            setLojasMarcadas((atual) =>
+                              atual.includes(l.id) ? atual.filter((id) => id !== l.id) : [...atual, l.id],
+                            )
+                          }
+                        />
+                        {l.nome}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </fieldset>
+            )}
+
             {restringeALoja && (
               <div>
                 <label htmlFor="usuario-loja" className="block text-sm font-medium text-slate-700 mb-1">
@@ -720,6 +815,34 @@ export default function UsuariosPage() {
               </select>
               <p className="mt-1 text-xs text-slate-500">{ROLE_INFO[editRole].descricao}</p>
             </div>
+            {!naoPodeEmpresaInteira && (
+              <fieldset>
+                <legend className="block text-sm font-medium text-slate-700 mb-2">Lojas</legend>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={editTodasAsLojas}
+                    onChange={(e) => setEditTodasAsLojas(e.target.checked)}
+                  />
+                  Todas as lojas (atuais e futuras)
+                </label>
+                {!editTodasAsLojas && (
+                  <select
+                    className={`${inputClass} mt-2`}
+                    value={editPerfilId}
+                    onChange={(e) => setEditPerfilId(e.target.value)}
+                    aria-label="Perfil de lojas"
+                  >
+                    <option value="">Escolha um perfil</option>
+                    {perfis.filter((p) => !ehPerfilDeRede(p.nome)).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </fieldset>
+            )}
             <div>
               <label htmlFor="usuario-nova-senha-opcional" className="block text-sm font-medium text-slate-700 mb-1">
                 Nova senha (opcional)

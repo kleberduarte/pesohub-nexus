@@ -204,6 +204,12 @@ export interface DecodedUser {
   role: UserRole;
   clienteId: string | null;
   lojaId: string | null;
+  /**
+   * Escopo de lojas (card #87). Sem Perfil a pessoa administra a empresa
+   * inteira; com Perfil, só as lojas dele — e o menu esconde o que passa
+   * desse alcance.
+   */
+  perfilId?: string | null;
   /** Identificador da sessão. Muda a cada login/refresh. */
   jti?: string;
 }
@@ -594,6 +600,34 @@ export type AvisoDaRede =
       diasDeCarencia: number;
       linkPagamento: string | null;
     };
+
+/**
+ * Perfil = escopo de lojas (cards #83/#87). Usuário sem Perfil enxerga TODAS
+ * as lojas da empresa, o que é o padrão de quem administra a rede inteira.
+ */
+export interface Perfil {
+  id: string;
+  nome: string;
+  lojas: { lojaId: string; loja?: { id: string; nome: string } }[];
+}
+
+export interface PerfilInput {
+  nome: string;
+  lojaIds: string[];
+}
+
+/** Perfis "Rede: ..." nascem do domínio da loja e não se editam à mão (#96). */
+export function ehPerfilDeRede(nome: string): boolean {
+  return nome.trim().toLowerCase().startsWith("rede:");
+}
+
+export const perfisApi = {
+  list: () => request<Perfil[]>("/perfis"),
+  create: (data: PerfilInput) => request<Perfil>("/perfis", { method: "POST", body: JSON.stringify(data) }),
+  update: (id: string, data: Partial<PerfilInput>) =>
+    request<Perfil>(`/perfis/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  remove: (id: string) => request<void>(`/perfis/${id}`, { method: "DELETE" }),
+};
 
 export const billingApi = {
   avisoDaRede: () => request<AvisoDaRede>("/billing/aviso-da-rede"),
@@ -1124,7 +1158,7 @@ export interface AppUser {
   email: string;
   role: UserRole;
   createdAt: string;
-  perfil?: { nome: string } | null;
+  perfil?: { id?: string; nome: string } | null;
   /** Data futura enquanto a conta estiver travada por erros de senha. */
   lockedUntil?: string | null;
   /** Conta ainda com a senha definida por quem a criou. */
@@ -1147,11 +1181,13 @@ export interface CreateUserInput {
   convidar?: boolean;
   role: UserRole;
   lojaId?: string;
+  perfilId?: string;
 }
 
 export interface UpdateUserInput {
   role?: UserRole;
   senha?: string;
+  perfilId?: string | null;
 }
 
 export const usersApi = {

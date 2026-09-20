@@ -1,4 +1,4 @@
-import { render, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import DashboardLayout from "../app/(dashboard)/layout";
 import { authApi, clientesApi, getCurrentUser, lojasApi } from "../lib/api";
 
@@ -68,5 +68,46 @@ describe("Escopo de loja na sessão", () => {
     await waitFor(() => expect(lojasApi.list).toHaveBeenCalled());
 
     expect(authApi.switchLoja).not.toHaveBeenCalled();
+  });
+
+  it("com uma única loja mostra o nome, não um seletor (card #87)", async () => {
+    (getCurrentUser as jest.Mock).mockReturnValue({ sub: "u1", role: "ADMIN", clienteId: "c-1", lojaId: "loja-1" });
+    (authApi.me as jest.Mock).mockResolvedValue({
+      sub: "u1",
+      role: "ADMIN",
+      email: "admin@ramuza.com.br",
+      clienteId: "c-1",
+      lojaId: "loja-1",
+    });
+
+    render(<DashboardLayout>conteudo</DashboardLayout>);
+    expect(await screen.findByText("Loja Matriz Ramuza")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+  });
+
+  it("esconde Perfis, Lojas e Empresas de ADMIN com Perfil (card #87)", async () => {
+    (getCurrentUser as jest.Mock).mockReturnValue({
+      sub: "u1",
+      role: "ADMIN",
+      clienteId: "c-1",
+      lojaId: "loja-1",
+      perfilId: "p-1",
+    });
+    (authApi.me as jest.Mock).mockResolvedValue({
+      sub: "u1",
+      role: "ADMIN",
+      email: "gerente@ramuza.com.br",
+      clienteId: "c-1",
+      lojaId: "loja-1",
+      perfilId: "p-1",
+    });
+    (lojasApi.list as jest.Mock).mockResolvedValue([LOJA, { id: "loja-2", nome: "Filial" }]);
+
+    render(<DashboardLayout>conteudo</DashboardLayout>);
+    expect(await screen.findByRole("link", { name: /usuários/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^perfis$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /^lojas$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /empresas/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /financeiro/i })).not.toBeInTheDocument();
   });
 });

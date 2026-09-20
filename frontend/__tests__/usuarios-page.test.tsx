@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import UsuariosPage from "../app/(dashboard)/usuarios/page";
-import { clientesApi, lojasApi, usersApi } from "../lib/api";
+import { clientesApi, lojasApi, perfisApi, usersApi } from "../lib/api";
 
 /**
  * Tela de Usuários — 466 linhas, 21 estados, sem testes até aqui.
@@ -19,6 +19,8 @@ jest.mock("../lib/api", () => ({
   usersApi: { list: jest.fn(), create: jest.fn(), update: jest.fn(), remove: jest.fn(), desbloquear: jest.fn() },
   lojasApi: { list: jest.fn() },
   clientesApi: { getMe: jest.fn() },
+  perfisApi: { list: jest.fn(), create: jest.fn(), update: jest.fn(), remove: jest.fn() },
+  ehPerfilDeRede: (nome: string) => nome.trim().toLowerCase().startsWith("rede:"),
   getCurrentUser: () => mockUsuarioAtual,
   // Reproduz a lógica real em vez de devolver um valor fixo: um `false`
   // constante esconderia o teste de desbloqueio, que depende de a conta
@@ -42,6 +44,7 @@ beforeEach(() => {
   mockUsuarioAtual = { clienteId: "c-1", role: "ADMIN", email: "admin@ramuza.com.br" };
   (usersApi.list as jest.Mock).mockResolvedValue([usuario()]);
   (lojasApi.list as jest.Mock).mockResolvedValue([{ id: "loja-1", nome: "Loja Matriz" }]);
+  (perfisApi.list as jest.Mock).mockResolvedValue([]);
   (clientesApi.getMe as jest.Mock).mockResolvedValue({ isDefault: false, dominio: "ramuza.com.br" });
   (usersApi.create as jest.Mock).mockResolvedValue({});
 });
@@ -89,6 +92,27 @@ describe("Usuários — escopo de acesso por papel", () => {
 
     await waitFor(() => expect(usersApi.create).toHaveBeenCalled());
     expect((usersApi.create as jest.Mock).mock.calls[0][0]).not.toHaveProperty("lojaId");
+  });
+
+  it("ADMIN com o toggle desligado envia a loja marcada", async () => {
+    (lojasApi.list as jest.Mock).mockResolvedValue([
+      { id: "loja-1", nome: "Matriz" },
+      { id: "loja-2", nome: "Filial" },
+    ]);
+    render(<UsuariosPage />);
+    await screen.findByText("operador@ramuza.com.br");
+
+    await preencherNovoUsuario("gerente@ramuza.com.br", "Senha!Forte1");
+    await userEvent.selectOptions(screen.getAllByLabelText(/perfil/i)[0], "ADMIN");
+    await userEvent.click(screen.getByRole("checkbox", { name: /todas as lojas/i }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Matriz" }));
+    await userEvent.click(screen.getByRole("button", { name: /^cadastrar$/i }));
+
+    await waitFor(() => expect(usersApi.create).toHaveBeenCalled());
+    expect((usersApi.create as jest.Mock).mock.calls[0][0]).toMatchObject({
+      role: "ADMIN",
+      lojaId: "loja-1",
+    });
   });
 });
 

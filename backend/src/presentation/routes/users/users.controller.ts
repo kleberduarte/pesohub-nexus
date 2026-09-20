@@ -66,7 +66,7 @@ export class UsersController {
         role: true,
         createdAt: true,
         perfilId: true,
-        perfil: { select: { nome: true, lojas: { select: { lojaId: true } } } },
+        perfil: { select: { id: true, nome: true, lojas: { select: { lojaId: true } } } },
         // Sem isso o administrador não enxerga que a conta de alguém travou —
         // e a pessoa fica só com um "credenciais inválidas" que não explica
         // nada.
@@ -92,7 +92,7 @@ export class UsersController {
 
     return visiveis.map(({ tokensSenha, passwordChangedAt, perfilId: _perfilId, perfil, ...user }) => ({
       ...user,
-      perfil: perfil ? { nome: perfil.nome } : null,
+      perfil: perfil ? { id: perfil.id, nome: perfil.nome } : null,
       convite: statusConvite(tokensSenha[0], passwordChangedAt),
     }));
   }

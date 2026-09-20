@@ -22,6 +22,7 @@ import {
   CreditCard,
   Wallet,
   Store,
+  IdCard,
 } from "lucide-react";
 import {
   authApi,
@@ -56,6 +57,7 @@ const baseNavigation = [
 const adminNavigation = [
   { name: "Usuários", href: "/usuarios", icon: Users },
   { name: "Lojas", href: "/lojas", icon: Store },
+  { name: "Perfis", href: "/perfis", icon: IdCard },
 ];
 
 // Assinatura é a conta do SUPERMERCADO, e quem a paga é a rede. Por isso o
@@ -164,6 +166,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, []);
 
   const isAdmin = user?.role === "SUPERADMIN" || user?.role === "ADMIN";
+  // Sem Perfil = empresa inteira. Com Perfil, o ADMIN é gerente de loja e não
+  // mexe em Lojas, Perfis, Empresas nem Financeiro (card #87).
+  const administraEmpresaInteira = isAdmin && !user?.perfilId;
   // Administrador da loja (card #96) gere só a equipe do supermercado: nada de
   // Lojas, que são da empresa — mas a assinatura da própria rede é dele.
   const isAdminRede = user?.role === "ADMIN_REDE";
@@ -171,7 +176,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     ...(user?.role === "SUPERADMIN" ? superadminNavigation : []),
     ...(user?.role === "SUPERADMIN" && branding?.isDefault ? financeiroNavigation : []),
     ...baseNavigation,
-    ...(isAdmin ? adminNavigation : []),
+    ...(administraEmpresaInteira ? adminNavigation : []),
+    ...(isAdmin && !administraEmpresaInteira ? adminNavigation.filter((n) => n.href === "/usuarios") : []),
     ...(isAdminRede ? adminNavigation.filter((n) => n.href === "/usuarios") : []),
     ...(isAdminRede ? assinaturaNavigation : []),
   ];
@@ -289,7 +295,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </h1>
           </div>
           <div className="flex items-center space-x-4">
-            {lojas.length > 0 && (
+            {lojas.length === 1 && (
+              <span className="text-sm text-slate-600 px-3 py-1.5 border border-slate-200 rounded-lg bg-slate-50">
+                {lojas[0].nome}
+              </span>
+            )}
+            {lojas.length > 1 && (
               <select
                 value={user?.lojaId ?? ""}
                 disabled={switchingLoja}
