@@ -115,6 +115,7 @@ export default function AssinaturaPage() {
   // contrário seria um alerta permanente dizendo que nada mudou.
   const mudancaNaProxima =
     previa && assinatura && previa.valorTotal !== Number(assinatura.valor) ? previa : null;
+  const vencida = situacao === "ATRASADA" || situacao === "BLOQUEADA";
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -139,10 +140,14 @@ export default function AssinaturaPage() {
               <div>
                 <span className="text-sm text-slate-500">Mensalidade</span>
                 <p className="text-3xl font-semibold text-slate-800 mt-1">{real(assinatura.valor)}</p>
+                {/* Vencido é passado: chamar de "próxima cobrança" uma data
+                    que já passou faz a pessoa achar que ainda há prazo. */}
                 <p className="text-sm text-slate-500 mt-1">
-                  {assinatura.proximoVencimento
-                    ? `Próxima cobrança em ${data(assinatura.proximoVencimento)}`
-                    : "Sem cobrança agendada"}
+                  {!assinatura.proximoVencimento
+                    ? "Sem cobrança agendada"
+                    : vencida
+                      ? `Venceu em ${data(assinatura.proximoVencimento)}`
+                      : `Próxima cobrança em ${data(assinatura.proximoVencimento)}`}
                 </p>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-medium border ${selo.className}`}>{selo.label}</span>
@@ -301,7 +306,7 @@ export default function AssinaturaPage() {
               return (
                 <li key={f.id} className="flex items-center gap-4 py-2.5 text-sm">
                   <span className="text-slate-800 font-medium w-24 shrink-0">{real(f.valor)}</span>
-                  <span className="text-slate-500 w-28 shrink-0">
+                  <span className="text-slate-500 w-36 shrink-0">
                     {f.dataVencimento ? `Venc. ${data(f.dataVencimento)}` : "—"}
                   </span>
                   <span className={`flex-1 ${rotulo.className}`}>{rotulo.label}</span>

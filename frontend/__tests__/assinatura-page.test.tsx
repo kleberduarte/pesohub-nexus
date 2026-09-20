@@ -69,6 +69,20 @@ it("avisa que a balança continua imprimindo quando a rede está em atraso", asy
   expect(screen.getByText(/continuam pesando e imprimindo etiquetas/)).toBeInTheDocument();
 });
 
+it("chama de vencida a data que já passou, em vez de \"próxima cobrança\"", async () => {
+  // Pego conferindo no navegador: em atraso, o topo anunciava a data vencida
+  // como se ainda houvesse prazo.
+  statusMock.mockResolvedValue({
+    ...assinaturaBase,
+    status: "INADIMPLENTE",
+    bloqueio: { situacao: "BLOQUEADA", bloqueado: true, diasDeCarencia: 7, bloqueiaEm: null },
+  });
+  render(<AssinaturaPage />);
+
+  expect(await screen.findByText(/^Venceu em /)).toBeInTheDocument();
+  expect(screen.queryByText(/Próxima cobrança em/)).not.toBeInTheDocument();
+});
+
 it("mostra o que muda na próxima cobrança quando a quantidade de balanças mudou", async () => {
   statusMock.mockResolvedValue({
     ...assinaturaBase,
