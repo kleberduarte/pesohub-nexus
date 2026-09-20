@@ -122,7 +122,8 @@ export class BillingController {
   @UseGuards(RolesGuard)
   @Roles("SUPERADMIN")
   async painelFinanceiro(@Req() req: Request) {
-    await this.painel.exigirSuperadminGlobal(this.usuario(req).sub);
+    const user = this.usuario(req);
+    await this.painel.exigirSuperadminGlobal(user.sub, user.clienteId);
     return this.painel.visaoGeral();
   }
 
@@ -139,7 +140,8 @@ export class BillingController {
     @Body() body: FecharCompetenciaDto,
     @Req() req: Request,
   ) {
-    await this.painel.exigirSuperadminGlobal(this.usuario(req).sub);
+    const user = this.usuario(req);
+    await this.painel.exigirSuperadminGlobal(user.sub, user.clienteId);
     // Identificador do PesoHub é cuid, não uuid — ParseUUIDPipe recusaria os
     // ids reais. Aqui só se barra lixo antes de ir ao banco.
     if (!/^[a-z0-9_-]{1,40}$/i.test(clienteId)) {

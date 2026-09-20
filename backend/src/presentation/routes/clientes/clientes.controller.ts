@@ -165,6 +165,8 @@ export class ClientesController {
         corSecundaria: true,
         tagline: true,
         accessToken: true,
+        // O menu Financeiro só existe na empresa padrão (card #98).
+        isDefault: true,
       },
     });
   }

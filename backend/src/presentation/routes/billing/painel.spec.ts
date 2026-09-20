@@ -36,6 +36,7 @@ describe("PainelService", () => {
   function montar(over: Record<string, unknown> = {}) {
     const prisma = {
       user: { findUnique: jest.fn().mockResolvedValue({ role: "SUPERADMIN", clienteId: null }) },
+      cliente: { findUnique: jest.fn().mockResolvedValue({ isDefault: true }) },
       assinatura: {
         findMany: jest.fn().mockResolvedValue([
           {
@@ -147,6 +148,21 @@ describe("PainelService", () => {
       user: { findUnique: jest.fn().mockResolvedValue({ role: "SUPERADMIN", clienteId: "ramuza" }) },
     });
     await expect(servico.exigirSuperadminGlobal("u1")).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("na empresa padrão, o administrador do produto entra", async () => {
+    const { servico } = montar();
+    await expect(servico.exigirSuperadminGlobal("u1", "cliente-default")).resolves.toBeUndefined();
+  });
+
+  it("dentro de uma empresa cliente, o painel fica fora do ar até voltar para a padrão", async () => {
+    const { servico } = montar({ cliente: { findUnique: jest.fn().mockResolvedValue({ isDefault: false }) } });
+    await expect(servico.exigirSuperadminGlobal("u1", "ramuza")).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("sem empresa ativa também não abre", async () => {
+    const { servico } = montar();
+    await expect(servico.exigirSuperadminGlobal("u1", null)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("lista as assinaturas com situação e a prévia pelas balanças de hoje", async () => {

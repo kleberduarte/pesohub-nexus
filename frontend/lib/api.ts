@@ -1000,6 +1000,8 @@ export const configuracaoAvancadaApi = {
 export interface ClienteBranding {
   id: string;
   nome: string;
+  /** Empresa padrão (PesoHub): é a única que vê o módulo financeiro. */
+  isDefault?: boolean;
   logoUrl?: string | null;
   corPrimaria?: string | null;
   corSecundaria?: string | null;

@@ -58,11 +58,11 @@ const adminNavigation = [
   { name: "Assinatura", href: "/assinatura", icon: CreditCard },
 ];
 
-const superadminNavigation = [
-  { name: "Empresas", href: "/empresas", icon: Building2 },
-  // Visão de cobrança de toda a base — só quem opera o PesoHub (card #98).
-  { name: "Financeiro", href: "/financeiro", icon: Wallet },
-];
+const superadminNavigation = [{ name: "Empresas", href: "/empresas", icon: Building2 }];
+
+// Cobrança de toda a base. Só aparece na EMPRESA PADRÃO: dentro de uma empresa
+// cliente, o financeiro do PesoHub não tem lugar (card #98).
+const financeiroNavigation = [{ name: "Financeiro", href: "/financeiro", icon: Wallet }];
 
 const SIDEBAR_STORAGE_KEY = "pesohub:sidebar-collapsed";
 
@@ -162,6 +162,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isAdminRede = user?.role === "ADMIN_REDE";
   const navigation = [
     ...(user?.role === "SUPERADMIN" ? superadminNavigation : []),
+    ...(user?.role === "SUPERADMIN" && branding?.isDefault ? financeiroNavigation : []),
     ...baseNavigation,
     ...(isAdmin ? adminNavigation : []),
     ...(isAdminRede ? adminNavigation.filter((n) => n.href === "/usuarios") : []),

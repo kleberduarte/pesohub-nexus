@@ -89,16 +89,26 @@ export class PainelService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Só o SUPERADMIN "global" (sem empresa fixa no cadastro) enxerga o painel.
-   * Um SUPERADMIN preso a uma empresa é tratado como usuário dela.
+   * Só o SUPERADMIN "global" (sem empresa fixa no cadastro) enxerga o painel,
+   * e apenas enquanto estiver na EMPRESA PADRÃO. Trocar para uma empresa
+   * cliente é entrar no contexto dela — e ali o financeiro do PesoHub não tem
+   * lugar, nem para quem poderia vê-lo.
    */
-  async exigirSuperadminGlobal(userId: string): Promise<void> {
+  async exigirSuperadminGlobal(userId: string, clienteAtivoId?: string | null): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { role: true, clienteId: true },
     });
     if (user?.role !== "SUPERADMIN" || user.clienteId !== null) {
       throw new ForbiddenException("Painel financeiro é exclusivo do administrador do PesoHub.");
+    }
+    if (clienteAtivoId !== undefined) {
+      const ativo = clienteAtivoId
+        ? await this.prisma.cliente.findUnique({ where: { id: clienteAtivoId }, select: { isDefault: true } })
+        : null;
+      if (!ativo?.isDefault) {
+        throw new ForbiddenException("Volte para a empresa padrão para acessar o painel financeiro.");
+      }
     }
   }
 
