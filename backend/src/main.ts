@@ -14,14 +14,13 @@ import express from "express";
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
- * Enquanto frontend e backend viviam em domínios diferentes, o cookie de
- * sessão precisava de SameSite=None, o que desliga a proteção contra CSRF
- * do browser. Com COOKIE_DOMAIN (ver auth-cookie.ts) o cookie volta a ser
- * Lax, mas este guard continua como defesa em profundidade: custa quase
- * nada e cobre browsers sem suporte a SameSite. Requisições que mudam
- * estado precisam vir de uma origem na allowlist. Browsers sempre mandam
- * Origin em requisições cross-site; ausência de Origin só ocorre em
- * chamadas não-browser (curl, etc), que não são o vetor de CSRF.
+ * O cookie de sessão usa SameSite=None em produção (necessário enquanto
+ * frontend e backend vivem em domínios diferentes — ver auth-cookie.ts), o
+ * que desliga a proteção contra CSRF que SameSite=Strict/Lax dava. Como
+ * reposição, exigimos que requisições que mudam estado venham de uma origem
+ * na allowlist. Browsers sempre mandam Origin em requisições cross-site;
+ * ausência de Origin só ocorre em chamadas não-browser (curl, etc), que não
+ * são o vetor de CSRF.
  */
 function csrfOriginGuard(corsOrigins: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {

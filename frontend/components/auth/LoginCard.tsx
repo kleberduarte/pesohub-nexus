@@ -36,16 +36,6 @@ interface LoginCardProps {
   onLoginSuccess?: () => Promise<void> | void;
 }
 
-/**
- * Para onde voltar depois do login: a rota que o middleware.ts barrou
- * (`/login?next=/devices`). Só aceita caminho interno — "//evil.com" ou
- * "https://..." virariam open redirect.
- */
-function destinoPosLogin(): string {
-  const next = new URLSearchParams(window.location.search).get("next");
-  return next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/";
-}
-
 export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) {
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
@@ -76,7 +66,7 @@ export default function LoginCard({ branding, onLoginSuccess }: LoginCardProps) 
       if (onLoginSuccess) await onLoginSuccess();
       // Primeiro acesso ou senha vencida: a senha ainda é conhecida por quem
       // criou a conta, então não há sessão útil antes da troca.
-      router.push(user.precisaTrocarSenha ? "/trocar-senha" : destinoPosLogin());
+      router.push(user.precisaTrocarSenha ? "/trocar-senha" : "/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível conectar à API. Tente novamente.");
     } finally {
