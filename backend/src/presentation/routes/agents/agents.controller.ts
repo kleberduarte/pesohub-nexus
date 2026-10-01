@@ -4,13 +4,11 @@ import { Request } from "express";
 import { CreateAgentUseCase } from "../../../application/usecases/create-agent.usecase";
 import { CreateAgentDto } from "../../../application/dtos/create-agent.dto";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { RolesGuard } from "../../middleware/roles.guard";
 import { Roles } from "../../middleware/roles.decorator";
 import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 
 @ApiTags("agents")
-@UseGuards(JwtAuthGuard)
 @Controller("agents")
 export class AgentsController {
   constructor(

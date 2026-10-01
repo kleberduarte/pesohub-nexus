@@ -1,13 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateAlergicoDto } from "../../../application/dtos/create-alergico.dto";
 import { UpdateAlergicoDto } from "../../../application/dtos/update-alergico.dto";
 import { ALERGICO_REPOSITORY, AlergicoRepository } from "../../../domain/repositories/alergico.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("alergicos")
-@UseGuards(JwtAuthGuard)
 @Controller("alergicos")
 export class AlergicosController {
   constructor(@Inject(ALERGICO_REPOSITORY) private readonly alergicos: AlergicoRepository) {}

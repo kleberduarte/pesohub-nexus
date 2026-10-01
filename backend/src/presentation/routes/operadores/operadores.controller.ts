@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateOperadorUseCase } from "../../../application/usecases/create-operador.usecase";
@@ -6,10 +6,8 @@ import { UpdateOperadorUseCase } from "../../../application/usecases/update-oper
 import { CreateOperadorDto } from "../../../application/dtos/create-operador.dto";
 import { UpdateOperadorDto } from "../../../application/dtos/update-operador.dto";
 import { OPERADOR_REPOSITORY, OperadorRepository } from "../../../domain/repositories/operador.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("operadores")
-@UseGuards(JwtAuthGuard)
 @Controller("operadores")
 export class OperadoresController {
   constructor(

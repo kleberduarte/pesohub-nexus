@@ -55,6 +55,15 @@ export class SessionRevocationService implements OnModuleDestroy {
    */
   static readonly INATIVIDADE_SEGUNDOS = 10 * 60;
 
+  /**
+   * Quanto tempo um token rotacionado pelo refresh continua aceito. Requisições
+   * que já estavam a caminho com o cookie antigo, e refreshes disparados em
+   * paralelo (outra aba, eventos de atividade em rajada), chegam com o `jti`
+   * anterior; recusá-los na hora derrubava quem estava trabalhando com
+   * "conta acessada em outro dispositivo" (card #78).
+   */
+  static readonly TOLERANCIA_ROTACAO_SEGUNDOS = 30;
+
   private keyRevogada(jti: string): string {
     return `session:revoked:${jti}`;
   }
@@ -75,13 +84,17 @@ export class SessionRevocationService implements OnModuleDestroy {
     jti: string | undefined,
     exp: number | undefined,
     motivo: MotivoRevogacao = "logout",
+    toleranciaSegundos = 0,
   ): Promise<void> {
     if (!jti) return;
     const ttlSegundos = Math.ceil((exp ?? 0) - Date.now() / 1000);
     if (ttlSegundos <= 0) return;
+    // Com tolerância, a entrada guarda até quando o token ainda vale:
+    // `motivo@epochMs`. Sem ela, a revogação é imediata.
+    const valor = toleranciaSegundos > 0 ? `${motivo}@${Date.now() + toleranciaSegundos * 1000}` : motivo;
     try {
-      await this.redis.set(this.keyRevogada(jti), motivo, "EX", ttlSegundos);
-      await this.redis.del(this.keyVista(jti));
+      await this.redis.set(this.keyRevogada(jti), valor, "EX", ttlSegundos);
+      if (toleranciaSegundos <= 0) await this.redis.del(this.keyVista(jti));
     } catch (err) {
       // Um Redis fora do ar não pode impedir o usuário de sair; o cookie é
       // apagado de qualquer forma e o token morre sozinho.
@@ -98,8 +111,11 @@ export class SessionRevocationService implements OnModuleDestroy {
   async motivoRevogacao(jti: string | undefined): Promise<MotivoRevogacao | null> {
     if (!jti) return null;
     try {
-      const motivo = await this.redis.get(this.keyRevogada(jti));
-      return (motivo as MotivoRevogacao | null) ?? null;
+      const valor = await this.redis.get(this.keyRevogada(jti));
+      if (!valor) return null;
+      const [motivo, valeAte] = valor.split("@");
+      if (valeAte && Date.now() < Number(valeAte)) return null;
+      return motivo as MotivoRevogacao;
     } catch (err) {
       this.logger.error(`Falha ao consultar revogação de ${jti}: ${(err as Error).message}`);
       return "logout";
@@ -118,17 +134,20 @@ export class SessionRevocationService implements OnModuleDestroy {
    * @param expAnterior expiração aproximada da sessão anterior. Não temos o
    * `exp` real dela guardado, então usamos o do token novo: a entrada de
    * revogação sobrevive pelo menos o tempo que o token antigo ainda valeria.
+   * @param toleranciaAnterior segundos em que a sessão anterior ainda é aceita.
+   * O refresh passa a tolerância de rotação; o login revoga na hora.
    */
   async registrarSessaoAtiva(
     userId: string,
     jti: string,
     exp: number,
     motivoAnterior: MotivoRevogacao = "outro_dispositivo",
+    toleranciaAnterior = 0,
   ): Promise<void> {
     try {
       const anterior = await this.redis.get(this.keyAtiva(userId));
       if (anterior && anterior !== jti) {
-        await this.revoke(anterior, exp, motivoAnterior);
+        await this.revoke(anterior, exp, motivoAnterior, toleranciaAnterior);
       }
       const ttlSegundos = Math.ceil(exp - Date.now() / 1000);
       if (ttlSegundos > 0) {

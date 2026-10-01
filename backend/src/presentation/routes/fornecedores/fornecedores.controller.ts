@@ -1,13 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateFornecedorDto } from "../../../application/dtos/create-fornecedor.dto";
 import { UpdateFornecedorDto } from "../../../application/dtos/update-fornecedor.dto";
 import { FORNECEDOR_REPOSITORY, FornecedorRepository } from "../../../domain/repositories/fornecedor.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("fornecedores")
-@UseGuards(JwtAuthGuard)
 @Controller("fornecedores")
 export class FornecedoresController {
   constructor(@Inject(FORNECEDOR_REPOSITORY) private readonly fornecedores: FornecedorRepository) {}

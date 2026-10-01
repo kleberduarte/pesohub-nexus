@@ -5,6 +5,8 @@ $ErrorActionPreference = "Stop"
 $InstallDir = "C:\PesoHub\agent-local"
 $ServiceName = "PesoHubAgentLocal"
 
+Remove-NetFirewallRule -DisplayName "PesoHub Agent Local - descoberta de balancas" -ErrorAction SilentlyContinue
+
 $currentPrincipal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "ERRO: execute como Administrador." -ForegroundColor Red

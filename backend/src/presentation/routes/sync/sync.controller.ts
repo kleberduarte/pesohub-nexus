@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Inject, NotFoundException, Param, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
@@ -6,11 +6,9 @@ import { Request } from "express";
 import { CreateSyncJobDto } from "../../../application/dtos/create-sync-job.dto";
 import { DEVICE_REPOSITORY, DeviceRepository } from "../../../domain/repositories/device.repository";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 import { AuditLogService } from "../../../infrastructure/audit/audit-log.service";
 
 @ApiTags("sync")
-@UseGuards(JwtAuthGuard)
 @Controller("sync")
 export class SyncController {
   constructor(

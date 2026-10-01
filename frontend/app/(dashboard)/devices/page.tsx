@@ -426,7 +426,22 @@ export default function DevicesPage() {
                 filteredDevices.map((device) => (
                   <tr key={device.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-slate-800">{device.nome}</td>
-                    <td className="px-6 py-4 text-slate-500 font-mono">{device.ip}</td>
+                    <td className="px-6 py-4 text-slate-500">
+                      <div className="font-mono">{device.ip}</div>
+                      {device.mac && (
+                        <div className="text-xs text-slate-400 font-mono" title="Identificador da placa de rede">
+                          MAC {device.mac}
+                        </div>
+                      )}
+                      {device.ipAtualizadoEm && (
+                        <div
+                          className="text-xs text-emerald-700"
+                          title="A balança mudou de IP ao ser religada e o cadastro foi corrigido pelo MAC"
+                        >
+                          IP atualizado automaticamente em {new Date(device.ipAtualizadoEm).toLocaleString("pt-BR")}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-slate-500 font-mono">{device.porta}</td>
                     <td className="px-6 py-4">
                       {device.agentId ? (

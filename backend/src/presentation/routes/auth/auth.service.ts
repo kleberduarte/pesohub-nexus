@@ -4,7 +4,7 @@ import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
-import { SessionRevocationService } from "../../../infrastructure/auth/session-revocation.service";
+import { MotivoRevogacao, SessionRevocationService } from "../../../infrastructure/auth/session-revocation.service";
 import {
   acrescentarAoHistorico,
   reusaSenhaAnterior,
@@ -101,18 +101,28 @@ export class AuthService {
   /**
    * Renova a sessão sem passar pela senha. O `jti` muda a cada renovação, então
    * um token vazado tem validade curta mesmo que a pessoa siga trabalhando.
+   *
+   * Nunca revoga como `outro_dispositivo`: quem chega aqui passou pelo guard,
+   * então a sessão ativa anterior é uma rotação irmã deste mesmo navegador
+   * (outra aba, refresh concorrente), não um login alheio. E o `jti` antigo
+   * fica aceito por alguns segundos, para as requisições já em voo (card #78).
    */
   async refresh(currentUser: AuthenticatedUser) {
-    await this.sessions.revoke(currentUser.jti, currentUser.exp, "troca_de_escopo");
-    return this.emitirSessao({
-      sub: currentUser.sub,
-      email: currentUser.email,
-      role: currentUser.role,
-      clienteId: currentUser.clienteId,
-      lojaId: currentUser.lojaId,
-      perfilId: currentUser.perfilId ?? null,
-      scoped: currentUser.scoped ?? false,
-    });
+    const tolerancia = SessionRevocationService.TOLERANCIA_ROTACAO_SEGUNDOS;
+    await this.sessions.revoke(currentUser.jti, currentUser.exp, "troca_de_escopo", tolerancia);
+    return this.emitirSessao(
+      {
+        sub: currentUser.sub,
+        email: currentUser.email,
+        role: currentUser.role,
+        clienteId: currentUser.clienteId,
+        lojaId: currentUser.lojaId,
+        perfilId: currentUser.perfilId ?? null,
+        scoped: currentUser.scoped ?? false,
+      },
+      {},
+      { motivoAnterior: "troca_de_escopo", toleranciaAnterior: tolerancia },
+    );
   }
 
   async trocarSenha(currentUser: AuthenticatedUser, senhaAtual: string, novaSenha: string) {
@@ -253,11 +263,18 @@ export class AuthService {
       scoped: boolean;
     },
     extras: { precisaTrocarSenha?: boolean } = {},
+    anterior: { motivoAnterior?: MotivoRevogacao; toleranciaAnterior?: number } = {},
   ) {
     const jti = randomUUID();
     const accessToken = this.jwt.sign({ ...payload, jti }, { expiresIn: TOKEN_TTL });
     const { exp } = this.jwt.decode(accessToken) as { exp: number };
-    await this.sessions.registrarSessaoAtiva(payload.sub, jti, exp);
+    await this.sessions.registrarSessaoAtiva(
+      payload.sub,
+      jti,
+      exp,
+      anterior.motivoAnterior,
+      anterior.toleranciaAnterior,
+    );
     return {
       accessToken,
       user: { ...payload, jti, ...extras },

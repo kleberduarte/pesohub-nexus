@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
@@ -10,10 +10,8 @@ import {
   FormatoImpressaoRepository,
 } from "../../../domain/repositories/formato-impressao.repository";
 import { PrismaService } from "../../../infrastructure/database/prisma.service";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("formatos-impressao")
-@UseGuards(JwtAuthGuard)
 @Controller("formatos-impressao")
 export class FormatosImpressaoController {
   constructor(

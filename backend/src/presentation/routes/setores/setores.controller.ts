@@ -1,13 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Patch, Post, Req} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { CreateSetorDto } from "../../../application/dtos/create-setor.dto";
 import { UpdateSetorDto } from "../../../application/dtos/update-setor.dto";
 import { SETOR_REPOSITORY, SetorRepository } from "../../../domain/repositories/setor.repository";
-import { JwtAuthGuard } from "../../middleware/jwt-auth.guard";
 
 @ApiTags("setores")
-@UseGuards(JwtAuthGuard)
 @Controller("setores")
 export class SetoresController {
   constructor(@Inject(SETOR_REPOSITORY) private readonly setores: SetorRepository) {}

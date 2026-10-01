@@ -78,7 +78,11 @@ enum StatusFatura {
 
 model Cliente {
   id                    String                 @id @default(cuid())
-  accessToken           String                 @unique @default(cuid())
+  /// Segredo do link público /acesso/:token. NÃO tem default: cuid() é um
+  /// contador monotônico com fingerprint de máquina, adivinhável o bastante
+  /// para enumerar empresas por um endpoint público. Quem cria um Cliente é
+  /// obrigado a gerar o valor com randomBytes(32).toString("base64url").
+  accessToken           String                 @unique
   nome                  String
   logoUrl               String?
   corPrimaria           String?
@@ -241,10 +245,17 @@ model Device {
   /// Quando o mapa acima foi lido. `null` = nunca lido. Um mapa velho é melhor
   /// que nenhum, mas a tela precisa dizer a idade em vez de fingir certeza.
   slotsEtiquetaLidosEm DateTime?
+  /// MAC da placa de rede, lido pelo Agent Local na tabela ARP. É o que
+  /// identifica a balança quando o DHCP troca o IP ao religar (card #79).
+  mac                  String?
+  /// Última vez que o IP foi corrigido sozinho pelo MAC. A tela mostra, para
+  /// ninguém estranhar um IP que mudou sem ter sido editado.
+  ipAtualizadoEm       DateTime?
   createdAt            DateTime     @default(now())
   updatedAt            DateTime     @updatedAt
 
   @@unique([lojaId, ip])
+  @@unique([lojaId, mac])
   @@index([clienteId])
   @@index([agentId])
   @@index([grupoId])

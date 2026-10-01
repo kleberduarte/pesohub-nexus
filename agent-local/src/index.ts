@@ -9,6 +9,7 @@ import {
   ScaleSyncPayload,
   sendProductsToScale,
 } from "./scale-client";
+import { resolverMac } from "./mac-resolver";
 
 const BACKEND_URL = process.env.AGENT_BACKEND_URL ?? "http://localhost:3000";
 const AGENT_TOKEN = process.env.AGENT_TOKEN;
@@ -77,6 +78,9 @@ setInterval(() => {
 interface DiscoveredScale {
   ip: string;
   port: number;
+  /** MAC lido do ARP — é o que deixa o backend reconhecer a balança quando o
+   * DHCP troca o IP (card #79). null enquanto não resolvido ou incerto. */
+  mac: string | null;
   lastSeen: number;
 }
 
@@ -90,7 +94,7 @@ function reportDiscovered() {
   }
   if (socket.connected) {
     socket.emit("devices:discovered", {
-      devices: [...discovered.values()].map(({ ip, port }) => ({ ip, port })),
+      devices: [...discovered.values()].map(({ ip, port, mac }) => ({ ip, port, mac })),
     });
   }
 }
@@ -100,11 +104,28 @@ discoverySocket.on("message", (msg, rinfo) => {
   const match = msg.toString("ascii").match(/^UDP\t(\d+)\t/);
   if (!match) return;
   const port = Number(match[1]);
-  const isNew = !discovered.has(rinfo.address);
-  discovered.set(rinfo.address, { ip: rinfo.address, port, lastSeen: Date.now() });
-  if (isNew) console.log(`[discovery] balança encontrada: ${rinfo.address}:${port}`);
+  const anterior = discovered.get(rinfo.address);
+  discovered.set(rinfo.address, { ip: rinfo.address, port, mac: anterior?.mac ?? null, lastSeen: Date.now() });
+  if (!anterior) {
+    console.log(`[discovery] balança encontrada: ${rinfo.address}:${port}`);
+    void identificar(rinfo.address);
+  }
   reportDiscovered();
 });
+
+/** Resolve o MAC de um IP recém-visto e reporta de novo quando descobrir. */
+async function identificar(ip: string) {
+  const mac = await resolverMac(ip);
+  const scale = discovered.get(ip);
+  if (!scale) return;
+  scale.mac = mac;
+  if (mac) {
+    console.log(`[discovery] ${ip} identificada pelo MAC ${mac}`);
+  } else {
+    console.warn(`[discovery] não foi possível ler o MAC de ${ip}; o IP dela não será atualizado automaticamente`);
+  }
+  reportDiscovered();
+}
 discoverySocket.on("error", (err) => console.error(`[discovery] erro: ${err.message}`));
 discoverySocket.bind(DISCOVERY_PORT, () => {
   console.log(`[discovery] escutando broadcasts de balança em 0.0.0.0:${DISCOVERY_PORT}`);
