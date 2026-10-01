@@ -68,6 +68,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [user, setUser] = useState<DecodedUser | null>(null);
   const [lojas, setLojas] = useState<Loja[]>([]);
   const [switchingLoja, setSwitchingLoja] = useState(false);
+  // Não pinta a sidebar antes de saber se há sessão — sem isso, quem não
+  // está logado vê o dashboard vazio por um instante antes do redirect.
+  // É só polimento de UI: os dados já vêm protegidos pelo 401 da API.
+  const [checking, setChecking] = useState(true);
 
   useLayoutEffect(() => {
     const cached = readCachedBranding();
@@ -82,6 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace("/login");
       return;
     }
+    setChecking(false);
     // Confirma a sessão com o backend (fonte de verdade — o cache local de
     // usuário é só para gating de UI otimista). Se o cookie de sessão
     // estiver ausente/expirado, o interceptor 401 do request() redireciona.
@@ -140,6 +145,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     clearCurrentUser();
     router.push("/login");
   };
+
+  if (checking) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex w-full">

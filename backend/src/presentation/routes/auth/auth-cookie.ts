@@ -5,17 +5,26 @@ const MAX_AGE_MS = 15 * 60 * 1000; // mantém o mesmo TTL do accessToken (15m)
 
 function cookieOptions(): CookieOptions {
   const isProduction = process.env.NODE_ENV === "production";
+  // Domínio raiz compartilhado por app.* (Vercel) e api.* (Railway), ex.:
+  // ".pesohub.com.br". Com ele, frontend e backend são o mesmo *site*: o
+  // cookie volta a poder ser Lax e passa a chegar também na Vercel (o que
+  // permite gating de sessão no middleware.ts do frontend). Atenção: o
+  // cookie vale para TODO subdomínio desse domínio — não hospede conteúdo
+  // de terceiros sob ele.
+  const domain = process.env.COOKIE_DOMAIN?.trim() || undefined;
   return {
     httpOnly: true,
     secure: isProduction,
-    // SameSite=None é necessário enquanto frontend (Vercel) e backend (Railway)
-    // vivem em domínios diferentes — "Strict"/"Lax" fariam o browser descartar
-    // o cookie em toda chamada cross-site. Exige Secure=true (só em produção,
-    // que sempre roda atrás de HTTPS). A proteção contra CSRF que o SameSite
-    // dava passa a ser feita pelo allowlist de Origin em main.ts. Quando
-    // app.* e api.* passarem a viver sob o mesmo domínio raiz, "strict" volta
-    // a ser seguro e pode substituir isso.
-    sameSite: isProduction ? "none" : "strict",
+    // Sem COOKIE_DOMAIN em produção, frontend e backend ainda vivem em
+    // domínios diferentes e SameSite=None é obrigatório — "Strict"/"Lax"
+    // fariam o browser descartar o cookie em toda chamada cross-site (a
+    // proteção contra CSRF fica só com o allowlist de Origin em main.ts).
+    // Com COOKIE_DOMAIN, Lax: bloqueia POST/fetch vindos de outro site (o
+    // vetor de CSRF) mas deixa passar a navegação GET de nível superior —
+    // com Strict, quem abrisse um link do dashboard vindo de e-mail/WhatsApp
+    // chegaria sem cookie e cairia no /login mesmo estando logado.
+    sameSite: isProduction && !domain ? "none" : isProduction ? "lax" : "strict",
+    domain,
     path: "/",
     maxAge: MAX_AGE_MS,
   };
